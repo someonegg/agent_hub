@@ -197,6 +197,10 @@ export const namespaceKeys = {
     "viewOriginalDiff",
   ],
   errors: [
+    "messageNotSubmitted",
+    "interactionNotSupported",
+    "interactionFailed",
+    "operationResultUnknown",
     "requestDetails",
     "requestDisconnected",
     "requestFailed",

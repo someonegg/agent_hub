@@ -311,6 +311,7 @@ async function capture(
     hasMore: false,
   };
   const sentMessages = [];
+  let rejectNextMessage = false;
   const uploadedNames = [];
   let historyDeleted = false;
   let deletionAttempts = 0;
@@ -367,6 +368,15 @@ async function capture(
       });
     }
     if (path.endsWith("/messages") && route.request().method() === "POST") {
+      if (rejectNextMessage) {
+        rejectNextMessage = false;
+        return route.fulfill({
+          status: 409,
+          json: {
+            error: { code: "message_not_submitted", message: "Untranslated server diagnostic" },
+          },
+        });
+      }
       sentMessages.push(route.request().postDataJSON().message);
       return route.fulfill({ status: 204 });
     }
@@ -514,6 +524,20 @@ async function capture(
     await demo.waitForFunction(
       () => document.querySelector(".interaction-send")?.getAttribute("aria-disabled") !== "true",
     );
+    rejectNextMessage = true;
+    await demo.getByRole("button", { name: label("Send"), exact: true }).click();
+    const alert = demo.getByRole("alert");
+    await alert
+      .getByText(label("Could not submit. Please check the terminal."), { exact: true })
+      .waitFor();
+    if ((await alert.innerText()).includes("Untranslated server diagnostic"))
+      throw new Error("Submission failure leaked server diagnostics");
+    if ((await composer.inputValue()) !== "before replace after")
+      throw new Error("Submission failure lost the draft");
+    await demo.getByRole("button", { name: label("Remove photo.png"), exact: true }).waitFor();
+    await demo
+      .getByRole("button", { name: label("Dismiss interaction error"), exact: true })
+      .click();
     const sent = demo.waitForResponse(
       (response) => response.url().endsWith("/messages") && response.request().method() === "POST",
     );

@@ -66,8 +66,7 @@ export function createSessionInteractionRoutes(
       }
       if (operation === "messages") {
         const body = parseMessageBody(await readJsonObject(request));
-        if (body.requireIdle === undefined) await interaction.sendMessage(id, body.message);
-        else await interaction.sendMessage(id, body.message, body.requireIdle);
+        await interaction.sendMessage(id, body.message, body.requireIdle ?? false, true);
         return noContent(response);
       }
       if (operation === "keys") {

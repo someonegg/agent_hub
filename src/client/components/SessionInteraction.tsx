@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
 
 import type { InteractionResponse } from "../../shared/api-contract";
 
+import { ApiClientError } from "../api/client";
 import { useSessionInteraction } from "../state/use-session-interaction";
 import { useTerminalPreview } from "../state/use-terminal-preview";
 import { InteractionRegion } from "./InteractionRegion";
@@ -34,6 +35,9 @@ export function SessionInteraction({
 
   const preview = useTerminalPreview(sessionId, interactionAvailable, previewAutoExpandKey);
 
+  const currentSession = useRef(sessionId);
+  currentSession.current = sessionId;
+
   const sendMessage = async (message: string) => {
     const dismissPreview = /^\/[A-Za-z]+$/.test(message.trimEnd())
       ? undefined
@@ -42,6 +46,12 @@ export function SessionInteraction({
       await controller.sendMessage(message);
     } catch (reason) {
       dismissPreview?.();
+      if (
+        currentSession.current === sessionId &&
+        reason instanceof ApiClientError &&
+        reason.code === "message_not_submitted"
+      )
+        preview.onExpandPreview();
       throw reason;
     }
   };

@@ -118,7 +118,12 @@ it("exposes fresh terminal capture and validates idle input options", async () =
   const message = "first\r\nsecond 🌊";
   for (const requireIdle of [true, false]) {
     expect((await post("messages", { message, requireIdle })).status).toBe(204);
-    expect(interaction.sendMessage).toHaveBeenLastCalledWith(SESSION_ID, message, requireIdle);
+    expect(interaction.sendMessage).toHaveBeenLastCalledWith(
+      SESSION_ID,
+      message,
+      requireIdle,
+      true,
+    );
     expect((await post("keys", { keys: ["enter"], requireIdle })).status).toBe(204);
     expect(interaction.sendKeys).toHaveBeenLastCalledWith(SESSION_ID, ["enter"], requireIdle);
   }
