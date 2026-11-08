@@ -31,7 +31,6 @@ export const messages: Record<keyof typeof english, string> = {
 
   cancel: "取消",
   capturingTerminalPane: "正在捕获终端窗格…",
-  capturing: "正在捕获…",
   changedFiles: "变更文件",
   checkTheCurrentStateBeforeTryingAgain: "重试前请检查当前状态。",
   childSessions: "子会话",
@@ -73,7 +72,7 @@ export const messages: Record<keyof typeof english, string> = {
   dismiss: "关闭提示",
   dismissInteractionError: "关闭交互错误提示",
   dismissSessionCreatedNotification: "关闭会话创建通知",
-  dismissTerminalPreviewError: "关闭终端预览错误提示",
+  dismissTerminalPreviewError: "关闭终端错误提示",
   dismissUploadError: "关闭上传错误提示",
   down: "向下",
   preparingFile: "正在准备文件…",
@@ -103,7 +102,7 @@ export const messages: Record<keyof typeof english, string> = {
   idle: "空闲",
 
   interrupt: "中断",
-  invalidTerminalPreviewUpdateReconnecting: "终端预览更新无效，正在重新连接",
+  invalidTerminalPreviewUpdateReconnecting: "终端更新无效，正在重新连接",
 
   jumpToBottom: "跳到底部",
 
@@ -142,7 +141,7 @@ export const messages: Record<keyof typeof english, string> = {
   planContentUnavailable: "计划内容不可用。",
   previewUnavailable: "预览不可用",
   previewUnavailableDownloadTheFileBelow: "预览不可用，请在下方下载文件。",
-  previewUpdatesStopped: "预览更新已停止。",
+  previewUpdatesStopped: "终端更新已停止。",
   projectDirectory: "项目目录 ·",
   selectProjectDirectory: "选择项目目录",
   otherProjectDirectory: "其他目录…",
@@ -168,7 +167,7 @@ export const messages: Record<keyof typeof english, string> = {
   retry: "重试",
 
   retryOpeningSession: "重新打开会话",
-  retryPreview: "重试预览",
+  retryPreview: "重试终端",
   retryStatusCheck: "重试状态检查",
   right: "向右",
   scrollableCodeBlock: "可滚动代码块",
@@ -197,11 +196,13 @@ export const messages: Record<keyof typeof english, string> = {
   startingCodex: "正在启动智能体",
   superseded: "已被替代",
   takePhoto: "拍照",
+  expandComposer: "展开",
+  collapseComposer: "收起",
   terminalPreview: "终端预览",
-  terminalPreviewConnectionClosed: "终端预览连接已关闭",
-  terminalPreviewConnectionFailed: "终端预览连接失败",
-  terminalPreviewContent: "终端预览内容",
-  terminalPreviewUnavailable: "终端预览不可用。",
+  terminalPreviewConnectionClosed: "终端连接已关闭",
+  terminalPreviewConnectionFailed: "终端连接失败",
+  terminalPreviewContent: "终端内容",
+  terminalPreviewUnavailable: "终端不可用。",
   terminalControls: "终端控制",
   terminalOutputExceededThePreviewLimitTheBeginningWasOmitted:
     "终端输出超过预览限制，开头内容已省略。",

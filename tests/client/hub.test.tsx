@@ -192,15 +192,14 @@ describe("unified hub", () => {
       if (dismiss) {
         expect(window.location.pathname).toBe(`/sessions/${SESSION_ID}`);
         expect(screen.getByRole("heading", { name: "Reader work" })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole("link", { name: "Open session" }));
-        await flush();
+      } else {
+        expect(screen.getByRole("button", { name: /^reader.*1/ })).toHaveAttribute(
+          "aria-expanded",
+          "true",
+        );
+        expect(window.location.pathname).toBe(`/sessions/${CHILD_ID}`);
+        expect(screen.getByRole("heading", { name: "Child trace" })).toBeInTheDocument();
       }
-      expect(screen.getByRole("button", { name: /^reader.*1/ })).toHaveAttribute(
-        "aria-expanded",
-        "true",
-      );
-      expect(window.location.pathname).toBe(`/sessions/${CHILD_ID}`);
-      expect(screen.getByRole("heading", { name: "Child trace" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Open session" })).toBeNull();
     },
   );

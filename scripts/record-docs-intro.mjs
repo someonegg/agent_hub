@@ -220,10 +220,10 @@ async function record(
     await capture(1100);
     stage = 2;
     await demo.getByRole("heading", { name: label("Three focused improvements") }).waitFor();
-    await demo.locator(".interaction-panel").scrollIntoViewIfNeeded();
+    await demo.locator(".interaction-region").scrollIntoViewIfNeeded();
     await demo.locator(".user-input-status.answered").waitFor();
     await demo.locator(".user-input-card").scrollIntoViewIfNeeded();
-    await demo.evaluate(() => window.scrollBy(0, -40));
+    await demo.evaluate(() => document.querySelector(".message-scroll").scrollBy(0, -40));
     await capture(6500);
     if (await demo.getByRole("alert").count()) throw new Error("Demo contains an error alert");
     if (errors.length) throw new Error(errors.join("\n"));

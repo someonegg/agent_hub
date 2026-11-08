@@ -41,7 +41,13 @@ function newRequestId(): string {
 }
 
 export type OperationController = ReturnType<typeof useHubOperation>;
-export function OperationStatus({ controller }: { controller: OperationController }) {
+export function OperationStatus({
+  controller,
+  compact = false,
+}: {
+  controller: OperationController;
+  compact?: boolean;
+}) {
   useTranslation();
   const op = controller.operation;
   const [dismissed, setDismissed] = useState<HubOperation | null>(null);
@@ -58,31 +64,17 @@ export function OperationStatus({ controller }: { controller: OperationControlle
             {t(op.mode === "resume" ? "operationResume" : OPERATION_LABELS[op.type])} ·{" "}
             {t(STATUS_LABELS[op.status])}
           </strong>
-          {op.status === "pending" && op.type === "create" ? (
-            <p>
-              {op.attachCommand
-                ? t("noCodexSessionDetectedYetAttachToTmuxToCheckStartupProgress")
-                : t("startingCodex")}
-            </p>
+          {compact && op.status === "pending" && op.phase ? (
+            <p>{t(PHASE_LABELS[op.phase])}</p>
           ) : null}
-          {op.status === "pending" && op.phase ? <p>{t(PHASE_LABELS[op.phase])}</p> : null}
-          {op.attachCommand ? <AttachCommand command={op.attachCommand} /> : null}
-          {op.status === "unknown" ? (
-            <p>
-              {t("trackingHasStoppedRefreshTheSessionListToCheckTheResult")}{" "}
-              {op.type === "create"
-                ? t("attachToTmuxBeforeTryingAgainCreatingAgainMayStartAnotherSession")
-                : t("checkTheCurrentStateBeforeTryingAgain")}
-            </p>
-          ) : null}
-          {op.error ? (
-            <p>
-              <RequestError error={op.error} />
-            </p>
-          ) : null}
-          <small>
-            {t("operation")} {op.operationId}
-          </small>
+          {compact ? (
+            <details>
+              <summary>{t("requestDetails")}</summary>
+              {renderDetails()}
+            </details>
+          ) : (
+            renderDetails()
+          )}
         </aside>
       ) : null}
       {controller.error ? (
@@ -101,6 +93,40 @@ export function OperationStatus({ controller }: { controller: OperationControlle
       ) : null}
     </>
   );
+  function renderDetails() {
+    if (!op) return null;
+    return (
+      <>
+        {op.status === "pending" && op.type === "create" ? (
+          <p>
+            {op.attachCommand
+              ? t("noCodexSessionDetectedYetAttachToTmuxToCheckStartupProgress")
+              : t("startingCodex")}
+          </p>
+        ) : null}
+        {!compact && op.status === "pending" && op.phase ? (
+          <p>{t(PHASE_LABELS[op.phase])}</p>
+        ) : null}
+        {op.attachCommand ? <AttachCommand command={op.attachCommand} /> : null}
+        {op.status === "unknown" ? (
+          <p>
+            {t("trackingHasStoppedRefreshTheSessionListToCheckTheResult")}{" "}
+            {op.type === "create"
+              ? t("attachToTmuxBeforeTryingAgainCreatingAgainMayStartAnotherSession")
+              : t("checkTheCurrentStateBeforeTryingAgain")}
+          </p>
+        ) : null}
+        {op.error ? (
+          <p>
+            <RequestError error={op.error} />
+          </p>
+        ) : null}
+        <small>
+          {t("operation")} {op.operationId}
+        </small>
+      </>
+    );
+  }
 }
 interface CreateSessionProps {
   agents?: readonly SessionAgent[];

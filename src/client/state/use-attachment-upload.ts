@@ -10,7 +10,7 @@ import type { DraftAttachment } from "./session-drafts";
 
 export function useAttachmentUpload(
   sessionId: string,
-  previewConnected: boolean,
+  interactionAvailable: boolean,
   interactionBusy: boolean,
   addAttachment: (attachment: DraftAttachment) => void,
 ) {
@@ -25,7 +25,7 @@ export function useAttachmentUpload(
     return () => upload.current?.abort();
   }, []);
   const uploadFiles = async (files: File[]) => {
-    if (!files.length || upload.current || interactionBusy || !previewConnected) return;
+    if (!files.length || upload.current || interactionBusy || !interactionAvailable) return;
     setUploadError(null);
     if (files.some((file) => file.size > MAX_UPLOAD_BYTES)) {
       setUploadError(new LocalizedError("filesMustBeAtMost20MiB"));

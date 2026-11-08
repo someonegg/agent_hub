@@ -5,6 +5,10 @@ import { cleanupTempDirectories } from "./helpers/temp-directories.js";
 afterEach(cleanupTempDirectories);
 // Node-only suites do not need the DOM matchers or React renderer.
 if (typeof window !== "undefined") {
+  // jsdom has no scrolling implementation; keep scroll-container interactions observable.
+  HTMLElement.prototype.scrollTo = function (options?: ScrollToOptions | number, y?: number) {
+    this.scrollTop = typeof options === "number" ? (y ?? 0) : (options?.top ?? this.scrollTop);
+  };
   await import("@testing-library/jest-dom/vitest");
   const { cleanup } = await import("@testing-library/react/pure");
   afterEach(() => {

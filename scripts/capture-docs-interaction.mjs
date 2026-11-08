@@ -42,22 +42,204 @@ async function capture(
       localStorage.setItem("ahub.preferences.v1", JSON.stringify({ language: value }));
   }, language);
   const demo = await context.newPage();
-  await demo.route("**/api/v1/capabilities", (route) => route.fulfill({ json: { hosting: true } }));
-  const verifyPageJumps = async () => {
-    await demo.evaluate(
+  const settle = () =>
+    demo.evaluate(
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     );
+
+  await demo.route("**/api/v1/capabilities", (route) => route.fulfill({ json: { hosting: true } }));
+  const verifyPageJumps = async () => {
+    await settle();
     const valid = await demo.evaluate(() => {
       const controls = document.querySelector(".page-jump-controls");
-      const panel = document.querySelector(".interaction-panel");
+      const region = document.querySelector(".message-region");
       return (
-        getComputedStyle(controls).display !== "none" &&
-        controls.getBoundingClientRect().bottom <= panel.getBoundingClientRect().top - 11
+        getComputedStyle(controls).position === "absolute" &&
+        controls.closest(".message-region") !== null &&
+        controls.getBoundingClientRect().bottom <= region.getBoundingClientRect().bottom &&
+        controls.getBoundingClientRect().top >= region.getBoundingClientRect().top &&
+        document.documentElement.scrollHeight <= innerHeight + 1
       );
     });
-    if (!valid) throw new Error("Page jumps hide or overlap the interaction panel");
+    if (!valid)
+      throw new Error("Page jumps must stay within the message region without document scrolling");
+  };
+  const verifyDockBehavior = async () => {
+    const composer = demo.getByRole("textbox", { name: label("Message to agent") });
+    const toggle = demo.getByRole("button", { name: label("Terminal Preview"), exact: true });
+    const draft = await composer.inputValue();
+    const attachments = await demo.locator(".interaction-attachment").count();
+    await demo.getByRole("button", { name: label("Collapse"), exact: true }).click();
+    if (await composer.isVisible()) throw new Error("Collapsed composer is visible");
+    if ((await toggle.getAttribute("aria-expanded")) !== "true")
+      throw new Error("Panel collapse changed preview visibility");
+    await demo.getByRole("button", { name: label("Expand"), exact: true }).click();
+    if (
+      (await composer.inputValue()) !== draft ||
+      (await demo.locator(".interaction-attachment").count()) !== attachments
+    )
+      throw new Error("Panel collapse lost draft or attachments");
+    await demo.getByLabel(label("Terminal content"), { exact: true }).focus();
+    await demo.keyboard.press("Escape");
+    if (!(await toggle.evaluate((element) => document.activeElement === element)))
+      throw new Error("Terminal Escape lost switch focus");
+    await toggle.click();
+    if (!(await toggle.evaluate((element) => document.activeElement === element)))
+      throw new Error("Preview expansion stole switch focus");
+    // Grow the real message flow to exercise message-region ResizeObserver and page jump geometry.
+    await demo.evaluate(() => {
+      const spacer = document.createElement("li");
+      spacer.id = "scroll-verification";
+      spacer.style.height = "1800px";
+      document.querySelector(".timeline").append(spacer);
+    });
+    await settle();
+    await demo.evaluate(() => {
+      const scroll = document.querySelector(".message-scroll");
+      scroll.scrollTo({ top: scroll.scrollHeight, behavior: "instant" });
+    });
+    await settle();
+    await demo.evaluate(() => {
+      document.querySelector("#scroll-verification").style.height = "2000px";
+    });
+    await settle();
+    if (
+      !(await demo.evaluate(() => {
+        const scroll = document.querySelector(".message-scroll");
+        return scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 2;
+      }))
+    )
+      throw new Error("New messages did not follow at the end");
+    await demo.evaluate(() =>
+      document.querySelector(".message-scroll").scrollTo({ top: 600, behavior: "instant" }),
+    );
+    await settle();
+    await demo.evaluate(() => {
+      document.querySelector("#scroll-verification").style.height = "2200px";
+    });
+    await settle();
+    if (
+      Math.abs(
+        (await demo.evaluate(() => document.querySelector(".message-scroll").scrollTop)) - 600,
+      ) > 1
+    )
+      throw new Error("New messages moved the reading position");
+    await demo.getByRole("button", { name: label("Jump to bottom"), exact: true }).click();
+    await demo.waitForFunction(() => {
+      const scroll = document.querySelector(".message-scroll");
+      return scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 2;
+    });
+    const uncovered = await demo.evaluate(
+      () =>
+        document.querySelector(".terminal-preview").getBoundingClientRect().bottom <=
+        document.querySelector(".interaction-region").getBoundingClientRect().top,
+    );
+    if (!uncovered) throw new Error("Dock covers the terminal at End");
+    await demo.getByRole("button", { name: label("Back to top"), exact: true }).click();
+    await demo.waitForFunction(() => document.querySelector(".message-scroll").scrollTop < 2);
+    await demo.evaluate(() => document.querySelector("#scroll-verification").remove());
+    await settle();
+  };
+  const verifyToolbar = async () => {
+    const toggle = demo.getByRole("button", { name: label("Terminal Preview"), exact: true });
+    const expanded = await toggle.getAttribute("aria-expanded");
+    for (const state of ["false", "true"]) {
+      if ((await toggle.getAttribute("aria-expanded")) !== state)
+        await toggle.locator(".terminal-activity").click();
+      await settle();
+      const fits = await demo.locator(".interaction-toolbar").evaluate((toolbar) => {
+        const toggle = toolbar.querySelector(".terminal-preview-toggle");
+        const label = toggle.children[1].getBoundingClientRect();
+        const activity = toggle.querySelector(".terminal-activity")?.getBoundingClientRect();
+        const bounds = toolbar.getBoundingClientRect();
+        return (
+          toolbar.scrollWidth <= toolbar.clientWidth &&
+          [...toolbar.children].every((element) => {
+            const rect = element.getBoundingClientRect();
+            return rect.left >= bounds.left - 1 && rect.right <= bounds.right + 1;
+          }) &&
+          activity !== undefined &&
+          Math.abs(label.top + label.height / 2 - activity.top - activity.height / 2) < 2
+        );
+      });
+      if (!fits)
+        throw new Error(
+          `Terminal toolbar wraps or overflows with expanded=${state} at ${demo.viewportSize().width}px`,
+        );
+    }
+    await demo.keyboard.press("Tab");
+    const buttons = demo.locator(
+      ".interaction-toolbar button, .interaction-actions button, .terminal-key, .session-title-row button",
+    );
+    for (const button of await buttons.all()) {
+      if (!(await button.isVisible()) || !(await button.isEnabled())) continue;
+      await button.focus();
+      if (
+        !(await button.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return (
+            element.matches(":focus-visible") &&
+            parseFloat(style.outlineWidth) === 1 &&
+            parseFloat(style.outlineOffset) < 0
+          );
+        }))
+      )
+        throw new Error("Session button has an inconsistent outer focus ring");
+    }
+    if ((await toggle.getAttribute("aria-expanded")) !== expanded) await toggle.click();
+  };
+  const verifyKeyboardViewport = async () => {
+    await demo.evaluate(() => {
+      const viewport = window.visualViewport;
+      for (const [key, value] of Object.entries({ height: 400, offsetTop: 120 }))
+        Object.defineProperty(viewport, key, { configurable: true, value });
+      viewport.dispatchEvent(new Event("resize"));
+    });
+    const verify = async (top) => {
+      await settle();
+      const aligned = await demo.evaluate((top) => {
+        const shell = document.querySelector(".hub").getBoundingClientRect();
+        const dock = document.querySelector(".interaction-dock").getBoundingClientRect();
+        const messages = document.querySelector(".message-region").getBoundingClientRect();
+        return (
+          Math.abs(shell.top - top) < 1 &&
+          Math.abs(shell.bottom - top - 400) < 1 &&
+          Math.abs(dock.bottom - shell.bottom) < 1 &&
+          messages.bottom <= dock.top + 1
+        );
+      }, top);
+      if (!aligned) throw new Error("Session shell did not follow the keyboard viewport");
+    };
+    await verify(120);
+    await demo.evaluate(() => {
+      Object.defineProperty(window.visualViewport, "offsetTop", { configurable: true, value: 220 });
+      window.visualViewport.dispatchEvent(new Event("scroll"));
+    });
+    await verify(220);
+    await demo.evaluate(() => {
+      delete window.visualViewport.height;
+      delete window.visualViewport.offsetTop;
+      window.visualViewport.dispatchEvent(new Event("resize"));
+    });
+    await settle();
+    const restored = await demo.locator(".hub").evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return Math.abs(rect.top) < 1 && Math.abs(rect.bottom - window.visualViewport.height) < 1;
+    });
+    if (!restored) throw new Error("Session shell did not recover after the keyboard closed");
   };
   const verifyCompactInteraction = async () => {
+    await verifyToolbar();
+    const actionSizes = await demo.locator(".interaction-actions").evaluate((element) => {
+      const send = element.querySelector(".interaction-send").getBoundingClientRect();
+      const attach = element.querySelector(".interaction-attach").getBoundingClientRect();
+      return (
+        Math.abs(send.height - 36) < 1 &&
+        Math.abs(send.top + send.height / 2 - attach.top - attach.height / 2) < 1
+      );
+    });
+    if (!actionSizes)
+      throw new Error("Send must be compact and centered beside the attachment button");
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     const original = await composer.inputValue();
     await composer.fill("One\nTwo\nThree");
@@ -263,18 +445,17 @@ async function capture(
       exact: true,
     });
     if ((await previewToggle.getAttribute("aria-expanded")) !== "true") await previewToggle.click();
-    await demo.getByLabel(label("Terminal Preview content"), { exact: true }).waitFor();
+    await demo.getByLabel(label("Terminal content"), { exact: true }).waitFor();
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     await composer.fill("Suggest the next step.");
     await composer.press("Escape");
     if (
-      (await previewToggle.getAttribute("aria-expanded")) !== "false" ||
+      (await previewToggle.getAttribute("aria-expanded")) !== "true" ||
       !(await composer.evaluate((element) => document.activeElement === element)) ||
       (await composer.inputValue()) !== "Suggest the next step."
     )
-      throw new Error("Composer Escape must collapse preview and preserve draft and focus");
-    await previewToggle.click();
-    await demo.getByLabel(label("Terminal Preview content"), { exact: true }).waitFor();
+      throw new Error("Composer Escape must preserve preview, draft and focus");
+    await demo.getByLabel(label("Terminal content"), { exact: true }).waitFor();
     await demo.evaluate(() => document.fonts.ready);
   }
 
@@ -397,7 +578,7 @@ async function capture(
     if (previewWasExpanded) {
       if ((await previewToggle.getAttribute("aria-expanded")) !== "true")
         await previewToggle.click();
-      await demo.getByLabel(label("Terminal Preview content"), { exact: true }).waitFor();
+      await demo.getByLabel(label("Terminal content"), { exact: true }).waitFor();
     }
     await composer.fill("Suggest the next step.");
   }
@@ -572,7 +753,7 @@ async function capture(
   }
 
   async function assertDesktopCardsVisible() {
-    for (const selector of [".user-input-card", ".interaction-panel"]) {
+    for (const selector of [".user-input-card", ".interaction-region"]) {
       const bounds = await demo.locator(selector).boundingBox();
       if (!bounds || bounds.y < 0 || bounds.y + bounds.height > 1500)
         throw new Error(`${selector} is clipped`);
@@ -599,7 +780,7 @@ async function capture(
     await verifyCompactInteraction();
     await verifyAttachments();
     await prepareDesktopPreview();
-    for (const name of ["Message to agent", "Terminal Preview content"]) {
+    for (const name of ["Message to agent", "Terminal content"]) {
       if (!(await demo.getByLabel(label(name), { exact: true }).isVisible()))
         throw new Error(`${name} is hidden`);
     }
@@ -615,7 +796,8 @@ async function capture(
     if (await demo.getByRole("alert").count()) throw new Error("Desktop error alert");
     await verifyUploadHistory();
     await stageAttachment();
-    await demo.evaluate(() => window.scrollTo(0, 0));
+    await verifyDockBehavior();
+    await demo.evaluate(() => document.querySelector(".message-scroll").scrollTo(0, 0));
     await assertDesktopCardsVisible();
     await demo.screenshot({
       path: output,
@@ -675,13 +857,11 @@ async function capture(
     await verifyCompactInteraction();
     await composer.fill("Suggest the next step.");
     await stageAttachment();
-    await demo.evaluate(
-      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    );
+    await settle();
     await demo
-      .locator(".interaction-panel")
+      .locator(".interaction-region")
       .evaluate((element) => element.scrollIntoView({ block: "center", behavior: "instant" }));
-    const panelBounds = await demo.locator(".interaction-panel").boundingBox();
+    const panelBounds = await demo.locator(".interaction-region").boundingBox();
     if (panelBounds.y < 0 || panelBounds.y + panelBounds.height > 845)
       throw new Error(`Mobile attachment composer is clipped: ${JSON.stringify(panelBounds)}`);
     await verifyPageJumps();
@@ -696,6 +876,8 @@ async function capture(
     await verifyPageJumps();
     if (await demo.evaluate(() => document.documentElement.scrollWidth > innerWidth))
       throw new Error("Narrow composer horizontal overflow");
+    await demo.setViewportSize({ width: 390, height: 844 });
+    await verifyKeyboardViewport();
     await demo.setViewportSize({ width: 390, height: 400 });
     await verifyPageJumps();
     await composer.blur();
@@ -706,14 +888,14 @@ async function capture(
     await demo.getByRole("button", { name: label("Terminal Preview"), exact: true }).click();
     await verifyPageJumps();
     await demo.setViewportSize({ width: 1440, height: 400 });
-    await demo.evaluate(() => window.scrollTo(0, 0));
+    await demo.evaluate(() => document.querySelector(".message-scroll").scrollTo(0, 0));
     await verifyPageJumps();
-    const clearance = await demo
-      .locator(".page-jump-controls")
-      .evaluate((controls) =>
-        Number.parseFloat(controls.style.getPropertyValue("--panel-clearance")),
-      );
-    if (clearance !== 0) throw new Error("Page jumps do not return to the viewport corner");
+    if (
+      await demo
+        .locator(".page-jump-controls")
+        .evaluate((element) => element.style.getPropertyValue("--panel-clearance"))
+    )
+      throw new Error("Page jumps must not compute panel avoidance");
     items = [1, 2].map((ordinal) => ({
       kind: "message",
       id: `plan-${ordinal}`,

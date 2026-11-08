@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { t } from "../i18n";
 
 const EDGE_DISTANCE_PX = 480;
-const PANEL_GAP_PX = 12;
 
 interface ControlVisibility {
   top: boolean;
@@ -14,27 +13,24 @@ interface ControlVisibility {
 const hiddenControls: ControlVisibility = { top: false, bottom: false };
 
 export function PageJumpControls({
-  interactionPanel = null,
+  scrollElement,
+  contentElement,
 }: {
-  interactionPanel?: HTMLElement | null;
+  scrollElement: HTMLElement | null;
+  contentElement?: HTMLElement | null;
 }) {
   useTranslation();
-  const controls = useRef<HTMLElement | null>(null);
   const [visible, setVisible] = useState(hiddenControls);
 
   useEffect(() => {
-    let pageHeight = document.documentElement.scrollHeight;
+    if (!scrollElement) return;
     let animationFrame: number | null = null;
     const updateControls = () => {
-      const panelTop = interactionPanel?.getBoundingClientRect().top;
-      // Allow controls to leave the viewport rather than overlap a tall panel.
-      const panelClearance =
-        panelTop === undefined ? 0 : Math.max(0, window.innerHeight - panelTop + PANEL_GAP_PX);
-      controls.current?.style.setProperty("--panel-clearance", `${panelClearance}px`);
-      const viewportBottom = window.scrollY + window.innerHeight;
       const next = {
-        top: window.scrollY > EDGE_DISTANCE_PX,
-        bottom: pageHeight > window.innerHeight && pageHeight - viewportBottom > EDGE_DISTANCE_PX,
+        top: scrollElement.scrollTop > EDGE_DISTANCE_PX,
+        bottom:
+          scrollElement.scrollHeight - scrollElement.scrollTop - scrollElement.clientHeight >
+          EDGE_DISTANCE_PX,
       };
       setVisible((current) =>
         current.top === next.top && current.bottom === next.bottom ? current : next,
@@ -51,37 +47,29 @@ export function PageJumpControls({
         updateControls();
       });
     };
-    const updatePageGeometry = () => {
-      pageHeight = document.documentElement.scrollHeight;
-      scheduleControlsUpdate();
-    };
 
     updateControls();
     const resizeObserver =
-      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(updatePageGeometry);
-    const onScroll = () => {
-      if (resizeObserver === null) pageHeight = document.documentElement.scrollHeight;
-      scheduleControlsUpdate();
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", updatePageGeometry);
-    resizeObserver?.observe(document.documentElement);
-    if (interactionPanel) resizeObserver?.observe(interactionPanel);
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleControlsUpdate);
+    scrollElement.addEventListener("scroll", scheduleControlsUpdate, { passive: true });
+    window.addEventListener("resize", scheduleControlsUpdate);
+    resizeObserver?.observe(scrollElement);
+    if (contentElement) resizeObserver?.observe(contentElement);
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", updatePageGeometry);
+      scrollElement.removeEventListener("scroll", scheduleControlsUpdate);
+      window.removeEventListener("resize", scheduleControlsUpdate);
       if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
       resizeObserver?.disconnect();
     };
-  }, [interactionPanel]);
+  }, [scrollElement, contentElement]);
 
   const scrollTo = (top: number) => {
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    window.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
+    scrollElement?.scrollTo({ top, behavior: reduceMotion ? "auto" : "smooth" });
   };
 
   return (
-    <nav ref={controls} className="page-jump-controls" aria-label={t("pagePosition")}>
+    <nav className="page-jump-controls" aria-label={t("pagePosition")}>
       <button
         type="button"
         className={`page-jump-control${visible.top ? " is-visible" : ""}`}
@@ -98,7 +86,7 @@ export function PageJumpControls({
         aria-label={t("jumpToBottom")}
         aria-hidden={!visible.bottom}
         tabIndex={visible.bottom ? 0 : -1}
-        onClick={() => scrollTo(document.documentElement.scrollHeight)}
+        onClick={() => scrollTo(scrollElement?.scrollHeight ?? 0)}
       >
         <span aria-hidden="true">↓</span> {t("end")}
       </button>

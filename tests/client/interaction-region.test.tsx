@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InteractionResponse } from "../../src/shared/api-contract";
 import type { UploadAttachment } from "../../src/shared/uploads";
 
-import { InteractionPanel as Panel } from "../../src/client/components/InteractionPanel";
+import { InteractionRegion as Panel } from "../../src/client/components/InteractionRegion";
 import { updatePreferences } from "../../src/client/state/preferences";
 import { SessionDraftProvider } from "../../src/client/state/session-drafts";
 
@@ -53,12 +53,11 @@ function props(value: InteractionResponse | null) {
     previewStopped: false,
     onRetryPreview: vi.fn(),
     previewError: null,
-    onDismissPreviewError: vi.fn(),
     onTogglePreview: vi.fn(),
   };
 }
 
-function InteractionPanel(properties: Omit<ComponentProps<typeof Panel>, "previewExpanded">) {
+function InteractionRegion(properties: Omit<ComponentProps<typeof Panel>, "previewExpanded">) {
   const [expanded, setExpanded] = useState(properties.preview !== null);
   return (
     <Panel
@@ -76,8 +75,8 @@ function InteractionPanel(properties: Omit<ComponentProps<typeof Panel>, "previe
   );
 }
 
-describe("interaction panel", () => {
-  it("focuses the preview only on manual expansion, including before output arrives", async () => {
+describe("interaction region", () => {
+  it("preserves focus on manual and automatic expansion, including before output arrives", async () => {
     const handlers = props(interaction("connected"));
     const user = userEvent.setup();
     const { rerender } = render(<Panel {...handlers} previewExpanded={false} />);
@@ -90,7 +89,8 @@ describe("interaction panel", () => {
     await user.click(toggle);
     rerender(<Panel {...handlers} previewExpanded />);
     const previewBody = document.getElementById(toggle.getAttribute("aria-controls")!);
-    expect(previewBody).toHaveFocus();
+    expect(toggle).toHaveFocus();
+    (previewBody as HTMLElement).focus();
     await user.keyboard("{ArrowUp}");
     expect(handlers.onSendKeys).toHaveBeenCalledWith(["up"]);
     await user.click(composer);
@@ -112,12 +112,12 @@ describe("interaction panel", () => {
     expect(toggle).toHaveFocus();
     await user.click(toggle);
     rerender(<Panel {...handlers} previewExpanded />);
-    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toHaveFocus();
+    expect(toggle).toHaveFocus();
   });
 
-  it("retains the panel and draft through every unavailable state", () => {
+  it("retains the region and draft through every unavailable state", () => {
     const handlers = props(interaction("connected"));
-    const view = render(<InteractionPanel {...handlers} />);
+    const view = render(<InteractionRegion {...handlers} />);
     fireEvent.change(screen.getByRole("textbox", { name: "Message to agent" }), {
       target: { value: "draft" },
     });
@@ -135,19 +135,21 @@ describe("interaction panel", () => {
       { supported: false, attachCommand: null },
     ];
     for (const state of states) {
-      view.rerender(<InteractionPanel {...handlers} interaction={state} />);
+      view.rerender(<InteractionRegion {...handlers} interaction={state} />);
       expect(screen.getByRole("region", { name: "Session interaction" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Terminal Preview" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^(Collapse|Expand)$/ })).not.toBeInTheDocument();
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
       expect(screen.queryByRole("region", { name: "Terminal Preview" })).not.toBeInTheDocument();
     }
     expect(handlers.onSendMessage).not.toHaveBeenCalled();
-    view.rerender(<InteractionPanel {...handlers} />);
+    view.rerender(<InteractionRegion {...handlers} />);
     expect(screen.getByRole("textbox", { name: "Message to agent" })).toBeEnabled();
     expect(screen.getByRole("textbox", { name: "Message to agent" })).toHaveValue("draft");
   });
 
   it("shows connection information without input on initial unbound state", () => {
-    render(<InteractionPanel {...props(interaction("unbound"))} />);
+    render(<InteractionRegion {...props(interaction("unbound"))} />);
     expect(screen.getByRole("region", { name: "Session interaction" })).toBeVisible();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Terminal Preview" })).not.toBeInTheDocument();
@@ -156,7 +158,7 @@ describe("interaction panel", () => {
   it("inserts a newline on Enter, sends on Shift+Enter, and clears after success", async () => {
     const handlers = props(interaction("connected"));
     const user = userEvent.setup();
-    render(<InteractionPanel {...handlers} />);
+    render(<InteractionRegion {...handlers} />);
     const textarea = screen.getByRole("textbox", { name: "Message to agent" });
     expect(textarea).toHaveAttribute("rows", "3");
     expect(document.querySelector(".interaction-heading")).toBeNull();
@@ -173,7 +175,7 @@ describe("interaction panel", () => {
   it("keeps Send focusable but blocks activation for blank input", async () => {
     const handlers = props(interaction("connected"));
     const user = userEvent.setup();
-    render(<InteractionPanel {...handlers} />);
+    render(<InteractionRegion {...handlers} />);
     const textarea = screen.getByRole("textbox", { name: "Message to agent" });
     const send = screen.getByRole("button", { name: "Send" });
     expect(send).toBeEnabled();
@@ -197,7 +199,7 @@ describe("interaction panel", () => {
   it("dispatches interaction controls and keeps the composer editable while actions are busy", async () => {
     const handlers = props(interaction("connected"));
     const user = userEvent.setup();
-    const { rerender } = render(<InteractionPanel {...handlers} />);
+    const { rerender } = render(<InteractionRegion {...handlers} />);
     expect(screen.getByRole("textbox")).toBeEnabled();
     expect(screen.getByRole("button", { name: "Interrupt" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Send" }).parentElement).toHaveClass(
@@ -216,7 +218,7 @@ describe("interaction panel", () => {
     handlers.onSendKeys.mockClear();
     handlers.onSendMessage.mockClear();
     handlers.onExpandPreview.mockClear();
-    rerender(<InteractionPanel {...handlers} interactionBusy />);
+    rerender(<InteractionRegion {...handlers} interactionBusy />);
 
     expect(screen.getByRole("textbox")).toBeEnabled();
     expect(screen.getByRole("textbox")).toHaveValue("draft");
@@ -248,9 +250,9 @@ describe("interaction panel", () => {
         capturedAt: "2026-08-08T12:00:00.000Z",
       },
     };
-    render(<InteractionPanel {...handlers} />);
+    render(<InteractionRegion {...handlers} />);
 
-    const content = screen.getByLabelText("Terminal Preview content");
+    const content = screen.getByLabelText("Terminal content");
     expect(content).toHaveTextContent(
       "plain text<img src=x onerror=alert(1)><script>alert(2)</script>",
     );
@@ -270,7 +272,7 @@ describe("interaction panel", () => {
       },
     };
     const user = userEvent.setup();
-    const { rerender } = render(<InteractionPanel {...handlers} />);
+    const { rerender } = render(<InteractionRegion {...handlers} />);
     const keypad = screen.getByRole("group", { name: "Terminal controls" });
     expect(keypad).toBeInTheDocument();
     expect([...keypad.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
@@ -282,9 +284,9 @@ describe("interaction panel", () => {
       "→",
     ]);
 
-    screen.getByLabelText("Terminal Preview content").focus();
+    screen.getByLabelText("Terminal content").focus();
     await user.tab();
-    expect(screen.getByRole("textbox", { name: "Message to agent" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveFocus();
 
     for (const name of ["Enter", "Up", "BTab", "Left", "Down", "Right"]) {
       await user.click(screen.getByRole("button", { name }));
@@ -298,7 +300,7 @@ describe("interaction panel", () => {
       [["right"]],
     ]);
 
-    rerender(<InteractionPanel {...handlers} interactionBusy />);
+    rerender(<InteractionRegion {...handlers} interactionBusy />);
     handlers.onSendKeys.mockClear();
     handlers.onExpandPreview.mockClear();
     for (const name of ["Enter", "Up", "BTab", "Left", "Down", "Right"]) {
@@ -315,39 +317,37 @@ describe("interaction panel", () => {
 it.each([
   ["/plan", true],
   [" /plan", false],
-])(
-  "sends %s with preview expansion=%s and focuses the expanded preview",
-  async (message, expands) => {
-    const user = userEvent.setup();
-    const handlers = props(interaction("connected"));
-    render(<InteractionPanel {...handlers} />);
-    const textarea = screen.getByRole("textbox");
-    const toggle = screen.getByRole("button", { name: "Terminal Preview" });
-    textarea.focus();
-    fireEvent.change(textarea, { target: { value: message } });
-    await act(async () => fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true }));
-    expect(handlers.onSendMessage).toHaveBeenCalledWith(message);
-    expect(toggle).toHaveAttribute("aria-expanded", String(expands));
-    expect(handlers.onExpandPreview).toHaveBeenCalledTimes(expands ? 1 : 0);
-    if (!expands) {
-      expect(textarea).toHaveFocus();
-      return;
-    }
-    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toHaveFocus();
-    await user.keyboard("{ArrowDown}");
-    expect(handlers.onSendKeys).toHaveBeenCalledWith(["down"]);
-    await user.click(toggle);
-    await user.click(toggle);
-    expect(document.getElementById(toggle.getAttribute("aria-controls")!)).toHaveFocus();
-  },
-);
+])("sends %s with preview expansion=%s and preserves composer focus", async (message, expands) => {
+  const user = userEvent.setup();
+  const handlers = props(interaction("connected"));
+  render(<InteractionRegion {...handlers} />);
+  const textarea = screen.getByRole("textbox");
+  const toggle = screen.getByRole("button", { name: "Terminal Preview" });
+  textarea.focus();
+  fireEvent.change(textarea, { target: { value: message } });
+  await act(async () => fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true }));
+  expect(handlers.onSendMessage).toHaveBeenCalledWith(message);
+  expect(toggle).toHaveAttribute("aria-expanded", String(expands));
+  expect(handlers.onExpandPreview).toHaveBeenCalledTimes(expands ? 1 : 0);
+  if (!expands) {
+    expect(textarea).toHaveFocus();
+    return;
+  }
+  expect(textarea).toHaveFocus();
+  document.getElementById(toggle.getAttribute("aria-controls")!)!.focus();
+  await user.keyboard("{ArrowDown}");
+  expect(handlers.onSendKeys).toHaveBeenCalledWith(["down"]);
+  await user.click(toggle);
+  await user.click(toggle);
+  expect(toggle).toHaveFocus();
+});
 
 it.each([false, true])(
   "protects IME confirmation and key repeat with enterToSend=%s",
   (enterToSend) => {
     updatePreferences({ enterToSend });
     const handlers = props(interaction("connected"));
-    render(<InteractionPanel {...handlers} />);
+    render(<InteractionRegion {...handlers} />);
     const textarea = screen.getByRole("textbox");
     fireEvent.change(textarea, { target: { value: "中文" } });
     for (const options of [{ isComposing: true }, { keyCode: 229 }, { repeat: true }]) {
@@ -369,14 +369,14 @@ it("keeps an expanded preview open and preserves edits made during delivery", as
         resolve = done;
       }),
   );
-  const view = render(<InteractionPanel {...handlers} />);
+  const view = render(<InteractionRegion {...handlers} />);
   const toggle = screen.getByRole("button", { name: "Terminal Preview" });
   fireEvent.click(toggle);
   const textarea = screen.getByRole("textbox");
   textarea.focus();
   fireEvent.change(textarea, { target: { value: "/plan" } });
   fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
-  view.rerender(<InteractionPanel {...handlers} interactionBusy />);
+  view.rerender(<InteractionRegion {...handlers} interactionBusy />);
   expect(textarea).toBeEnabled();
   expect(textarea).toHaveFocus();
   fireEvent.change(textarea, { target: { value: "下一条消息" } });
@@ -393,7 +393,7 @@ it("keeps an expanded preview open and preserves edits made during delivery", as
 it("retains the draft after failed delivery", async () => {
   const handlers = props(interaction("connected"));
   handlers.onSendMessage.mockRejectedValueOnce(new Error("offline"));
-  render(<InteractionPanel {...handlers} />);
+  render(<InteractionRegion {...handlers} />);
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "/plan" } });
   fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await act(async () => {
@@ -405,7 +405,7 @@ it("retains the draft after failed delivery", async () => {
 
 it("preserves the collapsed preview and draft after handoff and disables Handoff while busy or disconnected", async () => {
   const handlers = props(interaction("connected"));
-  const view = render(<InteractionPanel {...handlers} />);
+  const view = render(<InteractionRegion {...handlers} />);
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "draft" } });
   const handoff = screen.getByRole("button", { name: "Handoff" });
   fireEvent.click(handoff);
@@ -423,23 +423,23 @@ it("preserves the collapsed preview and draft after handoff and disables Handoff
     "false",
   );
   handoff.focus();
-  view.rerender(<InteractionPanel {...handlers} interactionBusy />);
+  view.rerender(<InteractionRegion {...handlers} interactionBusy />);
   expect(handoff).toHaveFocus();
   fireEvent.click(handoff);
   expect(handlers.onHandoffPaneBinding).toHaveBeenCalledOnce();
   expect(handoff).toBeEnabled();
   expect(handoff).toHaveAttribute("aria-disabled", "true");
-  view.rerender(<InteractionPanel {...handlers} interaction={interaction("disconnected")} />);
+  view.rerender(<InteractionRegion {...handlers} interaction={interaction("disconnected")} />);
   expect(screen.queryByRole("button", { name: "Handoff" })).not.toBeInTheDocument();
 });
 
 it("shows takeover beside the status, preserves drafts, and navigates to the replacement", () => {
   const handlers = props(interaction("connected"));
   const onNavigate = vi.fn();
-  const view = render(<InteractionPanel {...handlers} onNavigate={onNavigate} />);
+  const view = render(<InteractionRegion {...handlers} onNavigate={onNavigate} />);
   fireEvent.change(screen.getByRole("textbox"), { target: { value: "draft" } });
   view.rerender(
-    <InteractionPanel
+    <InteractionRegion
       {...handlers}
       onNavigate={onNavigate}
       interaction={{
@@ -462,15 +462,15 @@ it("shows takeover beside the status, preserves drafts, and navigates to the rep
   fireEvent.click(link);
   expect(onNavigate).toHaveBeenCalledWith("replacement");
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-  for (const name of ["Send", "Handoff", "BTab", "Terminal Preview"])
+  for (const name of ["Send", "Handoff", "BTab"])
     expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
-  view.rerender(<InteractionPanel {...props(interaction("connected"))} />);
+  view.rerender(<InteractionRegion {...props(interaction("connected"))} />);
   expect(screen.getByRole("textbox")).toHaveValue("draft");
 });
 
 it("shows the takeover even on first load, with no link when its session is missing", () => {
   render(
-    <InteractionPanel
+    <InteractionRegion
       {...props({
         supported: true,
         activity: null,
@@ -494,7 +494,7 @@ it("preserves expanded preview during and after handoff delivery", async () => {
         resolve = done;
       }),
   );
-  render(<InteractionPanel {...handlers} />);
+  render(<InteractionRegion {...handlers} />);
   const toggle = screen.getByRole("button", { name: "Terminal Preview" });
   fireEvent.click(toggle);
   handlers.onTogglePreview.mockClear();
@@ -539,11 +539,11 @@ it("collapses the preview with Escape without interrupting and restores toggle f
   expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveFocus();
 });
 
-it("collapses from the composer while preserving focus and the draft without terminal input", async () => {
+it("ignores composer Escape while preserving preview, focus and draft", async () => {
   const handlers = props(interaction("connected"));
   const user = userEvent.setup();
   render(
-    <InteractionPanel
+    <InteractionRegion
       {...handlers}
       preview={{ revision: "1", content: "output", capturedAt: "now", truncated: false }}
     />,
@@ -554,15 +554,15 @@ it("collapses from the composer while preserving focus and the draft without ter
   await user.keyboard("{Escape}");
   expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveAttribute(
     "aria-expanded",
-    "false",
+    "true",
   );
   expect(input).toHaveFocus();
   expect(input).toHaveValue("unfinished draft");
-  expect(handlers.onTogglePreview).toHaveBeenCalledExactlyOnceWith();
+  expect(handlers.onTogglePreview).not.toHaveBeenCalled();
   expect(handlers.onSendKeys).not.toHaveBeenCalled();
   expect(handlers.onSendMessage).not.toHaveBeenCalled();
   await user.keyboard("{Escape}");
-  expect(handlers.onTogglePreview).toHaveBeenCalledTimes(1);
+  expect(handlers.onTogglePreview).not.toHaveBeenCalled();
 });
 
 it("ignores modified, composing, repeated and already handled composer Escape", () => {
@@ -579,7 +579,7 @@ it("ignores modified, composing, repeated and already handled composer Escape", 
   ]) {
     expect(fireEvent.keyDown(input, { key: "Escape", ...options })).toBe(true);
   }
-  expect(fireEvent.keyDown(input, { key: "Escape", repeat: true })).toBe(false);
+  expect(fireEvent.keyDown(input, { key: "Escape", repeat: true })).toBe(true);
   const handled = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
   handled.preventDefault();
   fireEvent(input, handled);
@@ -672,7 +672,7 @@ describe("composer uploads", () => {
       )
       .mockResolvedValueOnce(uploadResult("/tmp/two.txt"));
     const handlers = props(interaction("connected"));
-    render(<InteractionPanel {...handlers} />);
+    render(<InteractionRegion {...handlers} />);
     const input = screen.getByRole("textbox") as HTMLTextAreaElement;
     fireEvent.change(input, { target: { value: "before replace after" } });
     input.setSelectionRange(7, 14);
@@ -692,7 +692,7 @@ describe("composer uploads", () => {
     for (const name of ["Enter", "Up", "BTab", "Left", "Down", "Right"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toBeEnabled();
-      expect(button).toHaveAttribute("aria-disabled", "true");
+      expect(button).toHaveAttribute("aria-disabled", "false");
       fireEvent.click(button);
     }
     const previewBody = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
@@ -702,7 +702,7 @@ describe("composer uploads", () => {
     fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
     expect(handlers.onSendMessage).not.toHaveBeenCalled();
     expect(handlers.onHandoffPaneBinding).not.toHaveBeenCalled();
-    expect(handlers.onSendKeys).not.toHaveBeenCalled();
+    expect(handlers.onSendKeys).toHaveBeenCalledTimes(12);
     expect(screen.getByText("Uploading 1/2…")).toBeInTheDocument();
     await act(async () => finish(uploadResult("/tmp/space dir/one.png")));
     expect(input.value).toBe("before replace after");
@@ -729,7 +729,7 @@ describe("composer uploads", () => {
       .spyOn(api, "upload")
       .mockResolvedValueOnce(uploadResult("/tmp/one.txt"))
       .mockRejectedValueOnce(new Error("Disk full"));
-    render(<InteractionPanel {...props(interaction("connected"))} />);
+    render(<InteractionRegion {...props(interaction("connected"))} />);
     const input = screen.getByRole("textbox");
     fireEvent.drop(input, {
       dataTransfer: { files: [1, 2, 3].map((n) => new File(["x"], `${n}.txt`)), items: [] },
@@ -751,14 +751,14 @@ describe("composer uploads", () => {
           finish = resolve;
         }),
     );
-    const view = render(<InteractionPanel {...props(interaction("connected"))} />);
+    const view = render(<InteractionRegion {...props(interaction("connected"))} />);
     fireEvent.paste(screen.getByRole("textbox"), {
       clipboardData: { files: [new File(["x"], "a.txt")] },
     });
     const signal = upload.mock.calls[0]![1];
     view.unmount();
     expect(signal.aborted).toBe(true);
-    render(<InteractionPanel {...props(interaction("connected"))} />);
+    render(<InteractionRegion {...props(interaction("connected"))} />);
     await act(async () => finish(uploadResult("/tmp/old.txt")));
     expect(screen.getByRole("textbox")).toHaveValue("");
     upload.mockRestore();
@@ -767,7 +767,7 @@ describe("composer uploads", () => {
   it("leaves ordinary text paste alone and rejects oversized files before uploading", async () => {
     const { api } = await import("../../src/client/api/client");
     const upload = vi.spyOn(api, "upload");
-    render(<InteractionPanel {...props(interaction("connected"))} />);
+    render(<InteractionRegion {...props(interaction("connected"))} />);
     const input = screen.getByRole("textbox");
     expect(
       fireEvent.paste(input, { clipboardData: { files: [], getData: () => "/local/file.txt" } }),
@@ -791,7 +791,7 @@ it("adds a MIME extension to clipboard images and refuses new uploads while busy
         finish = resolve;
       }),
   );
-  render(<InteractionPanel {...props(interaction("connected"))} />);
+  render(<InteractionRegion {...props(interaction("connected"))} />);
   const input = screen.getByRole("textbox");
   const clipboard = {
     clipboardData: { files: [new File(["pixels"], "clipboard", { type: "image/png" })] },
@@ -807,7 +807,7 @@ it("adds a MIME extension to clipboard images and refuses new uploads while busy
 it("rejects folders without uploading", async () => {
   const { api } = await import("../../src/client/api/client");
   const upload = vi.spyOn(api, "upload");
-  render(<InteractionPanel {...props(interaction("connected"))} />);
+  render(<InteractionRegion {...props(interaction("connected"))} />);
   fireEvent.drop(screen.getByRole("textbox"), {
     dataTransfer: {
       files: [],
@@ -831,7 +831,7 @@ it("renders activity idle independently of preview expansion", () => {
 describe("image attachments", () => {
   it("navigates the menu, dismisses it and restores focus", async () => {
     const user = userEvent.setup();
-    render(<InteractionPanel {...props(interaction("connected"))} />);
+    render(<InteractionRegion {...props(interaction("connected"))} />);
     const trigger = screen.getByRole("button", { name: "Attach files" });
     await user.click(trigger);
     expect(screen.queryByRole("menuitem", { name: "Upload history" })).not.toBeInTheDocument();
@@ -858,7 +858,7 @@ describe("image attachments", () => {
     const upload = vi.spyOn(api, "upload").mockResolvedValue(uploadResult("/tmp/photo space.jpg"));
     const user = userEvent.setup();
     const handlers = props(interaction("connected"));
-    render(<InteractionPanel {...handlers} />);
+    render(<InteractionRegion {...handlers} />);
     const composer = screen.getByRole("textbox") as HTMLTextAreaElement;
     const camera = screen.getByLabelText("Take photo") as HTMLInputElement;
     const gallery = screen.getByLabelText("Choose images") as HTMLInputElement;
@@ -908,13 +908,13 @@ describe("image attachments", () => {
     const { api } = await import("../../src/client/api/client");
     const upload = vi.spyOn(api, "upload");
     const handlers = props(interaction("connected"));
-    const view = render(<InteractionPanel {...handlers} />);
+    const view = render(<InteractionRegion {...handlers} />);
     const camera = screen.getByLabelText("Take photo");
-    view.rerender(<InteractionPanel {...handlers} interactionBusy />);
+    view.rerender(<InteractionRegion {...handlers} interactionBusy />);
     expect(screen.getByRole("button", { name: "Attach files" })).not.toBeDisabled();
     fireEvent.change(camera, { target: { files: [new File(["x"], "a.jpg")] } });
     expect(screen.getByRole("alert")).toHaveTextContent("Session is busy");
-    view.rerender(<InteractionPanel {...handlers} interaction={interaction("disconnected")} />);
+    view.rerender(<InteractionRegion {...handlers} interaction={interaction("disconnected")} />);
     fireEvent.change(camera, { target: { files: [new File(["x"], "a.jpg")] } });
     expect(screen.getByRole("alert")).toHaveTextContent("Reconnect");
     expect(upload).not.toHaveBeenCalled();
@@ -924,7 +924,7 @@ describe("image attachments", () => {
   it("shares limits, failures, upload locking and session aborts with other upload sources", async () => {
     const { api } = await import("../../src/client/api/client");
     const upload = vi.spyOn(api, "upload").mockRejectedValueOnce(new Error("Storage unavailable"));
-    const view = render(<InteractionPanel {...props(interaction("connected"))} key="first" />);
+    const view = render(<InteractionRegion {...props(interaction("connected"))} key="first" />);
     const camera = screen.getByLabelText("Take photo");
     const file = new File(["x"], "a.jpg");
     Object.defineProperty(file, "size", { value: 20 * 1024 * 1024 + 1 });
@@ -943,7 +943,7 @@ describe("image attachments", () => {
     fireEvent.change(camera, { target: { files: [new File(["x"], "a.jpg")] } });
     expect(screen.getByRole("button", { name: "Attach files" })).not.toBeDisabled();
     const signal = upload.mock.calls[1]![1];
-    view.rerender(<InteractionPanel {...props(interaction("connected"))} key="second" />);
+    view.rerender(<InteractionRegion {...props(interaction("connected"))} key="second" />);
     expect(signal.aborted).toBe(true);
     await act(async () => finish(uploadResult("/tmp/old.jpg")));
     expect(screen.getByRole("textbox")).toHaveValue("");
@@ -955,7 +955,7 @@ describe("session drafts", () => {
   function session(id: string, handlers = props(interaction("connected"))) {
     return (
       <SessionDraftProvider>
-        <InteractionPanel {...handlers} sessionId={id} key={id} />
+        <InteractionRegion {...handlers} sessionId={id} key={id} />
       </SessionDraftProvider>
     );
   }
@@ -1008,7 +1008,7 @@ describe("session drafts", () => {
 it("previews, removes and releases image resources, falling back for undecodable images", async () => {
   const { api } = await import("../../src/client/api/client");
   const upload = vi.spyOn(api, "upload").mockResolvedValue(uploadResult("/tmp/photo.png"));
-  const view = render(<InteractionPanel {...props(interaction("connected"))} />);
+  const view = render(<InteractionRegion {...props(interaction("connected"))} />);
   fireEvent.change(screen.getByLabelText("Take photo"), {
     target: { files: [new File(["pixels"], "photo.png", { type: "image/png" })] },
   });
@@ -1033,7 +1033,7 @@ it("retains attachment drafts across sessions and failed sends, then sends witho
   handlers.onSendMessage.mockRejectedValueOnce(new Error("Disconnected"));
   const session = (id: string) => (
     <SessionDraftProvider>
-      <InteractionPanel {...handlers} sessionId={id} key={id} />
+      <InteractionRegion {...handlers} sessionId={id} key={id} />
     </SessionDraftProvider>
   );
   const view = render(session("a"));
@@ -1058,7 +1058,7 @@ it("counts attachment paths in the message limit", async () => {
   const { MAX_INTERACTION_MESSAGE_BYTES } = await import("../../src/shared/api-contract");
   const upload = vi.spyOn(api, "upload").mockResolvedValue(uploadResult("/tmp/report.txt"));
   const handlers = props(interaction("connected"));
-  render(<InteractionPanel {...handlers} />);
+  render(<InteractionRegion {...handlers} />);
   fireEvent.change(screen.getByLabelText("Choose files"), {
     target: { files: [new File(["x"], "report.txt")] },
   });
@@ -1091,7 +1091,7 @@ function uploadResult(path: string): UploadAttachment {
 
 it("switches send shortcuts live", async () => {
   const handlers = props(interaction("connected"));
-  render(<InteractionPanel {...handlers} />);
+  render(<InteractionRegion {...handlers} />);
   act(() => updatePreferences({ enterToSend: true }));
   const textarea = screen.getByRole("textbox");
   expect(textarea).toHaveAttribute(
@@ -1118,7 +1118,7 @@ it("keeps the mounted draft and expanded preview when changing language", () => 
   const callbacks = props(interaction("connected"));
   render(
     <SessionDraftProvider>
-      <InteractionPanel {...callbacks} />
+      <InteractionRegion {...callbacks} />
     </SessionDraftProvider>,
   );
   const composer = screen.getByRole("textbox", { name: "Message to agent" });
@@ -1137,3 +1137,102 @@ it("keeps the mounted draft and expanded preview when changing language", () => 
     act(() => updatePreferences({ language: "en" }));
   }
 });
+
+it("collapses the composer independently and retains its draft", async () => {
+  const user = userEvent.setup();
+  render(<Panel {...props(interaction("connected"))} previewExpanded />);
+  await user.type(screen.getByRole("textbox"), "draft survives");
+  await user.click(screen.getByRole("button", { name: "Collapse" }));
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await user.click(screen.getByRole("button", { name: "Expand" }));
+  expect(screen.getByRole("textbox")).toHaveValue("draft survives");
+});
+
+it("follows new terminal output near the end and preserves a scrolled reading position", () => {
+  const handlers = props(interaction("connected"));
+  const snapshot = { revision: "1", content: "output", capturedAt: "now", truncated: false };
+  const view = render(<Panel {...handlers} previewExpanded preview={snapshot} />);
+  const content = screen.getByLabelText("Terminal content");
+  Object.defineProperties(content, {
+    scrollHeight: { configurable: true, value: 1000 },
+    clientHeight: { configurable: true, value: 300 },
+  });
+  content.scrollTop = 675;
+  fireEvent.scroll(content);
+  view.rerender(
+    <Panel
+      {...handlers}
+      previewExpanded
+      preview={{ ...snapshot, revision: "2", content: "new output" }}
+    />,
+  );
+  expect(content.scrollTop).toBe(1000);
+  content.scrollTop = 400;
+  fireEvent.scroll(content);
+  view.rerender(
+    <Panel
+      {...handlers}
+      previewExpanded
+      preview={{ ...snapshot, revision: "3", content: "more output" }}
+    />,
+  );
+  expect(content.scrollTop).toBe(400);
+});
+
+it.each(["idle", "working"] as const)(
+  "toggles the terminal by clicking its %s status",
+  async (activity) => {
+    const user = userEvent.setup();
+    const handlers = props({ ...interaction("connected"), activity } as InteractionResponse);
+    render(<InteractionRegion {...handlers} />);
+    const toggle = screen.getByRole("button", { name: "Terminal Preview" });
+    const status = screen.getByText(activity === "idle" ? "Idle" : "Working");
+    expect(toggle).toContainElement(status);
+    const expanded = toggle.getAttribute("aria-expanded");
+    await user.click(status);
+    expect(toggle).toHaveAttribute("aria-expanded", String(expanded !== "true"));
+    expect(toggle).toHaveFocus();
+  },
+);
+
+it.each(["unbound", "disconnected", "unknown", "superseded", "unavailable"] as const)(
+  "preserves %s connection reason alongside old operation errors",
+  (state) => {
+    const value: InteractionResponse =
+      state === "unavailable"
+        ? { supported: false, attachCommand: null }
+        : {
+            supported: true,
+            state,
+            activity: null,
+            supersededBySessionId: null,
+            attachCommand: null,
+          };
+    render(
+      <Panel
+        {...props(value)}
+        error="old send failure"
+        previewError="old stream failure"
+        previewExpanded
+      />,
+    );
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Terminal Preview" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Error")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("old send failure");
+    expect(screen.queryByText("old stream failure")).not.toBeInTheDocument();
+    expect(document.querySelector(".interaction-status-warning")).toHaveTextContent(
+      {
+        unbound: "Unbound",
+        disconnected: "Disconnected",
+        unknown: "Connection unknown",
+        superseded: "Superseded",
+        unavailable: "Unavailable",
+      }[state],
+    );
+  },
+);

@@ -47,6 +47,22 @@ describe("infinite scroll sentinel", () => {
     expect(onLoadMore).toHaveBeenCalledTimes(2);
   });
 
+  it("observes pagination within the message scroll region", () => {
+    installIntersectionObserver();
+    const view = render(
+      <div className="message-scroll">
+        <InfiniteScrollSentinel
+          enabled
+          triggerKey="nested"
+          loading={false}
+          loadingLabel="Loading"
+          onLoadMore={vi.fn()}
+        />
+      </div>,
+    );
+    expect(latestObserverOptions()?.root).toBe(view.container.firstChild);
+  });
+
   it("does not duplicate a cursor during StrictMode effect replay", () => {
     installIntersectionObserver();
     const onLoadMore = vi.fn();

@@ -35,7 +35,7 @@ export function InfiniteScrollSentinel({
         callback.current();
       },
       {
-        root: null,
+        root: element.current.closest(".message-scroll"),
         rootMargin: "0px 0px 300px 0px",
         threshold: 0,
       },

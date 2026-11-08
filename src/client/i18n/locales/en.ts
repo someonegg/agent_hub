@@ -30,7 +30,6 @@ export const messages = {
 
   cancel: "Cancel",
   capturingTerminalPane: "Capturing terminal pane…",
-  capturing: "Capturing…",
   changedFiles: "Changed files",
   checkTheCurrentStateBeforeTryingAgain: "Check the current state before trying again.",
   childSessions: "Child sessions",
@@ -74,7 +73,7 @@ export const messages = {
   dismiss: "Dismiss",
   dismissInteractionError: "Dismiss interaction error",
   dismissSessionCreatedNotification: "Dismiss session created notification",
-  dismissTerminalPreviewError: "Dismiss terminal preview error",
+  dismissTerminalPreviewError: "Dismiss terminal error",
   dismissUploadError: "Dismiss upload error",
   down: "Down",
   preparingFile: "Preparing file…",
@@ -105,7 +104,7 @@ export const messages = {
   idle: "Idle",
 
   interrupt: "Interrupt",
-  invalidTerminalPreviewUpdateReconnecting: "Invalid terminal preview update; reconnecting",
+  invalidTerminalPreviewUpdateReconnecting: "Invalid terminal update; reconnecting",
 
   jumpToBottom: "Jump to bottom",
 
@@ -144,7 +143,7 @@ export const messages = {
   planContentUnavailable: "Plan content unavailable.",
   previewUnavailable: "Preview unavailable",
   previewUnavailableDownloadTheFileBelow: "Preview unavailable. Download the file below.",
-  previewUpdatesStopped: "Preview updates stopped.",
+  previewUpdatesStopped: "Terminal updates stopped.",
   projectDirectory: "Project Directory ·",
   selectProjectDirectory: "Select a project directory",
   otherProjectDirectory: "Other directory…",
@@ -170,7 +169,7 @@ export const messages = {
   retry: "Retry",
 
   retryOpeningSession: "Retry opening session",
-  retryPreview: "Retry preview",
+  retryPreview: "Retry terminal",
   retryStatusCheck: "Retry status check",
   right: "Right",
   scrollableCodeBlock: "Scrollable code block",
@@ -199,11 +198,13 @@ export const messages = {
   startingCodex: "Starting agent",
   superseded: "Superseded",
   takePhoto: "Take photo",
+  expandComposer: "Expand",
+  collapseComposer: "Collapse",
   terminalPreview: "Terminal Preview",
-  terminalPreviewConnectionClosed: "Terminal Preview connection closed",
-  terminalPreviewConnectionFailed: "Terminal Preview connection failed",
-  terminalPreviewContent: "Terminal Preview content",
-  terminalPreviewUnavailable: "Terminal Preview unavailable.",
+  terminalPreviewConnectionClosed: "Terminal connection closed",
+  terminalPreviewConnectionFailed: "Terminal connection failed",
+  terminalPreviewContent: "Terminal content",
+  terminalPreviewUnavailable: "Terminal unavailable.",
   terminalControls: "Terminal controls",
   terminalOutputExceededThePreviewLimitTheBeginningWasOmitted:
     "Terminal output exceeded the preview limit; the beginning was omitted.",

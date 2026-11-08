@@ -79,3 +79,26 @@ describe("session interaction state", () => {
     expect(result.current.error).toBeNull();
   });
 });
+
+it("serializes terminal writes without clearing or replacing composer errors", async () => {
+  vi.spyOn(api, "sendMessage").mockRejectedValue(new Error("send failed"));
+  const pending = deferred();
+  vi.spyOn(api, "sendKeys").mockReturnValue(pending.promise);
+  const { result } = renderHook(() => useSessionInteraction("a"));
+  await act(async () => {
+    await result.current.sendMessage("hello").catch(() => undefined);
+  });
+  let write!: Promise<void>;
+  act(() => {
+    write = result.current.sendTerminalKeys(["up"]);
+  });
+  const failure = write.catch(() => undefined);
+  await expect(result.current.sendMessage("again")).rejects.toThrow("already in progress");
+  expect(result.current.error).toBe("send failed");
+  await act(async () => {
+    pending.reject(new Error("key failed"));
+    await failure;
+  });
+  expect(result.current.error).toBe("send failed");
+  expect(result.current.interactionBusy).toBe(false);
+});
