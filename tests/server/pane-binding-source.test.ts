@@ -297,7 +297,7 @@ it("keeps the accepted duplicate, ignores its competitors' claims, and fully loa
   ).toHaveLength(2);
 });
 
-it("accumulates valid V1 project backups and rebuilds the same grouping without filesystem lookup", async () => {
+it("accumulates valid V3 project backups and rebuilds the same grouping without filesystem lookup", async () => {
   const agent = await createTempDirectory("project-backup-");
   await mkdir(join(agent, "sessions"));
   const file = join(agent, "sessions/rollout-project.jsonl");

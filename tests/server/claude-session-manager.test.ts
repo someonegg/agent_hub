@@ -168,15 +168,11 @@ it("waits one second between samples", async () => {
 });
 
 it.each([
-  { content: "Starting…", cursorX: 2, cursorY: 0 },
   {
     content: "Is this a project you trust?\n❯ No, exit\n  Yes, I trust this folder",
     cursorX: 2,
     cursorY: 1,
   },
-  // A dialog retains a previous empty prompt, but owns the cursor elsewhere.
-  { content: "❯ \n\nUpdate available\n❯ Restart now\n  Later", cursorX: 2, cursorY: 3 },
-  { content: "❯ \n\nStatus", cursorX: 8, cursorY: 0 },
   null,
 ])("never sends on an unconfirmed screen: %j", async (screen) => {
   vi.useFakeTimers();

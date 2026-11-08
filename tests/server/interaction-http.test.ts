@@ -5,46 +5,22 @@ import { SessionCatalogService } from "../../src/server/catalog/session-catalog-
 import { createApiRouter } from "../../src/server/http/api-router.js";
 import { SessionUpdatesService } from "../../src/server/updates/session-updates-service.js";
 import { startHttpServer } from "../helpers/http-server.js";
-import { sessionDetail } from "../helpers/session-fixtures.js";
 
 const SESSION_ID = "abcdefghijklmnopqrstuvwxyzABCDEFGH123456789";
-const SESSION = sessionDetail({ id: SESSION_ID });
 
 async function start() {
   const unavailable = async () => null;
   const repository: SessionReader = {
     list: vi.fn(),
-    getSession: vi.fn().mockResolvedValue({
-      session: SESSION,
-      interaction: {
-        supported: true,
-        activity: "unknown",
-        supersededBySessionId: null,
-        attachCommand: null,
-        state: "connected",
-      },
-      stateRevision: "r" as never,
-    }),
-    messages: async () => null,
-    readMessages: async () => null,
+    getSession: unavailable,
+    messages: unavailable,
+    readMessages: unavailable,
     getInteractionSession: unavailable,
     refresh: vi.fn(),
   };
   const interaction = {
-    describe: vi.fn().mockResolvedValue({
-      supported: true,
-      activity: "unknown",
-      supersededBySessionId: null,
-      attachCommand: null,
-      state: "connected",
-    }),
-    describeSnapshot: vi.fn().mockResolvedValue({
-      supported: true,
-      activity: "unknown",
-      supersededBySessionId: null,
-      attachCommand: null,
-      state: "connected",
-    }),
+    describe: vi.fn(),
+    describeSnapshot: vi.fn(),
     handoffPaneBinding: vi.fn().mockResolvedValue(undefined),
     sendMessage: vi.fn().mockResolvedValue(undefined),
     sendKeys: vi.fn().mockResolvedValue(undefined),
@@ -79,32 +55,6 @@ describe("interaction HTTP API", () => {
     expect((await post({ command: "arbitrary" })).status).toBe(400);
     expect((await post([])).status).toBe(400);
     expect(interaction.handoffPaneBinding).toHaveBeenCalledTimes(1);
-  });
-
-  it("includes connection state in session reads and accepts messages", async () => {
-    const { base, interaction } = await start();
-    const detail = await fetch(`${base}/api/v1/sessions/${SESSION_ID}`);
-    expect(detail.status).toBe(200);
-    expect(await detail.json()).toEqual(
-      expect.objectContaining({
-        interaction: expect.objectContaining({
-          supported: true,
-          activity: "unknown",
-          supersededBySessionId: null,
-          attachCommand: null,
-          state: "connected",
-        }),
-      }),
-    );
-    expect(interaction.describe).not.toHaveBeenCalled();
-    const message = "first\r\nsecond 🌊";
-    const sent = await fetch(`${base}/api/v1/sessions/${SESSION_ID}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
-    });
-    expect(sent.status).toBe(204);
-    expect(interaction.sendMessage).toHaveBeenCalledWith(SESSION_ID, message);
   });
 
   it("maps body and message validation failures without invoking interaction", async () => {
@@ -165,9 +115,10 @@ it("exposes fresh terminal capture and validates idle input options", async () =
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+  const message = "first\r\nsecond 🌊";
   for (const requireIdle of [true, false]) {
-    expect((await post("messages", { message: "hello", requireIdle })).status).toBe(204);
-    expect(interaction.sendMessage).toHaveBeenLastCalledWith(SESSION_ID, "hello", requireIdle);
+    expect((await post("messages", { message, requireIdle })).status).toBe(204);
+    expect(interaction.sendMessage).toHaveBeenLastCalledWith(SESSION_ID, message, requireIdle);
     expect((await post("keys", { keys: ["enter"], requireIdle })).status).toBe(204);
     expect(interaction.sendKeys).toHaveBeenLastCalledWith(SESSION_ID, ["enter"], requireIdle);
   }

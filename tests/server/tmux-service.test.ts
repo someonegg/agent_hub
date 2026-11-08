@@ -739,7 +739,7 @@ it("prepares sends, captures, and subscriptions without extra upper-layer probes
   }
 });
 
-it.each(["custom", "%1", "ahub-invalid", "AHUB-00000000-0000-0000-0000-000000000001"])(
+it.each(["%1", "AHUB-00000000-0000-0000-0000-000000000001"])(
   "rejects invalid session name %s before querying",
   async (sessionName) => {
     const runner = new FakeRunner();

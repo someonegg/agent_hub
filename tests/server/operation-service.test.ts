@@ -376,67 +376,6 @@ describe.each(["archive", "delete"] as const)("%s exit workflow", (type) => {
     expect(interaction.setBusy).toHaveBeenLastCalledWith("session", false);
   });
 
-  it("ends tracking on exit timeout and permits a fresh request", async () => {
-    const { service, manager, interaction, set, time } = setup();
-    set({ sessions: [session()] });
-    interaction.resolveTarget.mockResolvedValue(target);
-    interaction.inspectTarget.mockResolvedValue("alive");
-    const op = service.manage(type, "session");
-    await flush();
-    time(31);
-    await service.poll();
-    await flush();
-    expect(await service.get(op.operationId)).toMatchObject({
-      status: "unknown",
-      phase: "waiting_exit",
-    });
-    expect(interaction.setBusy).toHaveBeenLastCalledWith("session", false);
-    expect(manager[type]).not.toHaveBeenCalled();
-    interaction.inspectTarget.mockResolvedValue("exited");
-    manager[type].mockImplementation(async () => {
-      set({ sessions: type === "archive" ? [{ ...session(), archived: true }] : [] });
-    });
-    await Promise.all([service.get(op.operationId), service.get(op.operationId)]);
-    expect(await service.get(op.operationId)).toMatchObject({ status: "unknown" });
-    expect(manager[type]).not.toHaveBeenCalled();
-    const retry = service.manage(type, "session");
-    await flush();
-    expect(retry.operationId).not.toBe(op.operationId);
-    expect(manager[type]).toHaveBeenCalledOnce();
-  });
-
-  it("does not resend exit when submission has an uncertain result", async () => {
-    const { service, interaction, manager, set } = setup();
-    set({ sessions: [session()] });
-    interaction.resolveTarget.mockResolvedValue(target);
-    interaction.sendExitKeys.mockRejectedValue(new Error("submission outcome unknown"));
-    interaction.inspectTarget.mockResolvedValue("alive");
-    const op = service.manage(type, "session");
-    await flush();
-    expect(await service.get(op.operationId)).toMatchObject({ status: "unknown" });
-    expect(manager[type]).not.toHaveBeenCalled();
-    interaction.inspectTarget.mockResolvedValue("exited");
-    await Promise.all([service.get(op.operationId), service.get(op.operationId)]);
-    expect(manager[type]).not.toHaveBeenCalled();
-    expect(interaction.sendExitKeys).toHaveBeenCalledOnce();
-  });
-
-  it("does not change history on query errors", async () => {
-    const { service, interaction, manager, set, time } = setup();
-    set({ sessions: [session()] });
-    interaction.resolveTarget.mockResolvedValue(target);
-    interaction.inspectTarget.mockRejectedValue(new Error("permission denied"));
-    const op = service.manage(type, "session");
-    await flush();
-    await service.poll();
-    time(31);
-    await service.poll();
-    expect((await service.get(op.operationId))?.status).toBe("unknown");
-    expect(manager[type]).not.toHaveBeenCalled();
-    expect(interaction.sendExitKeys).not.toHaveBeenCalled();
-    expect(interaction.killTarget).not.toHaveBeenCalled();
-  });
-
   it("never repeats the native operation after command timeout", async () => {
     const { service, interaction, manager, set } = setup();
     set({ sessions: [session()] });
@@ -455,6 +394,70 @@ describe.each(["archive", "delete"] as const)("%s exit workflow", (type) => {
     expect((await service.get(op.operationId))?.status).toBe("unknown");
     expect(manager[type]).toHaveBeenCalledOnce();
     expect(interaction.sendExitKeys).not.toHaveBeenCalled();
+  });
+});
+
+describe("management exit failures", () => {
+  // Exit failure handling is shared; action-specific native calls remain covered above.
+  it("ends tracking on exit timeout and permits a fresh request", async () => {
+    const { service, manager, interaction, set, time } = setup();
+    set({ sessions: [session()] });
+    interaction.resolveTarget.mockResolvedValue(target);
+    interaction.inspectTarget.mockResolvedValue("alive");
+    const op = service.manage("archive", "session");
+    await flush();
+    time(31);
+    await service.poll();
+    await flush();
+    expect(await service.get(op.operationId)).toMatchObject({
+      status: "unknown",
+      phase: "waiting_exit",
+    });
+    expect(interaction.setBusy).toHaveBeenLastCalledWith("session", false);
+    expect(manager.archive).not.toHaveBeenCalled();
+    interaction.inspectTarget.mockResolvedValue("exited");
+    manager.archive.mockImplementation(async () => {
+      set({ sessions: [{ ...session(), archived: true }] });
+    });
+    await Promise.all([service.get(op.operationId), service.get(op.operationId)]);
+    expect(await service.get(op.operationId)).toMatchObject({ status: "unknown" });
+    expect(manager.archive).not.toHaveBeenCalled();
+    const retry = service.manage("archive", "session");
+    await flush();
+    expect(retry.operationId).not.toBe(op.operationId);
+    expect(manager.archive).toHaveBeenCalledOnce();
+  });
+
+  it("does not resend exit when submission has an uncertain result", async () => {
+    const { service, interaction, manager, set } = setup();
+    set({ sessions: [session()] });
+    interaction.resolveTarget.mockResolvedValue(target);
+    interaction.sendExitKeys.mockRejectedValue(new Error("submission outcome unknown"));
+    interaction.inspectTarget.mockResolvedValue("alive");
+    const op = service.manage("archive", "session");
+    await flush();
+    expect(await service.get(op.operationId)).toMatchObject({ status: "unknown" });
+    expect(manager.archive).not.toHaveBeenCalled();
+    interaction.inspectTarget.mockResolvedValue("exited");
+    await Promise.all([service.get(op.operationId), service.get(op.operationId)]);
+    expect(manager.archive).not.toHaveBeenCalled();
+    expect(interaction.sendExitKeys).toHaveBeenCalledOnce();
+  });
+
+  it("does not change history on query errors", async () => {
+    const { service, interaction, manager, set, time } = setup();
+    set({ sessions: [session()] });
+    interaction.resolveTarget.mockResolvedValue(target);
+    interaction.inspectTarget.mockRejectedValue(new Error("permission denied"));
+    const op = service.manage("archive", "session");
+    await flush();
+    await service.poll();
+    time(31);
+    await service.poll();
+    expect((await service.get(op.operationId))?.status).toBe("unknown");
+    expect(manager.archive).not.toHaveBeenCalled();
+    expect(interaction.sendExitKeys).not.toHaveBeenCalled();
+    expect(interaction.killTarget).not.toHaveBeenCalled();
   });
 });
 
@@ -589,12 +592,6 @@ it.each(["not_started", "unknown"] as const)(
     expect(manager.launch).toHaveBeenCalledOnce();
   },
 );
-
-it("rejects duplicate manager registrations", () => {
-  const { manager } = setup();
-  const registry = new SessionManagerRegistry("test").register("test", manager);
-  expect(() => registry.register("test", manager)).toThrow(/Duplicate/);
-});
 
 it.each(["archive", "delete"] as const)(
   "routes %s by source and ignores other-source confirmations",

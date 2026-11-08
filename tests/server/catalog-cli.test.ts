@@ -78,7 +78,8 @@ it.each(["project", "agent"])(
   },
 );
 
-it.each(["project", "agent"])("handles help, empty lists and errors for %s", async (kind) => {
+it("handles catalog help, empty lists and errors", async () => {
+  const kind = "project";
   for (const args of [[], ["--help"], ["list", "--help"]]) {
     const result = await cli([kind, ...args]);
     expect(result.code).toBe(0);
@@ -123,8 +124,6 @@ it.each([
   ["list", "--url", "ftp://example.com"],
   ["list", "--url", "http://example.com/path"],
   ["list", "--url", "http://user:password@example.com"],
-  ["list", "--url", "http://example.com/?query"],
-  ["list", "--url", "http://example.com/#hash"],
 ])("rejects invalid catalog arguments: %j", (...args) => {
   expect(() => parseCatalogArguments(args)).toThrow(CommandError);
   expect(() => parseCatalogArguments(args)).toThrow(

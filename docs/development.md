@@ -48,7 +48,8 @@ npm run format:check
 ```
 
 Use `npm run format` to format files and `npm run lint -- --fix` to fix supported
-lint issues. See the [lint toolchain](../tools/client-lint/README.md) for rules.
+lint issues. Lint also checks server import boundaries; scanner fixtures stay in
+the test suite. See the [lint toolchain](../tools/client-lint/README.md) for rules.
 
 Reader changes should cover ordinal pagination, state/message wakeups, timeout, cancellation,
 and one-time out-of-range recovery in existing tests. Protocol details live in the

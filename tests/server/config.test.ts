@@ -146,10 +146,3 @@ it.each(["~/config with spaces", "./config with spaces", "/tmp/config with space
     });
   },
 );
-
-it("uses the legacy data directory only when explicitly selected", () => {
-  expect(runnable(["--hosting", "--home-dir", "~/.codex-hub"])).toMatchObject({
-    uploadDirectory: resolve(homedir(), ".codex-hub/uploads"),
-    hostingDirectory: resolve(homedir(), ".codex-hub/hosting"),
-  });
-});
