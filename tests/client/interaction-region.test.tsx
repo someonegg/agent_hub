@@ -82,7 +82,7 @@ describe("interaction region", () => {
     const handlers = props(interaction("connected"));
     const user = userEvent.setup();
     const { rerender } = render(<InteractionRegion {...handlers} previewExpanded={false} />);
-    const toggle = screen.getByRole("button", { name: "Terminal Preview" });
+    const toggle = screen.getByRole("button", { name: "Terminal" });
     const composer = screen.getByRole("textbox", { name: "Message to agent" });
     await user.click(composer);
     rerender(<InteractionRegion {...handlers} previewExpanded />);
@@ -139,10 +139,10 @@ describe("interaction region", () => {
     for (const state of states) {
       view.rerender(<StatefulInteractionRegion {...handlers} interaction={state} />);
       expect(screen.getByRole("region", { name: "Session interaction" })).toBeVisible();
-      expect(screen.queryByRole("button", { name: "Terminal Preview" })).not.toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: /^(Collapse|Expand)$/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Terminal" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Message Input" })).not.toBeInTheDocument();
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-      expect(screen.queryByRole("region", { name: "Terminal Preview" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", { name: "Terminal" })).not.toBeInTheDocument();
     }
     expect(handlers.onSendMessage).not.toHaveBeenCalled();
     view.rerender(<StatefulInteractionRegion {...handlers} />);
@@ -160,7 +160,7 @@ describe("interaction region", () => {
       "interaction-primary-actions",
     );
     expect(screen.queryByRole("button", { name: "Esc" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Terminal Preview" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Terminal" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Interrupt" }));
     expect(screen.getByRole("button", { name: "Interrupt" })).toHaveFocus();
     expect(handlers.onSendKeys).toHaveBeenNthCalledWith(1, ["interrupt"]);
@@ -179,9 +179,7 @@ describe("interaction region", () => {
     expect(interrupt).toHaveFocus();
     expect(interrupt).toBeEnabled();
     expect(interrupt).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("button", { name: "Terminal Preview" })).not.toHaveAttribute(
-      "aria-disabled",
-    );
+    expect(screen.getByRole("button", { name: "Terminal" })).not.toHaveAttribute("aria-disabled");
     await user.click(interrupt);
     expect(handlers.onSendKeys).not.toHaveBeenCalled();
     expect(handlers.onSendMessage).not.toHaveBeenCalled();
@@ -219,7 +217,9 @@ describe("interaction region", () => {
 
     screen.getByLabelText("Terminal content").focus();
     await user.tab();
-    expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Message Input" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Terminal" })).toHaveFocus();
 
     for (const name of ["Enter", "Up", "BTab", "Left", "Down", "Right"]) {
       await user.click(screen.getByRole("button", { name }));
@@ -255,7 +255,7 @@ it.each([
   const handlers = props(interaction("connected"));
   render(<StatefulInteractionRegion {...handlers} />);
   const textarea = screen.getByRole("textbox");
-  const toggle = screen.getByRole("button", { name: "Terminal Preview" });
+  const toggle = screen.getByRole("button", { name: "Terminal" });
   textarea.focus();
   fireEvent.change(textarea, { target: { value: message } });
   await act(async () => fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true }));
@@ -285,7 +285,7 @@ it("keeps an expanded preview open and preserves edits made during delivery", as
       }),
   );
   const view = render(<StatefulInteractionRegion {...handlers} />);
-  const toggle = screen.getByRole("button", { name: "Terminal Preview" });
+  const toggle = screen.getByRole("button", { name: "Terminal" });
   fireEvent.click(toggle);
   const textarea = screen.getByRole("textbox");
   textarea.focus();
@@ -320,7 +320,7 @@ it("preserves the collapsed preview and draft after handoff and disables Handoff
     "Hand off this pane’s binding to the active agent session.",
   );
   expect(screen.getByRole("textbox")).toHaveValue("draft");
-  expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveAttribute(
+  expect(screen.getByRole("button", { name: "Terminal" })).toHaveAttribute(
     "aria-expanded",
     "false",
   );
@@ -399,7 +399,7 @@ it("preserves expanded preview during and after handoff delivery", async () => {
       }),
   );
   render(<StatefulInteractionRegion {...handlers} />);
-  const toggle = screen.getByRole("button", { name: "Terminal Preview" });
+  const toggle = screen.getByRole("button", { name: "Terminal" });
   fireEvent.click(toggle);
   handlers.onTogglePreview.mockClear();
   fireEvent.click(screen.getByRole("button", { name: "Handoff" }));
@@ -420,7 +420,7 @@ it("collapses the preview with Escape without interrupting and restores toggle f
   expect(fireEvent.keyDown(body, { key: "Escape" })).toBe(false);
   expect(handlers.onTogglePreview).toHaveBeenCalledExactlyOnceWith();
   expect(handlers.onSendKeys).not.toHaveBeenCalled();
-  expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveFocus();
+  expect(screen.getByRole("button", { name: "Terminal" })).toHaveFocus();
 });
 
 it("ignores composer Escape while preserving preview, focus and draft", async () => {
@@ -436,10 +436,7 @@ it("ignores composer Escape while preserving preview, focus and draft", async ()
   await user.click(input);
   await user.type(input, "unfinished draft");
   await user.keyboard("{Escape}");
-  expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveAttribute(
-    "aria-expanded",
-    "true",
-  );
+  expect(screen.getByRole("button", { name: "Terminal" })).toHaveAttribute("aria-expanded", "true");
   expect(input).toHaveFocus();
   expect(input).toHaveValue("unfinished draft");
   expect(handlers.onTogglePreview).not.toHaveBeenCalled();
@@ -484,7 +481,7 @@ it("preserves editing and unrelated keyboard actions and blocks sends while busy
   }
   expect(fireEvent.keyDown(screen.getByRole("textbox"), { key: "ArrowUp" })).toBe(true);
   expect(
-    fireEvent.keyDown(screen.getByRole("button", { name: "Terminal Preview" }), { key: "Enter" }),
+    fireEvent.keyDown(screen.getByRole("button", { name: "Terminal" }), { key: "Enter" }),
   ).toBe(true);
   expect(fireEvent.keyDown(screen.getByRole("textbox"), { key: "1" })).toBe(true);
   expect(handlers.onSendKeys).not.toHaveBeenCalled();
@@ -534,7 +531,7 @@ describe("composer uploads", () => {
       fireEvent.click(button);
       expect(button).toHaveFocus();
     }
-    fireEvent.click(screen.getByRole("button", { name: "Terminal Preview" }));
+    fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
     for (const name of ["Enter", "Up", "BTab", "Left", "Down", "Right"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toBeEnabled();
@@ -891,6 +888,8 @@ it("retains attachment drafts across sessions and failed sends, then sends witho
     target: { files: [new File(["report"], "report.txt")] },
   });
   await screen.findByRole("button", { name: "Remove report.txt" });
+  fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   view.rerender(session("b"));
   expect(screen.queryByRole("button", { name: "Remove report.txt" })).not.toBeInTheDocument();
   view.rerender(session("a"));
@@ -949,15 +948,12 @@ it("keeps the mounted draft and expanded preview when changing language", () => 
   );
   const composer = screen.getByRole("textbox", { name: "Message to agent" });
   fireEvent.change(composer, { target: { value: "Keep this draft /original/path" } });
-  fireEvent.click(screen.getByRole("button", { name: "Terminal Preview" }));
+  fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
   try {
     act(() => updatePreferences({ language: "zh-CN" }));
     expect(screen.getByRole("textbox", { name: "发送给智能体的消息" })).toBe(composer);
     expect(composer).toHaveValue("Keep this draft /original/path");
-    expect(screen.getByRole("button", { name: "终端预览" })).toHaveAttribute(
-      "aria-expanded",
-      "true",
-    );
+    expect(screen.getByRole("button", { name: "终端" })).toHaveAttribute("aria-expanded", "true");
     expect(callbacks.onSendMessage).not.toHaveBeenCalled();
   } finally {
     act(() => updatePreferences({ language: "en" }));
@@ -968,14 +964,12 @@ it("collapses the composer independently and retains its draft", async () => {
   const user = userEvent.setup();
   render(<InteractionRegion {...props(interaction("connected"))} previewExpanded />);
   await user.type(screen.getByRole("textbox"), "draft survives");
-  await user.click(screen.getByRole("button", { name: "Collapse" }));
+  await user.click(screen.getByRole("button", { name: "Message Input" }));
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-  expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveAttribute(
-    "aria-expanded",
-    "true",
-  );
-  await user.click(screen.getByRole("button", { name: "Expand" }));
+  expect(screen.getByRole("button", { name: "Terminal" })).toHaveAttribute("aria-expanded", "true");
+  await user.click(screen.getByRole("button", { name: "Message Input" }));
   expect(screen.getByRole("textbox")).toHaveValue("draft survives");
+  expect(screen.getByRole("textbox")).toHaveFocus();
 });
 
 it.each(["idle", "working"] as const)(
@@ -984,7 +978,7 @@ it.each(["idle", "working"] as const)(
     const user = userEvent.setup();
     const handlers = props({ ...interaction("connected"), activity } as InteractionResponse);
     render(<StatefulInteractionRegion {...handlers} />);
-    const toggle = screen.getByRole("button", { name: "Terminal Preview" });
+    const toggle = screen.getByRole("button", { name: "Terminal" });
     const status = screen.getByText(activity === "idle" ? "Idle" : "Working");
     expect(toggle).not.toContainElement(status);
     const expanded = toggle.getAttribute("aria-expanded");
@@ -1020,7 +1014,7 @@ it.each(["unbound", "unavailable"] as const)(
       />,
     );
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Terminal Preview" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Terminal" })).not.toBeInTheDocument();
     expect(screen.queryByText("Error")).not.toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("old send failure");
     expect(screen.queryByText("old stream failure")).not.toBeInTheDocument();
@@ -1032,3 +1026,88 @@ it.each(["unbound", "unavailable"] as const)(
     );
   },
 );
+
+describe("composer entry state", () => {
+  function session(id: string, long = false, ready = true) {
+    return (
+      <SessionDraftProvider>
+        <InteractionRegion
+          {...props(interaction("connected"))}
+          key={id}
+          sessionId={id}
+          previewExpanded={false}
+          messagesReady={ready}
+          hasMoreMessages={long}
+        />
+      </SessionDraftProvider>
+    );
+  }
+
+  it("opens short sessions without focus and restores explicit choices ahead of defaults", () => {
+    const view = render(session("short"));
+    expect(screen.getByRole("textbox")).not.toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    view.rerender(session("other"));
+    expect(screen.getByRole("textbox")).toBeVisible();
+    view.rerender(session("short"));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    expect(screen.getByRole("textbox")).toHaveFocus();
+    view.rerender(session("other"));
+    view.rerender(session("short", true));
+    expect(screen.getByRole("textbox")).toBeVisible();
+    expect(screen.getByRole("textbox")).not.toHaveFocus();
+  });
+
+  it("does not save automatic defaults as manual choices", () => {
+    const view = render(session("automatic"));
+    expect(screen.getByRole("textbox")).toBeVisible();
+    view.rerender(session("other"));
+    view.rerender(session("automatic", true));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("waits for messages, closes long sessions once and ignores later message updates", () => {
+    const view = render(session("long", false, false));
+    view.rerender(session("long", true));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    view.rerender(session("long", false));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    view.rerender(session("other"));
+    view.rerender(session("long", true));
+    expect(screen.getByRole("textbox")).toBeVisible();
+  });
+
+  it("opens text drafts ahead of a saved collapsed choice but permits collapsing during editing", () => {
+    const view = render(session("draft"));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "unsent" } });
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    view.rerender(session("other"));
+    view.rerender(session("draft", true));
+    expect(screen.getByRole("textbox")).toHaveValue("unsent");
+    expect(screen.getByRole("textbox")).not.toHaveFocus();
+  });
+
+  it("uses rendered message height rather than message count", () => {
+    const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 800 } as DOMRect);
+    try {
+      render(
+        <div className="message-scroll">
+          <ol className="timeline">
+            <li>A single long message</li>
+          </ol>
+          <InteractionRegion {...props(interaction("connected"))} previewExpanded={false} />
+        </div>,
+      );
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    } finally {
+      height.mockRestore();
+      bounds.mockRestore();
+    }
+  });
+});

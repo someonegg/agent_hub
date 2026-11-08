@@ -188,6 +188,8 @@ export function SessionReader({
                 interaction={interaction}
                 onNavigate={onNavigate}
                 sessionId={context.session.id}
+                messagesReady={!readerLoading}
+                hasMoreMessages={hasMore}
                 onMessagePreview={showMessagePreview}
                 previewAutoExpandKey={previewAutoExpandKey}
               />

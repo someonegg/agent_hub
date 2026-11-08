@@ -10,12 +10,15 @@ import type {
 } from "../../shared/api-contract";
 
 import { t } from "../i18n";
+import { useSessionComposerPreference, useSessionDraft } from "../state/session-drafts";
 import { InteractionComposer } from "./InteractionComposer";
 import { InternalLink } from "./InternalLink";
 import { TerminalPreview } from "./TerminalPreview";
 
 interface InteractionRegionProps {
   sessionId: string;
+  messagesReady?: boolean;
+  hasMoreMessages?: boolean;
   dockTarget?: HTMLElement | null;
   recoveryActions?: ReactNode;
   operationStatus?: ReactNode;
@@ -43,6 +46,8 @@ interface InteractionRegionProps {
 
 export function InteractionRegion({
   sessionId,
+  messagesReady = true,
+  hasMoreMessages = false,
   dockTarget,
   recoveryActions,
   operationStatus,
@@ -76,7 +81,28 @@ export function InteractionRegion({
   }, []);
   const interactionAvailable = interaction?.supported === true && interaction.state === "connected";
   const flow = useRef<HTMLDivElement | null>(null);
-  const [composerExpanded, setComposerExpanded] = useState(true);
+  const preference = useSessionComposerPreference(sessionId);
+  const { message, attachments } = useSessionDraft(sessionId);
+  const hasDraft = message.length > 0 || attachments.length > 0;
+  const [composerExpanded, setComposerExpanded] = useState<boolean | null>(null);
+  const [composerFocusRequest, setComposerFocusRequest] = useState(0);
+  const inputExpanded = composerExpanded ?? true;
+  useLayoutEffect(() => {
+    if (composerExpanded !== null || !messagesReady || !interactionAvailable) return;
+    const scroll = flow.current?.closest<HTMLElement>(".message-scroll");
+    const timeline = scroll?.querySelector<HTMLElement>(".timeline");
+    const longConversation =
+      hasMoreMessages ||
+      (!!scroll && !!timeline && timeline.getBoundingClientRect().height > scroll.clientHeight);
+    setComposerExpanded(hasDraft || (preference.expanded ?? !longConversation));
+  }, [
+    composerExpanded,
+    messagesReady,
+    interactionAvailable,
+    hasMoreMessages,
+    hasDraft,
+    preference.expanded,
+  ]);
   const scrollToEnd = () => {
     const scroll = flow.current?.closest<HTMLElement>(".message-scroll");
     scroll?.scrollTo({ top: scroll.scrollHeight, behavior: "instant" });
@@ -143,6 +169,39 @@ export function InteractionRegion({
           <div className="interaction-toolbar">
             <button
               type="button"
+              className="composer-toggle"
+              aria-expanded={inputExpanded}
+              onClick={() => {
+                const expanded = !inputExpanded;
+                setComposerExpanded(expanded);
+                preference.setExpanded(expanded);
+                if (expanded) setComposerFocusRequest((value) => value + 1);
+              }}
+            >
+              <svg
+                className="composer-toggle-icon"
+                width="8"
+                height="8"
+                viewBox="0 0 8 8"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d={inputExpanded ? "M0 2h8L4 6z" : "M2 0v8l4-4z"} />
+              </svg>
+              <span>{t("inputArea")}</span>
+            </button>
+            {interaction?.supported &&
+            (interaction.activity === "working" || interaction.activity === "idle") ? (
+              <span
+                className={`terminal-activity terminal-activity-${interaction.activity}`}
+                role="status"
+              >
+                <span className="terminal-activity-dot" aria-hidden="true" />
+                {interaction.activity === "working" ? t("working") : t("idle")}
+              </span>
+            ) : null}
+            <button
+              type="button"
               ref={previewToggle}
               className="terminal-preview-toggle"
               aria-expanded={previewExpanded}
@@ -167,24 +226,6 @@ export function InteractionRegion({
                 <path d="m7 9 3 3-3 3M13 15h4" />
               </svg>
               <span>{t("terminalPreview")}</span>
-            </button>
-            {interaction?.supported &&
-            (interaction.activity === "working" || interaction.activity === "idle") ? (
-              <span
-                className={`terminal-activity terminal-activity-${interaction.activity}`}
-                role="status"
-              >
-                <span className="terminal-activity-dot" aria-hidden="true" />
-                {interaction.activity === "working" ? t("working") : t("idle")}
-              </span>
-            ) : null}
-            <button
-              type="button"
-              className="composer-toggle"
-              aria-expanded={composerExpanded}
-              onClick={() => setComposerExpanded((value) => !value)}
-            >
-              {t(composerExpanded ? "collapseComposer" : "expandComposer")}
             </button>
           </div>
         ) : null}
@@ -215,7 +256,8 @@ export function InteractionRegion({
             sessionId={sessionId}
             interactionAvailable={interactionAvailable}
             interactionBusy={interactionBusy}
-            composerExpanded={composerExpanded}
+            composerExpanded={inputExpanded}
+            composerFocusRequest={composerFocusRequest}
             previewExpanded={previewExpanded}
             error={error}
             errorDetail={errorDetail}

@@ -15,6 +15,8 @@ interface SessionInteractionProps {
   interaction: InteractionResponse | null;
   onNavigate?: (sessionId: string) => void;
   sessionId: string;
+  messagesReady?: boolean;
+  hasMoreMessages?: boolean;
   onMessagePreview?: (message: string) => () => void;
   previewAutoExpandKey?: string | null;
 }
@@ -27,6 +29,8 @@ export function SessionInteraction({
   interaction,
   onNavigate,
   sessionId,
+  messagesReady,
+  hasMoreMessages,
   onMessagePreview,
   previewAutoExpandKey = null,
 }: SessionInteractionProps) {
@@ -60,6 +64,8 @@ export function SessionInteraction({
     <InteractionRegion
       key={sessionId}
       sessionId={sessionId}
+      messagesReady={messagesReady}
+      hasMoreMessages={hasMoreMessages}
       dockTarget={dockTarget}
       recoveryActions={recoveryActions}
       operationStatus={operationStatus}

@@ -16,6 +16,7 @@ function props() {
     interactionAvailable: true,
     interactionBusy: false,
     composerExpanded: true,
+    composerFocusRequest: 0,
     previewExpanded: false,
     error: null,
     onDismissError: vi.fn(),

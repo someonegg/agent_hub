@@ -18,6 +18,7 @@ export function InteractionComposer({
   interactionAvailable,
   interactionBusy,
   composerExpanded,
+  composerFocusRequest,
   previewExpanded,
   error,
   errorDetail,
@@ -32,6 +33,7 @@ export function InteractionComposer({
   interactionAvailable: boolean;
   interactionBusy: boolean;
   composerExpanded: boolean;
+  composerFocusRequest: number;
   previewExpanded: boolean;
   error: string | null;
   errorDetail?: unknown;
@@ -56,6 +58,9 @@ export function InteractionComposer({
   const { message, setMessage, attachments, addAttachment, removeAttachment, clearSentMessage } =
     useSessionDraft(sessionId);
   const composer = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    if (composerFocusRequest > 0) composer.current?.focus();
+  }, [composerFocusRequest]);
   useEffect(() => {
     const blurWhenHidden = () => {
       if (document.hidden && document.activeElement === composer.current) composer.current?.blur();
