@@ -51,7 +51,7 @@ it.each(["message_not_submitted", "interaction_failed"])(
     expect(composer).toHaveValue("draft");
     expect(screen.getByRole("button", { name: "Remove report.txt" })).toBeEnabled();
     expect(dismiss).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Terminal Preview" })).toHaveAttribute(
+    expect(screen.getByRole("button", { name: "Terminal" })).toHaveAttribute(
       "aria-expanded",
       String(code === "message_not_submitted"),
     );

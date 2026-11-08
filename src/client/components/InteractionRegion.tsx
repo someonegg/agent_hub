@@ -143,6 +143,34 @@ export function InteractionRegion({
           <div className="interaction-toolbar">
             <button
               type="button"
+              className="composer-toggle"
+              aria-expanded={composerExpanded}
+              onClick={() => setComposerExpanded((value) => !value)}
+            >
+              <svg
+                className="composer-toggle-icon"
+                width="8"
+                height="8"
+                viewBox="0 0 8 8"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path d={composerExpanded ? "M0 2h8L4 6z" : "M2 0v8l4-4z"} />
+              </svg>
+              <span>{t("inputArea")}</span>
+            </button>
+            {interaction?.supported &&
+            (interaction.activity === "working" || interaction.activity === "idle") ? (
+              <span
+                className={`terminal-activity terminal-activity-${interaction.activity}`}
+                role="status"
+              >
+                <span className="terminal-activity-dot" aria-hidden="true" />
+                {interaction.activity === "working" ? t("working") : t("idle")}
+              </span>
+            ) : null}
+            <button
+              type="button"
               ref={previewToggle}
               className="terminal-preview-toggle"
               aria-expanded={previewExpanded}
@@ -167,24 +195,6 @@ export function InteractionRegion({
                 <path d="m7 9 3 3-3 3M13 15h4" />
               </svg>
               <span>{t("terminalPreview")}</span>
-            </button>
-            {interaction?.supported &&
-            (interaction.activity === "working" || interaction.activity === "idle") ? (
-              <span
-                className={`terminal-activity terminal-activity-${interaction.activity}`}
-                role="status"
-              >
-                <span className="terminal-activity-dot" aria-hidden="true" />
-                {interaction.activity === "working" ? t("working") : t("idle")}
-              </span>
-            ) : null}
-            <button
-              type="button"
-              className="composer-toggle"
-              aria-expanded={composerExpanded}
-              onClick={() => setComposerExpanded((value) => !value)}
-            >
-              {t(composerExpanded ? "collapseComposer" : "expandComposer")}
             </button>
           </div>
         ) : null}

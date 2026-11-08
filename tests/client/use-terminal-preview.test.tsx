@@ -193,10 +193,10 @@ it("connects the terminal toggle to the socket lifecycle", () => {
     />,
   );
   expect(MockWebSocket.instances).toHaveLength(0);
-  fireEvent.click(screen.getByRole("button", { name: "Terminal Preview" }));
+  fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
   act(() => latest().message(frame));
   expect(screen.getByLabelText("Terminal content")).toHaveTextContent("output");
-  fireEvent.click(screen.getByRole("button", { name: "Terminal Preview" }));
+  fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
   expect(latest().close).toHaveBeenCalledOnce();
   unmount();
 });
@@ -234,7 +234,7 @@ it.each([false, true])("shows one stream notice and recovers (retryable=%s)", as
       }}
     />,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Terminal Preview" }));
+  fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
   const old = latest();
   act(() => old.message(frame));
   act(() => old.message({ type: "error", code: "failed", message: "Capture failed", retryable }));

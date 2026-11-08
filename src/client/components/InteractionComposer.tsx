@@ -56,6 +56,11 @@ export function InteractionComposer({
   const { message, setMessage, attachments, addAttachment, removeAttachment, clearSentMessage } =
     useSessionDraft(sessionId);
   const composer = useRef<HTMLTextAreaElement | null>(null);
+  const wasComposerExpanded = useRef(composerExpanded);
+  useEffect(() => {
+    if (composerExpanded && !wasComposerExpanded.current) composer.current?.focus();
+    wasComposerExpanded.current = composerExpanded;
+  }, [composerExpanded]);
   useEffect(() => {
     const blurWhenHidden = () => {
       if (document.hidden && document.activeElement === composer.current) composer.current?.blur();
