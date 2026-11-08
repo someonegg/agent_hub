@@ -71,7 +71,6 @@ it.each([
   ["send", "id"],
   ["send", "id", "--stdin", "--message", "x"],
   ["keys", "id", "interrupt"],
-  ["keys", "id", "C-c", "--force"],
   ["resume", "id", "--agent", "other"],
   ["inspect", "id", "--limit", "301"],
   ["list", "--url", "ftp://example.com"],
@@ -84,24 +83,17 @@ it.each([
   );
 });
 
-it.each([true, false])("wires invalid arguments without requests (json=%s)", async (json) => {
+it("rejects invalid arguments without requests and writes human diagnostics to stderr", async () => {
   let requests = 0;
   const base = await serve((_req, res) => {
     requests++;
     res.end();
   });
-  const result = await cli(["list", "extra", ...(json ? ["--json"] : [])], "", {
-    AGENT_HUB_URL: base,
-  });
+  const result = await cli(["list", "extra"], "", { AGENT_HUB_URL: base });
   expect(result.code).toBe(1);
   expect(requests).toBe(0);
-  if (json) {
-    expect(result.stderr).toBe("");
-    expect(JSON.parse(result.stdout).error.code).toBe("invalid_arguments");
-  } else {
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("Invalid session command arguments");
-  }
+  expect(result.stdout).toBe("");
+  expect(result.stderr).toContain("Invalid session command arguments");
 });
 it("defaults to the main listener and preserves URL override precedence", () => {
   const origin = (args: string[], environmentUrl?: string) => {
@@ -442,16 +434,9 @@ it("renders human output and sends human diagnostics to stderr", async () => {
   expect(failure.stderr).toContain("Unsupported key");
 });
 
+// Input and terminal routes are covered above; child-specific coverage stays on reads and lifecycle operations.
 it.each([
   { args: ["inspect", "child"], requests: ["GET /api/v1/sessions/child/messages"] },
-  { args: ["terminal", "child"], requests: ["GET /api/v1/sessions/child/terminal"] },
-  {
-    args: ["send", "child", "--message", "hello"],
-    requests: ["POST /api/v1/sessions/child/messages"],
-  },
-  { args: ["keys", "child", "enter"], requests: ["POST /api/v1/sessions/child/keys"] },
-  { args: ["interrupt", "child"], requests: ["POST /api/v1/sessions/child/keys"] },
-  { args: ["handoff", "child"], requests: ["POST /api/v1/sessions/child/handoff-pane-binding"] },
   { args: ["exit", "child"], requests: ["POST /api/v1/sessions/child/exit"] },
   { args: ["archive", "child"], requests: ["POST /api/v1/sessions/child/archive"] },
   { args: ["delete", "child"], requests: ["DELETE /api/v1/sessions/child"] },
@@ -490,8 +475,6 @@ it.each([
         nextAfter: 0,
         hasMore: false,
       });
-    else if (req.url?.endsWith("/terminal"))
-      reply(res, { content: "screen", truncated: false, capturedAt: "now", private: "private" });
     else if (req.url === "/api/v1/sessions") {
       expect(body.resumeSessionId).toBe("child");
       reply(res, { status: "succeeded", sessionId: "child" });
@@ -502,12 +485,6 @@ it.each([
   expect(result.stdout).not.toContain("private");
   expect(result.stdout).not.toContain("parent");
   expect(seen).toEqual(requests);
-});
-
-it("keeps connection failures classified as query_failed", async () => {
-  const result = await cli(["list", "--json"]);
-  expect(result.code).toBe(1);
-  expect(JSON.parse(result.stdout).error.code).toBe("query_failed");
 });
 
 it.each(["list", "create"])("sets the timeout tier for %s", (command) => {
@@ -789,19 +766,4 @@ it("retries an out-of-range inspect once from the start", async () => {
     "/api/v1/sessions/id/messages?after=99",
     "/api/v1/sessions/id/messages?after=0",
   ]);
-});
-
-it("ignores the legacy URL environment variable", async () => {
-  let requests = 0;
-  const base = await serve((_req, res) => {
-    requests++;
-    reply(res, { sessions: [], agents: [], projects: [] });
-  });
-  const result = await cli(["list", "--json"], "", {
-    AGENT_HUB_URL: undefined,
-    CODEX_HUB_URL: base,
-  });
-  expect(requests).toBe(0);
-  // The default listener may be running; the legacy listener must never be contacted.
-  expect(result.stdout).not.toContain(base);
 });

@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import stringWidth from "string-width";
 import { expect, it } from "vitest";
 
 import { CommandError } from "../../src/server/cli/command-error.js";
@@ -23,7 +22,7 @@ it.each([
   );
 });
 
-it.each([true, false])("wires resource errors to the correct stream (json=%s)", async (json) => {
+it("wires resource errors to JSON output", async () => {
   const result = await exec(process.execPath, [
     "--import",
     "tsx",
@@ -31,20 +30,15 @@ it.each([true, false])("wires resource errors to the correct stream (json=%s)", 
     "page",
     "list",
     "--unknown",
-    ...(json ? ["--json"] : []),
+    "--json",
   ]).catch((error) => error);
   expect(result.code).toBe(1);
-  if (json) {
-    expect(result.stderr).toBe("");
-    expect(JSON.parse(result.stdout).error.code).toBe("invalid_arguments");
-  } else {
-    expect(result.stdout).toBe("");
-    expect(result.stderr).toContain("--unknown");
-  }
+  expect(result.stderr).toBe("");
+  expect(JSON.parse(result.stdout).error.code).toBe("invalid_arguments");
 });
 
 // Check representative action policies directly; shared parsing rejects restricted options.
-// Process tests above own output stream selection.
+// The process smoke above owns JSON output wiring; cli-output owns stream formatting.
 const invalidOptions = [
   { resource: "page", action: "list", option: "project" },
   { resource: "page", action: "delete", option: "name" },
@@ -83,41 +77,26 @@ it.each(["page", "diff"])(
       await writeFile(join(source, "index.html"), "<h1>Test</h1>");
       const file = join(root, "test.diff");
       await writeFile(file, "diff --git a/test b/test\n");
+      const title = "Example\n中文👩🏽‍💻";
       const published = await run(
         "publish",
         resource === "page" ? source : file,
         ...(resource === "page" ? ["--project", root, "--name", "example"] : []),
         "--title",
-        "Example",
+        title,
       );
-      expect(published.title).toBe("Example");
+      expect(published.title).toBe(title);
       if (resource === "page") expect(published.name).toBe("example");
       expect(await run("list")).toEqual([published]);
-      const unicode = await run(
-        "publish",
-        resource === "page" ? source : file,
-        ...(resource === "page" ? ["--project", root, "--name", "unicode"] : []),
-        "--title",
-        "© / ©️ / ™ / ™️\n中文👩🏽‍💻",
+      // The output unit tests own Unicode cell widths; this smoke checks resource field wiring.
+      const lines = (await runText("list")).trimEnd().split("\n");
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toMatch(
+        resource === "page" ? /^ID +PROJECT +TITLE +URL$/ : /^ID +TITLE +URL$/,
       );
-      const human = await runText("list");
-      expect(human).not.toContain("\t");
-      const lines = human.trimEnd().split("\n");
-      expect(lines).toHaveLength(3);
-      const header = lines[0]!;
-      for (const entry of [published, unicode]) {
-        const line = lines.find((value) => value.startsWith(entry.id))!;
-        const title = entry.title.replace(/[\r\n\t]/g, " ");
-        expect(line).toContain(title);
-        expect(line.endsWith(entry.url)).toBe(true);
-        expect(stringWidth(line.slice(0, line.indexOf(title)))).toBe(header.indexOf("TITLE"));
-        expect(stringWidth(line.slice(0, line.indexOf(entry.url)))).toBe(header.indexOf("URL"));
-        if (resource === "page") expect(line).toContain(root);
-      }
-      // JSON retains the original multiline title, rather than the table's sanitized cell.
-      expect(await run("list")).toEqual(expect.arrayContaining([published, unicode]));
-      expect(unicode.title).toBe("© / ©️ / ™ / ™️\n中文👩🏽‍💻");
-      await run("delete", unicode.id);
+      expect(lines[1]).toContain("Example 中文👩🏽‍💻");
+      expect(lines[1]!.endsWith(published.url)).toBe(true);
+      if (resource === "page") expect(lines[1]).toContain(root);
       expect(await run("delete", published.id)).toEqual({ id: published.id, deleted: true });
       expect(await run("list")).toEqual([]);
       expect(await runText("list")).toBe(

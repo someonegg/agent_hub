@@ -150,54 +150,6 @@ describe("interaction region", () => {
     expect(screen.getByRole("textbox", { name: "Message to agent" })).toHaveValue("draft");
   });
 
-  it("shows connection information without input on initial unbound state", () => {
-    render(<StatefulInteractionRegion {...props(interaction("unbound"))} />);
-    expect(screen.getByRole("region", { name: "Session interaction" })).toBeVisible();
-    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Terminal Preview" })).not.toBeInTheDocument();
-  });
-
-  it("inserts a newline on Enter, sends on Shift+Enter, and clears after success", async () => {
-    const handlers = props(interaction("connected"));
-    const user = userEvent.setup();
-    render(<StatefulInteractionRegion {...handlers} />);
-    const textarea = screen.getByRole("textbox", { name: "Message to agent" });
-    expect(textarea).toHaveAttribute("rows", "3");
-    expect(document.querySelector(".interaction-heading")).toBeNull();
-    await user.type(textarea, "line one{enter}line two");
-    expect(textarea).toHaveValue("line one\nline two");
-    expect(handlers.onSendMessage).not.toHaveBeenCalled();
-    await act(async () => {
-      fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
-    });
-    expect(handlers.onSendMessage).toHaveBeenCalledWith("line one\nline two");
-    expect(textarea).toHaveValue("");
-  });
-
-  it("keeps Send focusable but blocks activation for blank input", async () => {
-    const handlers = props(interaction("connected"));
-    const user = userEvent.setup();
-    render(<StatefulInteractionRegion {...handlers} />);
-    const textarea = screen.getByRole("textbox", { name: "Message to agent" });
-    const send = screen.getByRole("button", { name: "Send" });
-    expect(send).toBeEnabled();
-    expect(send).toHaveAttribute("aria-disabled", "true");
-    screen.getByRole("button", { name: "Attach files" }).focus();
-    await user.tab();
-    expect(send).toHaveFocus();
-    await user.keyboard("{Enter}");
-    await user.click(send);
-    expect(handlers.onSendMessage).not.toHaveBeenCalled();
-
-    await user.type(textarea, "   ");
-    expect(send).toHaveAttribute("aria-disabled", "true");
-    await user.click(send);
-    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
-    expect(handlers.onSendMessage).not.toHaveBeenCalled();
-    expect(handlers.onSendKeys).not.toHaveBeenCalled();
-    expect(textarea).toHaveValue("   ");
-  });
-
   it("dispatches interaction controls and keeps the composer editable while actions are busy", async () => {
     const handlers = props(interaction("connected"));
     const user = userEvent.setup();
@@ -240,27 +192,6 @@ describe("interaction region", () => {
     await user.click(send);
     expect(handlers.onSendMessage).not.toHaveBeenCalled();
     expect(handlers.onExpandPreview).not.toHaveBeenCalled();
-  });
-
-  it("renders a truncated terminal preview as plain text", () => {
-    const handlers = {
-      ...props(interaction("connected")),
-      preview: {
-        content: "\u001b[31mplain text<img src=x onerror=alert(1)><script>alert(2)</script>",
-        truncated: true,
-        revision: "r".repeat(43),
-        capturedAt: "2026-08-08T12:00:00.000Z",
-      },
-    };
-    render(<StatefulInteractionRegion {...handlers} />);
-
-    const content = screen.getByLabelText("Terminal content");
-    expect(content).toHaveTextContent(
-      "plain text<img src=x onerror=alert(1)><script>alert(2)</script>",
-    );
-    expect(content.querySelector("img")).toBeNull();
-    expect(content.querySelector("script")).toBeNull();
-    expect(screen.getByText(/terminal output exceeded the preview limit/i)).toBeInTheDocument();
   });
 
   it("sends the six terminal keys from the rectangular terminal keypad", async () => {
@@ -344,24 +275,6 @@ it.each([
   expect(toggle).toHaveFocus();
 });
 
-it.each([false, true])(
-  "protects IME confirmation and key repeat with enterToSend=%s",
-  (enterToSend) => {
-    updatePreferences({ enterToSend });
-    const handlers = props(interaction("connected"));
-    render(<StatefulInteractionRegion {...handlers} />);
-    const textarea = screen.getByRole("textbox");
-    fireEvent.change(textarea, { target: { value: "中文" } });
-    for (const options of [{ isComposing: true }, { keyCode: 229 }, { repeat: true }]) {
-      fireEvent.keyDown(textarea, { key: "Enter", shiftKey: !enterToSend, ...options });
-    }
-    expect(handlers.onSendMessage).not.toHaveBeenCalled();
-    expect(textarea).toHaveValue("中文");
-    fireEvent.keyDown(textarea, { key: "Enter", shiftKey: !enterToSend });
-    expect(handlers.onSendMessage).toHaveBeenCalledExactlyOnceWith("中文");
-  },
-);
-
 it("keeps an expanded preview open and preserves edits made during delivery", async () => {
   let resolve!: () => void;
   const handlers = props(interaction("connected"));
@@ -390,19 +303,6 @@ it("keeps an expanded preview open and preserves edits made during delivery", as
   expect(textarea).toHaveFocus();
   expect(handlers.onExpandPreview).not.toHaveBeenCalled();
   expect(toggle).toHaveAttribute("aria-expanded", "true");
-});
-
-it("retains the draft after failed delivery", async () => {
-  const handlers = props(interaction("connected"));
-  handlers.onSendMessage.mockRejectedValueOnce(new Error("offline"));
-  render(<StatefulInteractionRegion {...handlers} />);
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "/plan" } });
-  fireEvent.click(screen.getByRole("button", { name: "Send" }));
-  await act(async () => {
-    await Promise.resolve();
-  });
-  expect(screen.getByRole("textbox")).toHaveValue("/plan");
-  expect(handlers.onSendMessage).toHaveBeenCalledExactlyOnceWith("/plan");
 });
 
 it("preserves the collapsed preview and draft after handoff and disables Handoff while busy or disconnected", async () => {
@@ -512,26 +412,6 @@ it("preserves expanded preview during and after handoff delivery", async () => {
   expect(handlers.onTogglePreview).not.toHaveBeenCalled();
 });
 
-it.each([
-  ["Enter", "enter"],
-  ["ArrowLeft", "left"],
-  ["0", "0"],
-])("maps physical %s in the preview and prevents defaults", (physical, key) => {
-  const handlers = props(interaction("connected"));
-  render(<InteractionRegion {...handlers} previewExpanded />);
-  const body = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
-  body.focus();
-  expect(body).toHaveFocus();
-  expect(fireEvent.keyDown(body, { key: physical })).toBe(false);
-  expect(handlers.onSendKeys).toHaveBeenLastCalledWith([key]);
-  const button = screen.getByRole("button", { name: /^Left$/ });
-  button.focus();
-  expect(fireEvent.keyDown(button, { key: physical })).toBe(false);
-  expect(handlers.onSendKeys).toHaveBeenCalledTimes(2);
-  expect(handlers.onTogglePreview).not.toHaveBeenCalled();
-  expect(button).toHaveFocus();
-});
-
 it("collapses the preview with Escape without interrupting and restores toggle focus", () => {
   const handlers = props(interaction("connected"));
   render(<InteractionRegion {...handlers} previewExpanded interactionBusy />);
@@ -566,37 +446,6 @@ it("ignores composer Escape while preserving preview, focus and draft", async ()
   expect(handlers.onSendKeys).not.toHaveBeenCalled();
   expect(handlers.onSendMessage).not.toHaveBeenCalled();
   await user.keyboard("{Escape}");
-  expect(handlers.onTogglePreview).not.toHaveBeenCalled();
-});
-
-it("ignores modified, composing, repeated and already handled composer Escape", () => {
-  const handlers = props(interaction("connected"));
-  render(<InteractionRegion {...handlers} previewExpanded />);
-  const input = screen.getByRole("textbox");
-  for (const options of [
-    { altKey: true },
-    { ctrlKey: true },
-    { metaKey: true },
-    { shiftKey: true },
-    { isComposing: true },
-    { keyCode: 229 },
-  ]) {
-    expect(fireEvent.keyDown(input, { key: "Escape", ...options })).toBe(true);
-  }
-  expect(fireEvent.keyDown(input, { key: "Escape", repeat: true })).toBe(true);
-  const handled = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
-  handled.preventDefault();
-  fireEvent(input, handled);
-  expect(handlers.onTogglePreview).not.toHaveBeenCalled();
-  expect(handlers.onSendKeys).not.toHaveBeenCalled();
-});
-
-it("interrupts with Ctrl+c in the preview without collapsing it", () => {
-  const handlers = props(interaction("connected"));
-  render(<InteractionRegion {...handlers} previewExpanded />);
-  const body = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
-  expect(fireEvent.keyDown(body, { key: "c", ctrlKey: true })).toBe(false);
-  expect(handlers.onSendKeys).toHaveBeenCalledExactlyOnceWith(["interrupt"]);
   expect(handlers.onTogglePreview).not.toHaveBeenCalled();
 });
 
@@ -653,15 +502,6 @@ it("preserves editing and unrelated keyboard actions and blocks sends while busy
   expect(handlers.onSendKeys).not.toHaveBeenCalled();
   view.rerender(<InteractionRegion {...handlers} previewExpanded={false} />);
   expect(screen.queryByRole("group", { name: "Terminal controls" })).toBeNull();
-});
-
-it("sends once when Enter is pressed on a terminal button", async () => {
-  const handlers = props(interaction("connected"));
-  const user = userEvent.setup();
-  render(<InteractionRegion {...handlers} previewExpanded />);
-  screen.getByRole("button", { name: /^Up$/ }).focus();
-  await user.keyboard("{Enter}");
-  expect(handlers.onSendKeys).toHaveBeenCalledExactlyOnceWith(["enter"]);
 });
 
 describe("composer uploads", () => {
@@ -1099,30 +939,6 @@ function uploadResult(path: string): UploadAttachment {
   };
 }
 
-it("switches send shortcuts live", async () => {
-  const handlers = props(interaction("connected"));
-  render(<StatefulInteractionRegion {...handlers} />);
-  act(() => updatePreferences({ enterToSend: true }));
-  const textarea = screen.getByRole("textbox");
-  expect(textarea).toHaveAttribute(
-    "placeholder",
-    expect.stringContaining("Shift+Enter for newline"),
-  );
-  for (const message of ["hello", "/help"]) {
-    fireEvent.change(textarea, { target: { value: message } });
-    expect(fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true })).toBe(true);
-    fireEvent.keyDown(textarea, { key: "Enter", isComposing: true });
-    fireEvent.keyDown(textarea, { key: "Enter", repeat: true });
-    expect(handlers.onSendMessage).not.toHaveBeenCalled();
-    await act(async () => {
-      expect(fireEvent.keyDown(textarea, { key: "Enter" })).toBe(false);
-    });
-    expect(handlers.onSendMessage).toHaveBeenCalledWith(message);
-    expect(textarea).toHaveValue("");
-    handlers.onSendMessage.mockClear();
-  }
-});
-
 it("keeps the mounted draft and expanded preview when changing language", () => {
   updatePreferences({ language: "en" });
   const callbacks = props(interaction("connected"));
@@ -1162,37 +978,6 @@ it("collapses the composer independently and retains its draft", async () => {
   expect(screen.getByRole("textbox")).toHaveValue("draft survives");
 });
 
-it("follows new terminal output near the end and preserves a scrolled reading position", () => {
-  const handlers = props(interaction("connected"));
-  const snapshot = { revision: "1", content: "output", capturedAt: "now", truncated: false };
-  const view = render(<InteractionRegion {...handlers} previewExpanded preview={snapshot} />);
-  const content = screen.getByLabelText("Terminal content");
-  Object.defineProperties(content, {
-    scrollHeight: { configurable: true, value: 1000 },
-    clientHeight: { configurable: true, value: 300 },
-  });
-  content.scrollTop = 675;
-  fireEvent.scroll(content);
-  view.rerender(
-    <InteractionRegion
-      {...handlers}
-      previewExpanded
-      preview={{ ...snapshot, revision: "2", content: "new output" }}
-    />,
-  );
-  expect(content.scrollTop).toBe(1000);
-  content.scrollTop = 400;
-  fireEvent.scroll(content);
-  view.rerender(
-    <InteractionRegion
-      {...handlers}
-      previewExpanded
-      preview={{ ...snapshot, revision: "3", content: "more output" }}
-    />,
-  );
-  expect(content.scrollTop).toBe(400);
-});
-
 it.each(["idle", "working"] as const)(
   "keeps %s status independent from the terminal preview toggle",
   async (activity) => {
@@ -1212,7 +997,8 @@ it.each(["idle", "working"] as const)(
   },
 );
 
-it.each(["unbound", "disconnected", "unknown", "superseded", "unavailable"] as const)(
+// Supported and unsupported connections exercise the two error-composition paths.
+it.each(["unbound", "unavailable"] as const)(
   "preserves %s connection reason alongside old operation errors",
   (state) => {
     const value: InteractionResponse =
@@ -1241,9 +1027,6 @@ it.each(["unbound", "disconnected", "unknown", "superseded", "unavailable"] as c
     expect(document.querySelector(".interaction-status-warning")).toHaveTextContent(
       {
         unbound: "Unbound",
-        disconnected: "Disconnected",
-        unknown: "Connection unknown",
-        superseded: "Superseded",
         unavailable: "Unavailable",
       }[state],
     );

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
 import { TerminalPreview } from "../../src/client/components/TerminalPreview";
@@ -85,4 +86,92 @@ it("distinguishes first capture and an empty snapshot and preserves content whil
   expect(screen.getByText("Reconnecting…")).toBeInTheDocument();
   expect(screen.getByLabelText("Terminal content")).toHaveTextContent("last snapshot");
   expect(screen.queryByText("Capturing terminal pane…")).not.toBeInTheDocument();
+});
+
+it("renders a truncated terminal preview as plain text", () => {
+  const handlers = props();
+  render(
+    <TerminalPreview
+      {...handlers}
+      preview={{
+        ...handlers.preview,
+        content: "\u001b[31mplain text<img src=x onerror=alert(1)><script>alert(2)</script>",
+        truncated: true,
+      }}
+    />,
+  );
+
+  const content = screen.getByLabelText("Terminal content");
+  expect(content).toHaveTextContent(
+    "plain text<img src=x onerror=alert(1)><script>alert(2)</script>",
+  );
+  expect(content.querySelector("img")).toBeNull();
+  expect(content.querySelector("script")).toBeNull();
+  expect(screen.getByText(/terminal output exceeded the preview limit/i)).toBeInTheDocument();
+});
+
+it.each([
+  ["Enter", "enter"],
+  ["ArrowLeft", "left"],
+  ["0", "0"],
+])("maps physical %s in the preview and prevents defaults", (physical, key) => {
+  const handlers = props();
+  render(<TerminalPreview {...handlers} />);
+  const body = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
+  body.focus();
+  expect(body).toHaveFocus();
+  expect(fireEvent.keyDown(body, { key: physical })).toBe(false);
+  expect(handlers.onSendKeys).toHaveBeenLastCalledWith([key]);
+  const button = screen.getByRole("button", { name: /^Left$/ });
+  button.focus();
+  expect(fireEvent.keyDown(button, { key: physical })).toBe(false);
+  expect(handlers.onSendKeys).toHaveBeenCalledTimes(2);
+  expect(handlers.onToggle).not.toHaveBeenCalled();
+  expect(button).toHaveFocus();
+});
+
+it("interrupts with Ctrl+c in the preview without collapsing it", () => {
+  const handlers = props();
+  render(<TerminalPreview {...handlers} />);
+  const body = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
+  expect(fireEvent.keyDown(body, { key: "c", ctrlKey: true })).toBe(false);
+  expect(handlers.onSendKeys).toHaveBeenCalledExactlyOnceWith(["interrupt"]);
+  expect(handlers.onToggle).not.toHaveBeenCalled();
+});
+
+it("sends once when Enter is pressed on a terminal button", async () => {
+  const handlers = props();
+  const user = userEvent.setup();
+  render(<TerminalPreview {...handlers} />);
+  screen.getByRole("button", { name: /^Up$/ }).focus();
+  await user.keyboard("{Enter}");
+  expect(handlers.onSendKeys).toHaveBeenCalledExactlyOnceWith(["enter"]);
+});
+
+it("follows new terminal output near the end and preserves a scrolled reading position", () => {
+  const handlers = props();
+  const view = render(<TerminalPreview {...handlers} />);
+  const content = screen.getByLabelText("Terminal content");
+  Object.defineProperties(content, {
+    scrollHeight: { configurable: true, value: 1000 },
+    clientHeight: { configurable: true, value: 300 },
+  });
+  content.scrollTop = 675;
+  fireEvent.scroll(content);
+  view.rerender(
+    <TerminalPreview
+      {...handlers}
+      preview={{ ...handlers.preview, revision: "2", content: "new output" }}
+    />,
+  );
+  expect(content.scrollTop).toBe(1000);
+  content.scrollTop = 400;
+  fireEvent.scroll(content);
+  view.rerender(
+    <TerminalPreview
+      {...handlers}
+      preview={{ ...handlers.preview, revision: "3", content: "more output" }}
+    />,
+  );
+  expect(content.scrollTop).toBe(400);
 });
