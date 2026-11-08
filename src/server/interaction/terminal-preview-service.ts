@@ -2,11 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 
 import type { TerminalPreviewFrame, TerminalPreviewSnapshot } from "../../shared/api-contract.js";
 import { diffLines } from "./terminal-preview-diff.js";
-import {
-  createTmuxPreviewListener,
-  type PreviewListener,
-  type PreviewSubscription,
-} from "./tmux-preview-listener.js";
+import { TerminalTextObserver } from "./terminal-text-observer.js";
+import { createTmuxPreviewListener, type PreviewListener } from "./tmux-preview-listener.js";
 import type { TmuxBinding } from "./transport.js";
 
 interface Viewer {
@@ -20,13 +17,9 @@ interface State {
   key: string;
   binding: TmuxBinding;
   viewers: Set<Viewer>;
-  subscription?: PreviewSubscription;
+  observer?: TerminalTextObserver;
   snapshot?: TerminalPreviewSnapshot;
-  dirty: boolean;
-  listening: boolean;
   disposed: boolean;
-  task?: Promise<void>;
-  timer?: ReturnType<typeof setTimeout>;
 }
 
 export class TerminalPreviewService {
@@ -61,7 +54,7 @@ export class TerminalPreviewService {
     let state = this.#states.get(key);
     const fresh = !state;
     if (!state) {
-      state = { key, binding, viewers: new Set(), dirty: true, listening: false, disposed: false };
+      state = { key, binding, viewers: new Set(), disposed: false };
       this.#states.set(key, state);
     }
     const current = state;
@@ -76,22 +69,18 @@ export class TerminalPreviewService {
     try {
       assertOwner();
       if (fresh) {
-        current.subscription = this.listen(
+        current.observer = new TerminalTextObserver(
           binding,
-          () => {
-            current.dirty = true;
-            this.#schedule(current);
-          },
+          this.listen,
+          () => this.#capture(current),
           (error) => this.#fail(current, error),
         );
-        // A listener may fail synchronously during setup.
-        if (current.disposed) current.subscription.close();
+        if (current.disposed) current.observer.close();
       }
       void current
-        .subscription!.ready.then(async () => {
+        .observer!.ready.then(async () => {
           if (current.disposed || !current.viewers.has(viewer)) return;
-          current.listening = true;
-          if (!current.snapshot) await this.#capture(current);
+          if (!current.snapshot) await current.observer!.capture();
           if (current.disposed || !current.viewers.has(viewer)) return;
           assertOwner();
           if (!viewer.initialized) {
@@ -127,70 +116,42 @@ export class TerminalPreviewService {
     for (const viewer of state.viewers) viewer.assertOwner();
   }
 
-  #schedule(state: State): void {
-    if (!state.listening || state.disposed || state.task || state.timer) return;
-    state.timer = setTimeout(() => {
-      state.timer = undefined;
-      void this.#capture(state).catch(() => {});
-    }, 350);
-  }
-
-  #capture(state: State): Promise<void> {
-    if (state.task) return state.task;
-    clearTimeout(state.timer);
-    state.timer = undefined;
-    state.dirty = false;
-    state.task = (async () => {
-      const result = await this.captureFresh(state.binding, () => this.#assertOwner(state));
-      const previous = state.snapshot;
-      if (
-        previous &&
-        previous.content === result.content &&
-        previous.truncated === result.truncated
-      )
-        return;
-      const snapshot: TerminalPreviewSnapshot = {
-        ...result,
-        capturedAt: result.capturedAt,
-        revision: createHash("sha256")
-          .update(JSON.stringify([this.#identity, state.key, result.content, result.truncated]))
-          .digest("base64url"),
-      };
-      state.snapshot = snapshot;
-      const full: TerminalPreviewFrame = { type: "snapshot", ...snapshot };
-      let update: TerminalPreviewFrame = full;
-      if (previous) {
-        const operations = diffLines(previous.content, snapshot.content);
-        if (operations !== null) {
-          const delta: TerminalPreviewFrame = {
-            type: "delta",
-            baseRevision: previous.revision,
-            revision: snapshot.revision,
-            operations,
-            truncated: snapshot.truncated,
-            capturedAt: snapshot.capturedAt,
-          };
-          const size = bytes(delta);
-          if (size <= 8192 && size < bytes(full)) update = delta;
-        }
+  async #capture(state: State): Promise<void> {
+    const result = await this.captureFresh(state.binding, () => this.#assertOwner(state));
+    const previous = state.snapshot;
+    if (previous && previous.content === result.content && previous.truncated === result.truncated)
+      return;
+    const snapshot: TerminalPreviewSnapshot = {
+      ...result,
+      revision: createHash("sha256")
+        .update(JSON.stringify([this.#identity, state.key, result.content, result.truncated]))
+        .digest("base64url"),
+    };
+    state.snapshot = snapshot;
+    const full: TerminalPreviewFrame = { type: "snapshot", ...snapshot };
+    let update: TerminalPreviewFrame = full;
+    if (previous) {
+      const operations = diffLines(previous.content, snapshot.content);
+      if (operations !== null) {
+        const delta: TerminalPreviewFrame = {
+          type: "delta",
+          baseRevision: previous.revision,
+          revision: snapshot.revision,
+          operations,
+          truncated: snapshot.truncated,
+          capturedAt: snapshot.capturedAt,
+        };
+        const size = bytes(delta);
+        if (size <= 8192 && size < bytes(full)) update = delta;
       }
-      for (const viewer of [...state.viewers]) {
-        if (!state.viewers.has(viewer)) continue;
-        viewer.assertOwner();
-        const message = viewer.initialized ? update : full;
-        viewer.initialized = true;
-        viewer.frame(message);
-      }
-    })()
-      .catch((error: unknown) => {
-        this.#fail(state, error);
-        throw error;
-      })
-      .finally(() => {
-        state.task = undefined;
-        if (state.dirty) this.#schedule(state);
-      });
-    return state.task;
+    }
+    for (const viewer of [...state.viewers]) {
+      if (!state.viewers.has(viewer)) continue;
+      viewer.assertOwner();
+      const message = viewer.initialized ? update : full;
+      viewer.initialized = true;
+      viewer.frame(message);
+    }
   }
 
   #fail(state: State, error: unknown): void {
@@ -206,8 +167,7 @@ export class TerminalPreviewService {
   #dispose(state: State): void {
     if (state.disposed) return;
     state.disposed = true;
-    clearTimeout(state.timer);
-    state.subscription?.close();
+    state.observer?.close();
     if (this.#states.get(state.key) === state) this.#states.delete(state.key);
   }
 }

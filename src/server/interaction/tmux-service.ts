@@ -10,6 +10,7 @@ import { ownedSocket, tmuxTarget, validTmuxSessionName } from "./tmux-target.js"
 import {
   type InteractionTransport,
   InteractionTransportError,
+  type MessageSubmissionOptions,
   type TerminalCursorSnapshot,
   type TmuxBinding,
 } from "./transport.js";
@@ -126,16 +127,27 @@ export class TmuxInteractionService implements InteractionTransport {
     binding: TmuxBinding,
     message: string,
     assertAvailable: () => void = () => {},
+    submission?: MessageSubmissionOptions,
   ): Promise<void> {
     const normalized = normalizeMessage(message);
     return this.#serialize(binding, async () => {
       await this.#revalidate(binding);
       assertAvailable();
+      let confirmation: Awaited<ReturnType<MessageSubmissionOptions["prepare"]>> | undefined;
       const bufferName = `ahub-${process.pid}-${randomUUID()}`;
       let bufferMayExist = true;
       try {
         await this.#run(binding, ["load-buffer", "-b", bufferName, "-"], normalized);
         assertAvailable();
+        confirmation = await submission?.prepare(async () => {
+          const result = await this.#capture(
+            binding,
+            ["capture-pane", "-p", "-t", tmuxTarget(binding.sessionName)],
+            assertAvailable,
+          );
+          assertAvailable();
+          return { content: result.stdout, truncated: result.truncated === true };
+        });
         await this.#run(binding, [
           "paste-buffer",
           "-p",
@@ -146,9 +158,11 @@ export class TmuxInteractionService implements InteractionTransport {
           tmuxTarget(binding.sessionName),
         ]);
         bufferMayExist = false;
+        await confirmation?.confirm();
         assertAvailable();
         await this.#run(binding, ["send-keys", "-t", tmuxTarget(binding.sessionName), "Enter"]);
       } finally {
+        confirmation?.close();
         if (bufferMayExist) {
           try {
             await this.#run(binding, ["delete-buffer", "-b", bufferName]);

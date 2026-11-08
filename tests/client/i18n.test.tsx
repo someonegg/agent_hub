@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ApiClientError } from "../../src/client/api/client";
 import { AttachCommand } from "../../src/client/components/AttachCommand";
 import { MessageItem } from "../../src/client/components/MessageItem";
 import { RequestError } from "../../src/client/components/RequestError";
@@ -146,4 +147,32 @@ it("shows runtime names in default agent options and stores only the nickname", 
   const select = screen.getByRole("combobox", { name: "Default Agent", hidden: true });
   fireEvent.change(select, { target: { value: "personal" } });
   expect(select).toHaveValue("personal");
+});
+
+it.each([
+  ["message_not_submitted", "messageNotSubmitted"],
+  ["interaction_not_supported", "interactionNotSupported"],
+  ["interaction_failed", "interactionFailed"],
+  ["operation_result_unknown", "operationResultUnknown"],
+  ["session_busy", "sessionIsBusyTryAgainLater"],
+  ["session_not_found", "requestNotFound"],
+  ["interaction_not_connected", "requestDisconnected"],
+  ["payload_too_large", "requestTooLarge"],
+] as const)("localizes %s without leaking server text", (code, key) => {
+  updatePreferences({ language: "en" });
+  const detail = "Untranslated server diagnostic";
+  const { container } = render(<RequestError error={new ApiClientError(409, code, detail)} />);
+  expect(container).toHaveTextContent(en[key]);
+  expect(container).not.toHaveTextContent(detail);
+  act(() => updatePreferences({ language: "zh-CN" }));
+  expect(container.textContent).toBe(zh[key]);
+  act(() => updatePreferences({ language: "zh-TW" }));
+  expect(container.textContent).toBe(zhTW[key]);
+});
+
+it("preserves native diagnostics for unknown errors", () => {
+  updatePreferences({ language: "zh-CN" });
+  render(<RequestError error={new ApiClientError(500, "native_failure", "native diagnostic")} />);
+  expect(screen.getByText("native diagnostic")).toBeInTheDocument();
+  expect(screen.getByText(/本地 Hub 无法完成请求/)).toBeInTheDocument();
 });

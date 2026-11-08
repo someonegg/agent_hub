@@ -14,6 +14,7 @@ import type {
   TmuxKey,
 } from "../domain/session-domain.js";
 import { normalizeMessage } from "./message.js";
+import { confirmMessageSubmission } from "./message-submission.js";
 import { type PaneBindingManager, paneBindings } from "./pane-binding-manager.js";
 import { isCurrentObservation, observePaneBinding } from "./pane-observation.js";
 import type { RuntimeProbe } from "./runtime-capabilities.js";
@@ -31,6 +32,7 @@ import {
 export class SessionInteractionError extends Error {
   constructor(
     readonly code:
+      | "message_not_submitted"
       | "session_not_found"
       | "interaction_not_supported"
       | "interaction_not_connected"
@@ -62,6 +64,7 @@ export class SessionInteractionService {
   private readonly runtime?: RuntimeProbe;
   private readonly enabled: boolean;
   private readonly bindings: PaneBindingManager;
+  private readonly listener: PreviewListener;
   readonly #busy = new Set<string>();
   readonly #activity: TerminalActivityService;
   readonly #previews: TerminalPreviewService;
@@ -84,6 +87,7 @@ export class SessionInteractionService {
       listener = createTmuxPreviewListener(),
       runtime,
     } = options;
+    this.listener = listener;
     this.enabled = enabled;
     this.bindings = bindings;
     this.runtime = runtime;
@@ -221,14 +225,37 @@ export class SessionInteractionService {
     );
   }
 
-  async sendMessage(sessionId: string, message: string, requireIdle = false): Promise<void> {
+  async sendMessage(
+    sessionId: string,
+    message: string,
+    requireIdle = false,
+    confirmSubmission = false,
+  ): Promise<void> {
     message = normalizeMessage(message);
     this.#assertAvailable(sessionId);
     const { binding } = await this.#prepare(sessionId);
     this.#assertAvailable(sessionId);
     this.#assertInputAllowed(sessionId, binding, requireIdle);
+    const guard = this.#inputGuard(sessionId, binding, requireIdle);
+    if (!confirmSubmission) {
+      await this.#perform(() => this.tmux.sendMessage(binding, message, guard));
+      return;
+    }
     await this.#perform(() =>
-      this.tmux.sendMessage(binding, message, this.#inputGuard(sessionId, binding, requireIdle)),
+      this.tmux.sendMessage(
+        binding,
+        message,
+        guard,
+        confirmMessageSubmission(
+          binding,
+          this.listener,
+          () =>
+            new SessionInteractionError(
+              "message_not_submitted",
+              "Could not submit. Please check the terminal.",
+            ),
+        ),
+      ),
     );
   }
 

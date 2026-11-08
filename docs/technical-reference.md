@@ -405,6 +405,12 @@ used. It checks only the start of the entire message, without trimming whitespac
 for both `--message` and `--stdin`; subsequent lines are not checked. This guard is
 CLI-only and does not change API validation.
 
+HTTP message sends observe terminal text before pasting and wait up to two seconds
+for a change before sending Enter. If no change is observed, the request fails with
+`message_not_submitted` without sending Enter or retrying; this confirms terminal
+echo, not agent acceptance. The browser retains the draft and expands the terminal
+preview on this error. Direct service callers opt into this confirmation explicitly.
+
 CLI messages/ordinary keys default to `requireIdle: true`: non-idle input fails at
 transaction entry without waiting/retry. `--force` sends `requireIdle: false`, allowing
 input while working; browser calls omit the idle restriction. Connection, ownership, and management occupancy checks apply throughout. Ordinary keys use

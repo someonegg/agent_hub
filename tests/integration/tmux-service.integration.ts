@@ -484,3 +484,60 @@ it("keeps output activity alive without preview and preserves pane dimensions", 
     tmux("kill-server");
   }
 });
+
+it("confirms user sends without Web viewers and shares the Web control connection", async () => {
+  const { confirmMessageSubmission } = await import(
+    "../../src/server/interaction/message-submission.js"
+  );
+  const { createTmuxPreviewListener } = await import(
+    "../../src/server/interaction/tmux-preview-listener.js"
+  );
+  const directory = await createTempDirectory("send-confirm-tmux-");
+  const socketPath = join(directory, "server.sock");
+  const tmux = (...args: string[]) =>
+    execFileSync("tmux", ["-S", socketPath, ...args], { encoding: "utf8" });
+  const sessionName = "ahub-00000000-0000-0000-0000-000000000009";
+  tmux("new-session", "-d", "-s", sessionName, "sh");
+  const binding = { socketPath, sessionName };
+  const listen = createTmuxPreviewListener();
+  const transport = new TmuxInteractionService();
+  const previews = new TerminalPreviewService(
+    (target, guard) => transport.captureTerminal(target, guard),
+    listen,
+  );
+  const abort = new AbortController();
+  const frames: unknown[] = [];
+  const errors: unknown[] = [];
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const submission = () =>
+      confirmMessageSubmission(binding, listen, () => new Error("no change"));
+    await transport.sendMessage(binding, "printf 'first-confirmed\\n'", undefined, submission());
+    previews.subscribe(
+      binding,
+      () => {},
+      (frame) => frames.push(frame),
+      (error) => errors.push(error),
+      abort.signal,
+    );
+    await vi.waitFor(() => expect(frames.length).toBeGreaterThan(0));
+    let clients = 0;
+    await transport.sendMessage(binding, "printf 'second-confirmed\\n'", undefined, {
+      async prepare(read) {
+        const result = await submission().prepare(read);
+        clients = tmux("list-clients", "-F", "#{client_name}").trim().split("\n").length;
+        return result;
+      },
+    });
+    expect(clients).toBe(1);
+    const before = frames.length;
+    tmux("send-keys", "-t", sessionName, "printf 'web-still-active\\n'", "Enter");
+    await vi.waitFor(() => expect(frames.length).toBeGreaterThan(before));
+    expect(errors).toEqual([]);
+    expect((await transport.captureTerminal(binding)).content).toContain("second-confirmed");
+  } finally {
+    abort.abort();
+    previews.close();
+    tmux("kill-server");
+  }
+});

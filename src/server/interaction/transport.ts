@@ -12,12 +12,24 @@ export interface TerminalCursorSnapshot {
   readonly cursorY: number;
 }
 
+export interface MessageSubmissionOptions {
+  prepare(read: () => Promise<{ readonly content: string; readonly truncated: boolean }>): Promise<{
+    confirm(): Promise<void>;
+    close(): void;
+  }>;
+}
+
 export interface InteractionTransport {
   connect(attempt: InteractionBindingAttempt): Promise<TmuxBinding>;
   resolveTarget(attempt: InteractionBindingAttempt): Promise<TmuxBinding | null>;
   killSession(target: TmuxBinding, assertAvailable?: () => void): Promise<void>;
   inspect(target: TmuxBinding): Promise<"alive" | "exited">;
-  sendMessage(target: TmuxBinding, message: string, assertAvailable?: () => void): Promise<void>;
+  sendMessage(
+    target: TmuxBinding,
+    message: string,
+    assertAvailable?: () => void,
+    submission?: MessageSubmissionOptions,
+  ): Promise<void>;
   sendKeys(
     target: TmuxBinding,
     steps: readonly InteractionKeyStep[],

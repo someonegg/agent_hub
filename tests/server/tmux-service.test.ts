@@ -778,3 +778,60 @@ it.each(["alive", "query_failed"])(
     expect(runner.calls.map((call) => call.args[0])).toEqual(["capture-pane", "list-sessions"]);
   },
 );
+
+it("confirms inside the send transaction without reentering the capture queue", async () => {
+  const socketPath = await unixSocket();
+  const runner = new FakeRunner();
+  const service = new TmuxInteractionService(runner);
+  const binding = { socketPath, sessionName: MAIN };
+  const close = vi.fn();
+  await service.sendMessage(binding, "hello", undefined, {
+    async prepare(read) {
+      expect(runner.calls.at(-1)?.args[0]).toBe("load-buffer");
+      expect((await read()).content).toBe(runner.terminalOutput);
+      expect(runner.calls.some((call) => call.args[0] === "paste-buffer")).toBe(false);
+      return {
+        async confirm() {
+          expect(runner.calls.at(-1)?.args[0]).toBe("paste-buffer");
+          await read();
+        },
+        close,
+      };
+    },
+  });
+  expect(runner.calls.filter((call) => call.args[0] === "send-keys")).toHaveLength(1);
+  expect(close).toHaveBeenCalledOnce();
+});
+
+it("does not send Enter or retry paste when confirmation or ownership fails", async () => {
+  const socketPath = await unixSocket();
+  for (const ownership of [false, true]) {
+    const runner = new FakeRunner();
+    const service = new TmuxInteractionService(runner);
+    let valid = true;
+    const close = vi.fn();
+    await expect(
+      service.sendMessage(
+        { socketPath, sessionName: MAIN },
+        "hello",
+        () => {
+          if (!valid) throw new Error("replaced");
+        },
+        {
+          async prepare() {
+            return {
+              async confirm() {
+                if (ownership) valid = false;
+                else throw new Error("no change");
+              },
+              close,
+            };
+          },
+        },
+      ),
+    ).rejects.toThrow(ownership ? "replaced" : "no change");
+    expect(runner.calls.filter((call) => call.args[0] === "paste-buffer")).toHaveLength(1);
+    expect(runner.calls.some((call) => call.args[0] === "send-keys")).toBe(false);
+    expect(close).toHaveBeenCalledOnce();
+  }
+});
