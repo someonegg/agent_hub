@@ -32,7 +32,7 @@ describe("project directory selection", () => {
     render(<Field />);
     const select = screen.getByRole("combobox");
     fireEvent.change(select, { target: { value: "custom" } });
-    const input = screen.getByRole("textbox", { name: "Custom directory" });
+    const input = screen.getByRole("textbox", { name: "Directory path" });
     expect(input).toHaveValue("");
     expect(input).not.toHaveFocus();
     expect(input).toBeRequired();

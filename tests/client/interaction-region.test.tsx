@@ -1184,16 +1184,19 @@ it("follows new terminal output near the end and preserves a scrolled reading po
 });
 
 it.each(["idle", "working"] as const)(
-  "toggles the terminal by clicking its %s status",
+  "keeps %s status independent from the terminal preview toggle",
   async (activity) => {
     const user = userEvent.setup();
     const handlers = props({ ...interaction("connected"), activity } as InteractionResponse);
     render(<InteractionRegion {...handlers} />);
     const toggle = screen.getByRole("button", { name: "Terminal Preview" });
     const status = screen.getByText(activity === "idle" ? "Idle" : "Working");
-    expect(toggle).toContainElement(status);
+    expect(toggle).not.toContainElement(status);
     const expanded = toggle.getAttribute("aria-expanded");
     await user.click(status);
+    expect(toggle).toHaveAttribute("aria-expanded", expanded);
+    expect(handlers.onTogglePreview).not.toHaveBeenCalled();
+    await user.click(toggle);
     expect(toggle).toHaveAttribute("aria-expanded", String(expanded !== "true"));
     expect(toggle).toHaveFocus();
   },

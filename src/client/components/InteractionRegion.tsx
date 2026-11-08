@@ -151,19 +151,33 @@ export function InteractionRegion({
               aria-controls={previewContentId}
               onClick={onTogglePreview}
             >
-              <span className="preview-indicator" aria-hidden="true" />
+              <svg
+                className="preview-icon"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="4" width="18" height="16" rx="3" />
+                <path d="m7 9 3 3-3 3M13 15h4" />
+              </svg>
               <span>{t("terminalPreview")}</span>
-              {interaction?.supported &&
-              (interaction.activity === "working" || interaction.activity === "idle") ? (
-                <span
-                  className={`terminal-activity terminal-activity-${interaction.activity}`}
-                  role="status"
-                >
-                  <span className="terminal-activity-dot" aria-hidden="true" />
-                  {interaction.activity === "working" ? t("working") : t("idle")}
-                </span>
-              ) : null}
             </button>
+            {interaction?.supported &&
+            (interaction.activity === "working" || interaction.activity === "idle") ? (
+              <span
+                className={`terminal-activity terminal-activity-${interaction.activity}`}
+                role="status"
+              >
+                <span className="terminal-activity-dot" aria-hidden="true" />
+                {interaction.activity === "working" ? t("working") : t("idle")}
+              </span>
+            ) : null}
             <button
               type="button"
               className="composer-toggle"

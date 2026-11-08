@@ -149,14 +149,15 @@
   width: max-content;
   overflow: visible;
   gap: 0.35rem;
-  padding: 0.25rem;
+  padding: 0.25rem 0.45rem;
+  border-radius: var(--radius-control);
 }
 .interaction-toolbar .terminal-preview-toggle > span {
   flex-shrink: 0;
 }
 .interaction-toolbar .terminal-activity {
   color: var(--ink-soft);
-  margin-left: 0;
+  margin-left: 0.4rem;
 }
 .composer-toggle {
   margin-left: auto;
@@ -170,26 +171,12 @@
   color: var(--ink-soft);
   cursor: pointer;
 }
-.preview-indicator {
-  flex: 0 0 22px;
-  height: 13px;
-  padding: 2px;
-  border-radius: 10px;
-  background: var(--scrollbar-thumb);
+.preview-icon {
+  flex: 0 0 18px;
 }
-.preview-indicator::after {
-  content: "";
-  display: block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--paper);
-}
-[aria-pressed="true"] .preview-indicator {
-  background: var(--current);
-}
-[aria-pressed="true"] .preview-indicator::after {
-  margin-left: 9px;
+.interaction-toolbar .terminal-preview-toggle[aria-pressed="true"] {
+  color: var(--current);
+  background: color-mix(in srgb, var(--current) 9%, transparent);
 }
 .interaction-composer[hidden],
 .terminal-preview[hidden] {

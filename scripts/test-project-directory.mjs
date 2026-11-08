@@ -46,7 +46,7 @@ async function verify(page, output) {
     });
     if (await page.getByRole("listbox").count()) throw new Error("Floating suggestions remain");
     await field.selectOption("custom");
-    const custom = dialog.getByRole("textbox", { name: "Custom directory" });
+    const custom = dialog.getByRole("textbox", { name: "Directory path" });
     if (await custom.evaluate((element) => element === document.activeElement))
       throw new Error("Custom mode must not automatically open the keyboard");
     await custom.fill("/new/project");

@@ -144,13 +144,15 @@ async function capture(
     const toggle = demo.getByRole("button", { name: label("Terminal Preview"), exact: true });
     const expanded = await toggle.getAttribute("aria-expanded");
     for (const state of ["false", "true"]) {
+      if ((await toggle.getAttribute("aria-expanded")) !== state) await toggle.click();
+      await demo.locator(".interaction-toolbar .terminal-activity").click();
       if ((await toggle.getAttribute("aria-expanded")) !== state)
-        await toggle.locator(".terminal-activity").click();
+        throw new Error("Activity status must not toggle terminal preview");
       await settle();
       const fits = await demo.locator(".interaction-toolbar").evaluate((toolbar) => {
         const toggle = toolbar.querySelector(".terminal-preview-toggle");
         const label = toggle.children[1].getBoundingClientRect();
-        const activity = toggle.querySelector(".terminal-activity")?.getBoundingClientRect();
+        const activity = toolbar.querySelector(".terminal-activity")?.getBoundingClientRect();
         const bounds = toolbar.getBoundingClientRect();
         return (
           toolbar.scrollWidth <= toolbar.clientWidth &&
