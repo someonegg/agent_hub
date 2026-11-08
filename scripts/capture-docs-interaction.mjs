@@ -72,13 +72,13 @@ async function capture(
     await demo.getByRole("button", { name: label("Collapse"), exact: true }).click();
     if (await composer.isVisible()) throw new Error("Collapsed composer is visible");
     if ((await toggle.getAttribute("aria-expanded")) !== "true")
-      throw new Error("Panel collapse changed preview visibility");
+      throw new Error("Composer collapse changed preview visibility");
     await demo.getByRole("button", { name: label("Expand"), exact: true }).click();
     if (
       (await composer.inputValue()) !== draft ||
       (await demo.locator(".interaction-attachment").count()) !== attachments
     )
-      throw new Error("Panel collapse lost draft or attachments");
+      throw new Error("Composer collapse lost draft or attachments");
     await demo.getByLabel(label("Terminal content"), { exact: true }).focus();
     await demo.keyboard.press("Escape");
     if (!(await toggle.evaluate((element) => document.activeElement === element)))
@@ -892,12 +892,6 @@ async function capture(
     await demo.setViewportSize({ width: 1440, height: 400 });
     await demo.evaluate(() => document.querySelector(".message-scroll").scrollTo(0, 0));
     await verifyPageJumps();
-    if (
-      await demo
-        .locator(".page-jump-controls")
-        .evaluate((element) => element.style.getPropertyValue("--panel-clearance"))
-    )
-      throw new Error("Page jumps must not compute panel avoidance");
     items = [1, 2].map((ordinal) => ({
       kind: "message",
       id: `plan-${ordinal}`,

@@ -71,7 +71,6 @@ export const messages: Record<keyof typeof english, string> = {
   disconnected: "已断开",
   dismiss: "关闭提示",
   dismissInteractionError: "关闭交互错误提示",
-  dismissSessionCreatedNotification: "关闭会话创建通知",
   dismissTerminalPreviewError: "关闭终端错误提示",
   dismissUploadError: "关闭上传错误提示",
   down: "向下",
@@ -128,7 +127,6 @@ export const messages: Record<keyof typeof english, string> = {
 
   nothingToShow: "暂无内容",
   open: "打开",
-  openSession: "打开会话",
   openingSession: "正在打开会话…",
   operation: "操作",
   originalSessionID: "原始会话 ID ·",
@@ -181,7 +179,6 @@ export const messages: Record<keyof typeof english, string> = {
   session: "会话",
   sessionList: "会话列表",
 
-  sessionCreated: "会话已创建。",
   sessionAgent: "会话智能体",
   sessionInformation: "会话信息",
   sessionInteraction: "会话交互",

@@ -22,10 +22,6 @@
   font-size: var(--text-small);
   text-align: left;
 }
-.terminal-preview-toggle:disabled {
-  cursor: wait;
-  opacity: 0.72;
-}
 .terminal-preview-body {
   position: relative;
   min-height: 9.9rem;

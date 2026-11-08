@@ -113,7 +113,10 @@ export function TerminalPreview({
           tabIndex={0}
           onKeyDown={onPreviewKeyDown}
           onClick={(event) => {
-            if (!(event.target instanceof Element) || !event.target.closest("button, pre"))
+            if (
+              !(event.target instanceof Element) ||
+              !event.target.closest("button, pre, summary, details")
+            )
               event.currentTarget.focus();
           }}
         >

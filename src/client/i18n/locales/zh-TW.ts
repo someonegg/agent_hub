@@ -71,7 +71,6 @@ export const messages: Record<keyof typeof english, string> = {
   disconnected: "已斷開",
   dismiss: "關閉提示",
   dismissInteractionError: "關閉互動錯誤提示",
-  dismissSessionCreatedNotification: "關閉工作階段建立通知",
   dismissTerminalPreviewError: "關閉終端錯誤提示",
   dismissUploadError: "關閉上傳錯誤提示",
   down: "向下",
@@ -128,7 +127,6 @@ export const messages: Record<keyof typeof english, string> = {
 
   nothingToShow: "暫無內容",
   open: "開啟",
-  openSession: "開啟工作階段",
   openingSession: "正在開啟工作階段…",
   operation: "操作",
   originalSessionID: "原始工作階段 ID ·",
@@ -181,7 +179,6 @@ export const messages: Record<keyof typeof english, string> = {
   session: "工作階段",
   sessionList: "工作階段列表",
 
-  sessionCreated: "工作階段已建立。",
   sessionAgent: "工作階段智慧體",
   sessionInformation: "工作階段資訊",
   sessionInteraction: "工作階段互動",

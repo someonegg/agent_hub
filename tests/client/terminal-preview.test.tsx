@@ -19,6 +19,17 @@ function props() {
   };
 }
 
+it("preserves diagnostic summary focus and leaves its keyboard actions local", () => {
+  const handlers = props();
+  render(<TerminalPreview {...handlers} previewError="stream failed" />);
+  const summary = screen.getByText("Diagnostic details");
+  summary.focus();
+  fireEvent.click(summary);
+  expect(summary).toHaveFocus();
+  expect(fireEvent.keyDown(summary, { key: "Enter" })).toBe(true);
+  expect(handlers.onSendKeys).not.toHaveBeenCalled();
+});
+
 it("keeps stream and keyboard failures independent and clears keyboard failures on reopen", async () => {
   const handlers = props();
   handlers.onSendKeys.mockRejectedValueOnce(new Error("key failed"));

@@ -72,7 +72,6 @@ export const messages = {
   disconnected: "Disconnected",
   dismiss: "Dismiss",
   dismissInteractionError: "Dismiss interaction error",
-  dismissSessionCreatedNotification: "Dismiss session created notification",
   dismissTerminalPreviewError: "Dismiss terminal error",
   dismissUploadError: "Dismiss upload error",
   down: "Down",
@@ -130,7 +129,6 @@ export const messages = {
 
   nothingToShow: "Nothing to show",
   open: "Open",
-  openSession: "Open session",
   openingSession: "Opening session…",
   operation: "Operation",
   originalSessionID: "Original session ID ·",
@@ -183,7 +181,6 @@ export const messages = {
   session: "Session",
   sessionList: "Session list",
 
-  sessionCreated: "Session created.",
   sessionAgent: "Session agent",
   sessionInformation: "Session information",
   sessionInteraction: "Session interaction",
