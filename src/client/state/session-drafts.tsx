@@ -15,11 +15,33 @@ function useDraftStore() {
   return useState(() => new Map<string, SessionDraft>());
 }
 
+function useComposerStore() {
+  return useState(() => new Map<string, boolean>());
+}
+
+const SessionComposerContext = createContext<ReturnType<typeof useComposerStore> | null>(null);
+
+export function useSessionComposerPreference(sessionId: string) {
+  const localStore = useComposerStore();
+  const [preferences, setPreferences] = useContext(SessionComposerContext) ?? localStore;
+  return {
+    expanded: preferences.get(sessionId),
+    setExpanded: (expanded: boolean) => {
+      setPreferences((current) => new Map(current).set(sessionId, expanded));
+    },
+  };
+}
+
 const SessionDraftContext = createContext<ReturnType<typeof useDraftStore> | null>(null);
 
 export function SessionDraftProvider({ children }: { children: ReactNode }) {
   const store = useDraftStore();
-  return <SessionDraftContext value={store}>{children}</SessionDraftContext>;
+  const composerStore = useComposerStore();
+  return (
+    <SessionDraftContext value={store}>
+      <SessionComposerContext value={composerStore}>{children}</SessionComposerContext>
+    </SessionDraftContext>
+  );
 }
 
 export function useSessionDraft(sessionId: string) {

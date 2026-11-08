@@ -888,6 +888,8 @@ it("retains attachment drafts across sessions and failed sends, then sends witho
     target: { files: [new File(["report"], "report.txt")] },
   });
   await screen.findByRole("button", { name: "Remove report.txt" });
+  fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   view.rerender(session("b"));
   expect(screen.queryByRole("button", { name: "Remove report.txt" })).not.toBeInTheDocument();
   view.rerender(session("a"));
@@ -1024,3 +1026,88 @@ it.each(["unbound", "unavailable"] as const)(
     );
   },
 );
+
+describe("composer entry state", () => {
+  function session(id: string, long = false, ready = true) {
+    return (
+      <SessionDraftProvider>
+        <InteractionRegion
+          {...props(interaction("connected"))}
+          key={id}
+          sessionId={id}
+          previewExpanded={false}
+          messagesReady={ready}
+          hasMoreMessages={long}
+        />
+      </SessionDraftProvider>
+    );
+  }
+
+  it("opens short sessions without focus and restores explicit choices ahead of defaults", () => {
+    const view = render(session("short"));
+    expect(screen.getByRole("textbox")).not.toHaveFocus();
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    view.rerender(session("other"));
+    expect(screen.getByRole("textbox")).toBeVisible();
+    view.rerender(session("short"));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    expect(screen.getByRole("textbox")).toHaveFocus();
+    view.rerender(session("other"));
+    view.rerender(session("short", true));
+    expect(screen.getByRole("textbox")).toBeVisible();
+    expect(screen.getByRole("textbox")).not.toHaveFocus();
+  });
+
+  it("does not save automatic defaults as manual choices", () => {
+    const view = render(session("automatic"));
+    expect(screen.getByRole("textbox")).toBeVisible();
+    view.rerender(session("other"));
+    view.rerender(session("automatic", true));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+  });
+
+  it("waits for messages, closes long sessions once and ignores later message updates", () => {
+    const view = render(session("long", false, false));
+    view.rerender(session("long", true));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    view.rerender(session("long", false));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    view.rerender(session("other"));
+    view.rerender(session("long", true));
+    expect(screen.getByRole("textbox")).toBeVisible();
+  });
+
+  it("opens text drafts ahead of a saved collapsed choice but permits collapsing during editing", () => {
+    const view = render(session("draft"));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "unsent" } });
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    view.rerender(session("other"));
+    view.rerender(session("draft", true));
+    expect(screen.getByRole("textbox")).toHaveValue("unsent");
+    expect(screen.getByRole("textbox")).not.toHaveFocus();
+  });
+
+  it("uses rendered message height rather than message count", () => {
+    const height = vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(400);
+    const bounds = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue({ height: 800 } as DOMRect);
+    try {
+      render(
+        <div className="message-scroll">
+          <ol className="timeline">
+            <li>A single long message</li>
+          </ol>
+          <InteractionRegion {...props(interaction("connected"))} previewExpanded={false} />
+        </div>,
+      );
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    } finally {
+      height.mockRestore();
+      bounds.mockRestore();
+    }
+  });
+});

@@ -44,6 +44,11 @@ async function capture(
   const demo = await context.newPage();
   const previewToggle = demo.getByRole("button", { name: label("Terminal"), exact: true });
   const composerToggle = demo.getByRole("button", { name: label("Message Input"), exact: true });
+  const openComposer = async () => {
+    await composerToggle.waitFor();
+    if ((await composerToggle.getAttribute("aria-expanded")) !== "true")
+      await composerToggle.click();
+  };
   const settle = () =>
     demo.evaluate(
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
@@ -454,6 +459,7 @@ async function capture(
     return route.abort();
   });
   async function prepareDesktopPreview() {
+    await openComposer();
     if ((await previewToggle.getAttribute("aria-expanded")) !== "true") await previewToggle.click();
     await demo.getByLabel(label("Terminal content"), { exact: true }).waitFor();
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
@@ -586,6 +592,7 @@ async function capture(
       history.pushState(null, "", "/sessions/docs-demo-session-keyboard");
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
+    await openComposer();
     await demo.getByRole("textbox", { name: label("Message to agent") }).waitFor();
     if (await composer.inputValue()) throw new Error("Draft leaked into another session");
     await demo.evaluate((id) => {
@@ -729,6 +736,7 @@ async function capture(
     await demo.getByRole("button", { name: label("Confirm delete"), exact: true }).click();
     await demo.getByText(label("No uploads yet."), { exact: true }).waitFor();
     await demo.getByRole("link", { name: label("← Back to session"), exact: true }).click();
+    await openComposer();
     await composer.waitFor();
     historyDeleted = false;
     await prepareDesktopPreview();
@@ -832,6 +840,7 @@ async function capture(
     await demo.getByRole("button", { name: label("Close settings"), exact: true }).click();
     await demo.reload();
     const shortcutComposer = demo.getByRole("textbox", { name: label("Message to agent") });
+    await openComposer();
     await shortcutComposer.waitFor();
     if (
       !(await shortcutComposer.getAttribute("placeholder")).includes(
@@ -871,7 +880,20 @@ async function capture(
       throw new Error("Mobile horizontal overflow");
     if (errors.length || (await demo.getByRole("alert").count()))
       throw new Error(errors.join("\n") || "Mobile error alert");
+    if ((await composerToggle.getAttribute("aria-expanded")) !== "false")
+      throw new Error("Long conversations should start with the composer collapsed");
+    await demo.evaluate(() => {
+      const scroll = document.querySelector(".message-scroll");
+      scroll.scrollTo({ top: scroll.scrollHeight, behavior: "instant" });
+    });
+    await settle();
+    if ((await composerToggle.getAttribute("aria-expanded")) !== "false")
+      throw new Error("Scrolling to the end must not expand the composer");
+    await demo
+      .locator(".user-input-card")
+      .evaluate((card) => card.scrollIntoView({ block: "center" }));
     await demo.screenshot({ path: resolveMobile("reader"), animations: "disabled" });
+    await openComposer();
     await previewToggle.click();
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     await verifyCompactInteraction();
@@ -938,6 +960,7 @@ async function capture(
       throw new Error("Latest plan cannot be manually hidden");
     // Exercise the actual setting, rather than only seeding localized screenshots.
     const draft = demo.locator("textarea");
+    await openComposer();
     await draft.fill("Preserve this draft /original/path");
     const originalInput = await draft.elementHandle();
     const nextLanguage = language === "en" ? "zh-CN" : "en";
