@@ -5,7 +5,6 @@ import { ArtifactsPage } from "./components/ArtifactsPage";
 import { DiffPage } from "./components/DiffPage";
 import { CreateSession } from "./components/HubManagement";
 import { HubSidebar } from "./components/HubSidebar";
-import { InternalLink } from "./components/InternalLink";
 import { SidebarToggle } from "./components/SidebarToggle";
 import { UploadsPage } from "./components/UploadsPage";
 import { t } from "./i18n";
@@ -53,7 +52,6 @@ function SessionHub() {
   );
   const [createDirectory, setCreateDirectory] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
-  const [createdSessionId, setCreatedSessionId] = useState<string | null>(null);
   function toggleSidebar() {
     const collapsed = !sidebarCollapsed;
     setSidebarCollapsed(collapsed);
@@ -70,27 +68,6 @@ function SessionHub() {
     <main
       className={`hub${sessionId ? " has-session" : ""}${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
     >
-      {createdSessionId ? (
-        <aside className="creation-notice" role="status">
-          {t("sessionCreated")}{" "}
-          <InternalLink
-            href={`/sessions/${createdSessionId}`}
-            onNavigate={() => {
-              navigate(createdSessionId);
-              setCreatedSessionId(null);
-            }}
-          >
-            {t("openSession")}
-          </InternalLink>
-          <button
-            type="button"
-            aria-label={t("dismissSessionCreatedNotification")}
-            onClick={() => setCreatedSessionId(null)}
-          >
-            ×
-          </button>
-        </aside>
-      ) : null}
       <HubSidebar
         onCollapse={toggleSidebar}
         catalog={visibleCatalog}
@@ -175,10 +152,7 @@ function SessionHub() {
           catalog.refresh();
           if (!operation.sessionId) return;
           if (createOpen) {
-            setCreatedSessionId(null);
             navigate(operation.sessionId);
-          } else {
-            setCreatedSessionId(operation.sessionId);
           }
         }}
       />

@@ -488,12 +488,6 @@ over 350 ms; only content/truncation changes publish. Capacity is 100/process,
 ownership loss, invalid binds, changed targets, or listener failure close them
 permanently, even if ownership returns.
 
-Browser connects while expanded, connected, visible. Retryable errors
-back off; terminal errors await lifecycle change/explicit retry. Failures retain
-the last frame and notice. Dismissing details does not reconnect; retry cancels
-backoff. See [service](../src/server/interaction/terminal-preview-service.ts) and
-[transport](../src/server/http/terminal-preview-websocket.ts).
-
 ## Asynchronous management
 
 | Endpoint                              | Body / result                                                                                                                                                    |

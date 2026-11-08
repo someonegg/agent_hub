@@ -46,14 +46,17 @@ export function useTerminalPreview(
     return () => document.removeEventListener("visibilitychange", visibility);
   }, []);
   useEffect(() => {
-    if (!connected) {
-      setExpanded(false);
+    if (!connected || !expanded) {
+      if (!connected) {
+        setExpanded(false);
+        setPreview(null);
+      }
       setBusy(false);
-      setPreview(null);
       setStopped(false);
       setError(null);
+      return;
     }
-    if (!connected || !expanded || !visible) return;
+    if (!visible) return;
     let disposed = false;
     let generation = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -64,14 +67,14 @@ export function useTerminalPreview(
       const current = ++generation;
       let confirmed: TerminalPreviewSnapshot | null = null;
       setBusy(true);
-      setError(null);
+      setStopped(false);
       const failed = (message: string, retryable: boolean, detail?: Error) => {
         if (disposed || generation !== current) return;
         ++generation;
-        setBusy(false);
+        setBusy(retryable);
         setErrorDetail(detail ?? new Error(message));
         setError(message);
-        setStopped(true);
+        setStopped(!retryable);
         if (retryable) {
           timer = setTimeout(connect, retryDelayMs(retry));
           retry = nextRetryMs(retry);
@@ -123,6 +126,5 @@ export function useTerminalPreview(
     onTogglePreview: () => {
       if (connection.current) setExpanded((value) => !value);
     },
-    onDismissPreviewError: () => setError(null),
   };
 }

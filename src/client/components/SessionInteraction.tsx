@@ -4,10 +4,10 @@ import type { InteractionResponse } from "../../shared/api-contract";
 
 import { useSessionInteraction } from "../state/use-session-interaction";
 import { useTerminalPreview } from "../state/use-terminal-preview";
-import { InteractionPanel } from "./InteractionPanel";
+import { InteractionRegion } from "./InteractionRegion";
 
 interface SessionInteractionProps {
-  onPanelElement?: (element: HTMLElement | null) => void;
+  dockTarget?: HTMLElement | null;
   recoveryActions?: ReactNode;
   operationStatus?: ReactNode;
   managementBusy?: boolean;
@@ -19,7 +19,7 @@ interface SessionInteractionProps {
 }
 
 export function SessionInteraction({
-  onPanelElement,
+  dockTarget,
   recoveryActions,
   operationStatus,
   managementBusy,
@@ -29,10 +29,10 @@ export function SessionInteraction({
   onMessagePreview,
   previewAutoExpandKey = null,
 }: SessionInteractionProps) {
-  const previewAvailable = interaction?.supported === true && interaction.state === "connected";
+  const interactionAvailable = interaction?.supported === true && interaction.state === "connected";
   const controller = useSessionInteraction(sessionId);
 
-  const preview = useTerminalPreview(sessionId, previewAvailable, previewAutoExpandKey);
+  const preview = useTerminalPreview(sessionId, interactionAvailable, previewAutoExpandKey);
 
   const sendMessage = async (message: string) => {
     const dismissPreview = /^\/[A-Za-z]+$/.test(message.trimEnd())
@@ -47,10 +47,10 @@ export function SessionInteraction({
   };
 
   return (
-    <InteractionPanel
+    <InteractionRegion
       key={sessionId}
       sessionId={sessionId}
-      onPanelElement={onPanelElement}
+      dockTarget={dockTarget}
       recoveryActions={recoveryActions}
       operationStatus={operationStatus}
       interaction={interaction}
@@ -61,6 +61,7 @@ export function SessionInteraction({
       onDismissError={controller.clearError}
       onSendMessage={sendMessage}
       onSendKeys={controller.sendKeys}
+      onSendTerminalKeys={controller.sendTerminalKeys}
       onHandoffPaneBinding={controller.handoffPaneBinding}
       {...preview}
     />

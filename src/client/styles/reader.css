@@ -1,10 +1,67 @@
+html:has(.session-layout),
+body:has(.session-layout) {
+  overflow: hidden;
+  min-height: 0;
+}
 .reader-welcome {
   display: grid;
   place-items: center;
 }
 .reader-page {
-  min-height: 100vh;
+  min-height: 0;
+  flex: 1;
+  display: flex;
 }
+.session-layout {
+  width: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: var(--session-viewport-height, 100dvh);
+  position: fixed;
+  inset-inline: 0;
+  top: var(--session-viewport-top, 0px);
+}
+.hub .session-layout {
+  position: static;
+  height: 100%;
+}
+.message-region {
+  position: relative;
+  container-type: size;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.message-scroll {
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.interaction-dock {
+  min-height: 0;
+  max-height: min(
+    calc(var(--session-viewport-height, 100dvh) * 0.65),
+    max(44px, calc(var(--session-viewport-height, 100dvh) - 10rem))
+  );
+  overflow: auto;
+  padding: 0 clamp(1rem, 2.5vw, 2rem);
+  width: 100%;
+  border-top: 1px solid var(--notice-border);
+}
+.interaction-dock:empty {
+  display: none;
+}
+.interaction-dock .interaction-region {
+  max-width: 52rem;
+}
+@media (width < 768px) {
+  .interaction-dock {
+    padding-inline: 12px;
+  }
+}
+
 .reader-header h2 {
   font-family: var(--title-font);
   font-weight: var(--weight-medium);
@@ -34,7 +91,7 @@
 .reader {
   width: 100%;
   max-width: 72rem;
-  padding: 3.5rem clamp(1.5rem, 5vw, 5rem) 5rem;
+  padding: 1.5rem clamp(1rem, 2.5vw, 2rem) 2rem;
 }
 .reader-header {
   display: flex;
@@ -128,8 +185,8 @@
   background: rgb(31 35 40 / 9%);
 }
 .error-state .error-dismiss:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 2px;
+  outline: 1px solid currentColor;
+  outline-offset: -2px;
 }
 .empty-state {
   max-width: 30rem;
@@ -137,10 +194,10 @@
   color: var(--ink-soft);
 }
 .page-jump-controls {
-  position: fixed;
-  z-index: 30;
+  position: absolute;
+  z-index: 2;
   right: clamp(0.9rem, 2.2vw, 1.75rem);
-  bottom: max(clamp(0.9rem, 2.2vw, 1.75rem), var(--panel-clearance, 0px));
+  bottom: clamp(0.9rem, 2.2vw, 1.75rem);
   display: grid;
   gap: 0.35rem;
 }
@@ -281,7 +338,7 @@
 }
 @media (width < 768px) {
   .reader {
-    padding: 25px 20px 5rem;
+    padding: 16px 12px 12px;
   }
   .session-metadata {
     gap: var(--space-small);
@@ -296,4 +353,21 @@
   .session-information summary {
     min-height: 44px;
   }
+}
+
+.page-jump-control[aria-hidden="true"] {
+  display: none;
+}
+@container (height < 140px) {
+  .page-jump-controls {
+    display: flex;
+  }
+}
+
+.message-scroll:focus-visible {
+  outline: 1px solid var(--mist);
+  outline-offset: -1px;
+}
+.timeline > .trace-event:last-child {
+  padding-bottom: 0;
 }

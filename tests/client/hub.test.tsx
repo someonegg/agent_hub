@@ -192,15 +192,14 @@ describe("unified hub", () => {
       if (dismiss) {
         expect(window.location.pathname).toBe(`/sessions/${SESSION_ID}`);
         expect(screen.getByRole("heading", { name: "Reader work" })).toBeInTheDocument();
-        fireEvent.click(screen.getByRole("link", { name: "Open session" }));
-        await flush();
+      } else {
+        expect(screen.getByRole("button", { name: /^reader.*1/ })).toHaveAttribute(
+          "aria-expanded",
+          "true",
+        );
+        expect(window.location.pathname).toBe(`/sessions/${CHILD_ID}`);
+        expect(screen.getByRole("heading", { name: "Child trace" })).toBeInTheDocument();
       }
-      expect(screen.getByRole("button", { name: /^reader.*1/ })).toHaveAttribute(
-        "aria-expanded",
-        "true",
-      );
-      expect(window.location.pathname).toBe(`/sessions/${CHILD_ID}`);
-      expect(screen.getByRole("heading", { name: "Child trace" })).toBeInTheDocument();
       expect(screen.queryByRole("link", { name: "Open session" })).toBeNull();
     },
   );
@@ -317,7 +316,7 @@ describe("unified hub", () => {
     fireEvent.change(within(dialog).getByLabelText("Project directory"), {
       target: { value: "custom" },
     });
-    fireEvent.change(within(dialog).getByLabelText("Custom directory"), {
+    fireEvent.change(within(dialog).getByLabelText("Directory path"), {
       target: { value: "/new/project" },
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Close new session" }));
@@ -450,7 +449,7 @@ it("defaults creation to the first agent in aggregate view and restores a stored
   expect(screen.getByLabelText("Filter by agent")).toHaveValue("");
   fireEvent.click(screen.getAllByRole("button", { name: "New session" })[0]!);
   fireEvent.change(screen.getByLabelText("Project directory"), { target: { value: "custom" } });
-  fireEvent.change(screen.getByLabelText("Custom directory"), { target: { value: "/project" } });
+  fireEvent.change(screen.getByLabelText("Directory path"), { target: { value: "/project" } });
   expect(screen.getByRole("button", { name: "Create session" })).toBeEnabled();
   fireEvent.change(screen.getByLabelText("Session agent"), { target: { value: "work" } });
   expect(screen.getByRole("button", { name: "Create session" })).toBeEnabled();
@@ -486,7 +485,7 @@ it("preselects the default creation agent and respects an explicit agent filter"
   fireEvent.click(screen.getAllByRole("button", { name: "New session" })[0]!);
   expect(screen.getByLabelText("Session agent")).toHaveValue(list.agents[0]!.nickname);
   fireEvent.change(screen.getByLabelText("Project directory"), { target: { value: "custom" } });
-  fireEvent.change(screen.getByLabelText("Custom directory"), { target: { value: "/project" } });
+  fireEvent.change(screen.getByLabelText("Directory path"), { target: { value: "/project" } });
   const create = vi.spyOn(api, "createSession").mockRejectedValue(new Error("Test stopped"));
   fireEvent.click(screen.getByRole("button", { name: "Create session" }));
   await flush();

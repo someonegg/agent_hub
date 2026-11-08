@@ -1,0 +1,237 @@
+.interaction-composer {
+  margin-top: 0;
+  overflow: hidden;
+  background: var(--paper);
+  border: 1px solid var(--scrollbar-thumb);
+  border-radius: var(--radius-panel);
+}
+.interaction-composer:focus-within {
+  border-color: var(--current);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--current) 18%, transparent);
+}
+.interaction-composer textarea {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.7rem 0.75rem;
+  resize: vertical;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  line-height: 1.5;
+}
+.interaction-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0 0.4rem 0.1rem;
+  background: transparent;
+}
+.interaction-secondary-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+}
+.interaction-primary-actions {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.interaction-actions button {
+  min-height: var(--control-height);
+  padding: 0.2rem 0.5rem;
+  color: var(--current);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: var(--body-font);
+  font-size: var(--text-control);
+  line-height: 1.3;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.interaction-actions .interaction-send {
+  min-height: var(--control-height);
+  color: var(--paper);
+  background: var(--current);
+  border-color: var(--current);
+}
+.interaction-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 0.7rem;
+  color: var(--error-ink);
+  background: var(--error-surface);
+  font-size: var(--text-small);
+  overflow-wrap: anywhere;
+}
+.interaction-error > span {
+  min-width: 0;
+}
+.interaction-error button {
+  flex: 0 0 auto;
+  color: currentColor;
+  background: transparent;
+  border: 0;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+.interaction-composer-dragging {
+  outline: 2px dashed var(--current);
+  outline-offset: 4px;
+}
+.interaction-actions .interaction-attach {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+.interaction-attachment-menu {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  overflow-y: auto;
+  padding: 0.25rem;
+  background: var(--paper);
+  border: 1px solid var(--mist);
+  border-radius: var(--radius-control);
+  box-shadow: 0 4px 16px #0002;
+}
+.interaction-attachment-menu button {
+  min-height: 44px;
+  text-align: left;
+}
+.interaction-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 10px 10px 0;
+  margin: 0;
+}
+.interaction-attachments:empty {
+  display: none;
+}
+.interaction-attachment {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 96px;
+  background: var(--panel-surface);
+  padding: 6px;
+  border: 1px solid var(--notice-border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.attachment-thumbnail {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 4px;
+}
+.attachment-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 64px;
+  object-fit: contain;
+}
+.attachment-file-icon {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+  color: var(--ink-soft);
+}
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+.attachment-preview-error {
+  font-size: 11px;
+}
+.attachment-remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid var(--notice-border);
+  background: var(--panel-surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.attachment-preview-dialog {
+  max-width: min(960px, 94vw);
+  max-height: 90dvh;
+  padding: 40px 16px 16px;
+  border: 1px solid var(--notice-border);
+  border-radius: 12px;
+  background: var(--panel-surface);
+  color: var(--ink);
+}
+.attachment-preview-dialog p {
+  overflow-wrap: anywhere;
+}
+.attachment-preview-dialog img {
+  display: block;
+  max-width: 100%;
+  max-height: 70dvh;
+  object-fit: contain;
+  margin: auto;
+}
+.uploads-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+  overflow-wrap: anywhere;
+}
+.upload-entry {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--code-border);
+}
+.upload-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.upload-preview {
+  display: block;
+  padding: 0;
+  margin: 12px 0;
+  max-width: 100%;
+}
+.upload-preview img {
+  display: block;
+  max-width: 180px;
+  max-height: 140px;
+  object-fit: contain;
+}
+.upload-preview.expanded img {
+  max-width: 100%;
+  max-height: 80vh;
+}
+.interaction-attachment-menu a {
+  display: block;
+  padding: 8px 12px;
+}
+.interaction-upload-progress {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: var(--text-small);
+}

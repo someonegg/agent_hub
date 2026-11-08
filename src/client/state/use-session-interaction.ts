@@ -25,17 +25,17 @@ export function useSessionInteraction(sessionId: string) {
     setInteractionBusy(false);
   }, [sessionId]);
 
-  const act = useCallback(async (operation: () => Promise<void>) => {
+  const act = useCallback(async (operation: () => Promise<void>, reportError = true) => {
     if (!mounted.current || writing.current)
       throw new Error("An interaction is already in progress.");
     writing.current = true;
     const operationGeneration = ++generation.current;
     setInteractionBusy(true);
-    setError(null);
+    if (reportError) setError(null);
     try {
       await operation();
     } catch (reason) {
-      if (mounted.current && generation.current === operationGeneration) {
+      if (reportError && mounted.current && generation.current === operationGeneration) {
         setErrorDetail(reason);
         setError(messageFor(reason));
       }
@@ -63,6 +63,8 @@ export function useSessionInteraction(sessionId: string) {
     clearError: () => setError(null),
     sendMessage: (message: string) => act(() => api.sendMessage(sessionId, message)),
     handoffPaneBinding: () => act(() => api.handoffPaneBinding(sessionId)),
+    sendTerminalKeys: (keys: readonly InteractionKey[]) =>
+      act(() => api.sendKeys(sessionId, keys), false),
     sendKeys: (keys: readonly InteractionKey[]) => act(() => api.sendKeys(sessionId, keys)),
   };
 }

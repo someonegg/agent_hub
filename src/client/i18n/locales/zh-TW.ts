@@ -31,7 +31,6 @@ export const messages: Record<keyof typeof english, string> = {
 
   cancel: "取消",
   capturingTerminalPane: "正在擷取終端窗格…",
-  capturing: "正在擷取…",
   changedFiles: "變更檔案",
   checkTheCurrentStateBeforeTryingAgain: "重試前請檢查目前狀態。",
   childSessions: "子工作階段",
@@ -72,8 +71,7 @@ export const messages: Record<keyof typeof english, string> = {
   disconnected: "已斷開",
   dismiss: "關閉提示",
   dismissInteractionError: "關閉互動錯誤提示",
-  dismissSessionCreatedNotification: "關閉工作階段建立通知",
-  dismissTerminalPreviewError: "關閉終端預覽錯誤提示",
+  dismissTerminalPreviewError: "關閉終端錯誤提示",
   dismissUploadError: "關閉上傳錯誤提示",
   down: "向下",
   preparingFile: "正在準備檔案…",
@@ -103,7 +101,7 @@ export const messages: Record<keyof typeof english, string> = {
   idle: "閒置",
 
   interrupt: "中斷",
-  invalidTerminalPreviewUpdateReconnecting: "終端預覽更新無效，正在重新連線",
+  invalidTerminalPreviewUpdateReconnecting: "終端更新無效，正在重新連線",
 
   jumpToBottom: "跳到底部",
 
@@ -129,7 +127,6 @@ export const messages: Record<keyof typeof english, string> = {
 
   nothingToShow: "暫無內容",
   open: "開啟",
-  openSession: "開啟工作階段",
   openingSession: "正在開啟工作階段…",
   operation: "操作",
   originalSessionID: "原始工作階段 ID ·",
@@ -142,11 +139,11 @@ export const messages: Record<keyof typeof english, string> = {
   planContentUnavailable: "計畫內容不可用。",
   previewUnavailable: "預覽不可用",
   previewUnavailableDownloadTheFileBelow: "預覽不可用，請在下方下載檔案。",
-  previewUpdatesStopped: "預覽更新已停止。",
+  previewUpdatesStopped: "終端更新已停止。",
   projectDirectory: "專案目錄 ·",
   selectProjectDirectory: "選擇專案目錄",
   otherProjectDirectory: "其他目錄…",
-  customProjectDirectory: "自訂目錄",
+  customProjectDirectory: "目錄路徑",
   projectDirectoryLabel: "專案目錄",
   projectHub: "專案中心",
   projects: "專案",
@@ -168,7 +165,7 @@ export const messages: Record<keyof typeof english, string> = {
   retry: "重試",
 
   retryOpeningSession: "重新開啟工作階段",
-  retryPreview: "重試預覽",
+  retryPreview: "重試終端",
   retryStatusCheck: "重試狀態檢查",
   right: "向右",
   scrollableCodeBlock: "可滾動程式碼區塊",
@@ -182,7 +179,6 @@ export const messages: Record<keyof typeof english, string> = {
   session: "工作階段",
   sessionList: "工作階段列表",
 
-  sessionCreated: "工作階段已建立。",
   sessionAgent: "工作階段智慧體",
   sessionInformation: "工作階段資訊",
   sessionInteraction: "工作階段互動",
@@ -197,11 +193,13 @@ export const messages: Record<keyof typeof english, string> = {
   startingCodex: "正在啟動智慧體",
   superseded: "已被替代",
   takePhoto: "拍照",
+  expandComposer: "展開",
+  collapseComposer: "收起",
   terminalPreview: "終端預覽",
-  terminalPreviewConnectionClosed: "終端預覽連線已關閉",
-  terminalPreviewConnectionFailed: "終端預覽連線失敗",
-  terminalPreviewContent: "終端預覽內容",
-  terminalPreviewUnavailable: "終端預覽不可用。",
+  terminalPreviewConnectionClosed: "終端連線已關閉",
+  terminalPreviewConnectionFailed: "終端連線失敗",
+  terminalPreviewContent: "終端內容",
+  terminalPreviewUnavailable: "終端不可用。",
   terminalControls: "終端控制",
   terminalOutputExceededThePreviewLimitTheBeginningWasOmitted:
     "終端輸出超過預覽限制，開頭內容已省略。",

@@ -81,7 +81,7 @@ export function SessionPage({
           agentNickname={agents.length > 1 ? reader.context.session.origin.agent : undefined}
           managementBusy={operation.busy}
           operationStatus={
-            !showManagementStatus ? <OperationStatus controller={operation} /> : null
+            !showManagementStatus ? <OperationStatus controller={operation} compact /> : null
           }
           recoveryActions={
             !(

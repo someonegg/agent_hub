@@ -13,7 +13,7 @@ import { t } from "../i18n";
 import { LocalizedError } from "../i18n/localized-error";
 
 interface AttachmentMenuProps {
-  previewConnected: boolean;
+  interactionAvailable: boolean;
   interactionBusy: boolean;
   uploadProgress: string | null;
   onFiles: (files: File[]) => void;
@@ -23,7 +23,7 @@ interface AttachmentMenuProps {
 }
 
 export function AttachmentMenu({
-  previewConnected,
+  interactionAvailable,
   interactionBusy,
   uploadProgress,
   onFiles,
@@ -120,16 +120,16 @@ export function AttachmentMenu({
     };
   }, [attachmentsOpen]);
   useEffect(() => {
-    if (interactionBusy || !previewConnected) setAttachmentsOpen(false);
-  }, [interactionBusy, previewConnected]);
+    if (interactionBusy || !interactionAvailable) setAttachmentsOpen(false);
+  }, [interactionBusy, interactionAvailable]);
   const chooseFiles = (input: HTMLInputElement) => {
     const files = Array.from(input.files ?? []);
     input.value = "";
     if (!files.length) return;
-    if (!previewConnected || interactionBusy) {
+    if (!interactionAvailable || interactionBusy) {
       onError(
         new LocalizedError(
-          !previewConnected ? "reconnectBeforeAttachingFiles" : "sessionIsBusyTryAgainLater",
+          !interactionAvailable ? "reconnectBeforeAttachingFiles" : "sessionIsBusyTryAgainLater",
         ),
       );
       return;
@@ -200,7 +200,7 @@ export function AttachmentMenu({
                   key={input === photoInput ? "photo" : input === imagesInput ? "images" : "files"}
                   type="button"
                   role="menuitem"
-                  disabled={!previewConnected || interactionBusy || !!uploadProgress}
+                  disabled={!interactionAvailable || interactionBusy || !!uploadProgress}
                   onClick={() => {
                     input.current?.click();
                     closeAttachments();
