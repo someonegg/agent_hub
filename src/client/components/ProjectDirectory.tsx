@@ -31,7 +31,7 @@ export function ProjectDirectory({
           onChange={(event) => {
             const other = event.target.value === "custom";
             setCustom(other);
-            onChange(other ? "" : event.target.value);
+            if (!other) onChange(event.target.value);
           }}
         >
           <option value="" disabled>

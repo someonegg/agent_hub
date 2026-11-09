@@ -33,7 +33,7 @@ describe("project directory selection", () => {
     const select = screen.getByRole("combobox");
     fireEvent.change(select, { target: { value: "custom" } });
     const input = screen.getByRole("textbox", { name: "Directory path" });
-    expect(input).toHaveValue("");
+    expect(input).toHaveValue("/projects/atlas");
     expect(input).not.toHaveFocus();
     expect(input).toBeRequired();
     fireEvent.change(input, { target: { value: "/projects/atlas" } });
@@ -42,6 +42,8 @@ describe("project directory selection", () => {
     fireEvent.change(select, { target: { value: "/projects/reader" } });
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(select).toHaveValue("/projects/reader");
+    fireEvent.change(select, { target: { value: "custom" } });
+    expect(screen.getByRole("textbox")).toHaveValue("/projects/reader");
   });
 
   it("accepts a directory when there are no known projects", () => {
