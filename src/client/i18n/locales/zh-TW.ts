@@ -81,7 +81,8 @@ export const messages: Record<keyof typeof english, string> = {
   fileDownloadFailed: "檔案下載失敗，請重試。",
   download: "下載",
   dropFilesToUpload: "拖放檔案以上傳",
-  enableYOLOMode: "啟用 YOLO 模式",
+  permissionMode: "權限模式",
+  permissionModeDefault: "預設（沿用原生設定）",
   enableWorktree: "啟用 worktree",
   ensureTheOriginalSessionHasExited: "請確認原工作階段程序已經退出。",
   error: "錯誤",
@@ -292,6 +293,5 @@ export const settings: Record<keyof typeof englishSettings, string> = {
   auto: "自動",
   unavailable: "不可用的智慧體",
   worktree: "預設啟用 worktree",
-  yolo: "預設啟用 YOLO",
   enter: "按 Enter 傳送（Shift+Enter 換行）",
 };

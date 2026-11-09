@@ -3,12 +3,14 @@ import { useTranslation } from "react-i18next";
 
 import type { HubOperation, InteractionResponse, SessionAgent } from "../../shared/api-contract";
 import type { SessionDetail } from "../../shared/domain";
+import type { PermissionMode } from "../../shared/permission-mode";
 
 import { api } from "../api/client";
 import { t } from "../i18n";
 import { usePreferences } from "../state/preferences";
 import { useHubOperation } from "../state/use-hub-operation";
 import { AttachCommand } from "./AttachCommand";
+import { PermissionModeSelect } from "./PermissionModeSelect";
 import { ProjectDirectory } from "./ProjectDirectory";
 import { RequestError } from "./RequestError";
 import { TmuxAccessDialog } from "./TmuxAccessDialog";
@@ -176,13 +178,13 @@ export function CreateSession({
   const launchDefaults = useRef({ ...preferences, agent: initialAgent, directory: project });
   launchDefaults.current = { ...preferences, agent: initialAgent, directory: project };
   const [worktree, setWorktree] = useState(false);
-  const [yolo, setYolo] = useState(false);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>("default");
   useEffect(() => {
     if (open) {
       setDirectory(launchDefaults.current.directory);
       setAgent(launchDefaults.current.agent);
       setWorktree(launchDefaults.current.worktree);
-      setYolo(launchDefaults.current.yolo);
+      setPermissionMode(launchDefaults.current.permissionMode);
     }
   }, [open]);
   const request = useRef<{ fingerprint: string; id: string } | null>(null);
@@ -209,7 +211,7 @@ export function CreateSession({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          const fingerprint = JSON.stringify([agent, directory, worktree, yolo]);
+          const fingerprint = JSON.stringify([agent, directory, worktree, permissionMode]);
           if (request.current?.fingerprint !== fingerprint)
             request.current = { fingerprint, id: newRequestId() };
           void controller.start(() =>
@@ -217,7 +219,7 @@ export function CreateSession({
               ...(agent ? { agent } : {}),
               projectDirectory: directory,
               worktree,
-              yolo,
+              permissionMode,
               requestId: request.current!.id,
             }),
           );
@@ -260,15 +262,11 @@ export function CreateSession({
           />
           {t("enableWorktree")}
         </label>
-        <label className="check-row">
-          <input
-            type="checkbox"
-            checked={yolo}
-            onChange={(event) => setYolo(event.target.checked)}
-            disabled={controller.busy}
-          />
-          {t("enableYOLOMode")}
-        </label>
+        <PermissionModeSelect
+          value={permissionMode}
+          onChange={setPermissionMode}
+          disabled={controller.busy}
+        />
         <OperationStatus controller={controller} />
         <button
           type="submit"
@@ -500,8 +498,8 @@ export function ResumeSession({
   useTranslation();
   const preferences = usePreferences();
   const [open, setOpen] = useState(false);
-  const [yolo, setYolo] = useState(false);
-  const request = useRef<{ yolo: boolean; id: string } | null>(null);
+  const [permissionMode, setPermissionMode] = useState<PermissionMode>("default");
+  const request = useRef<{ permissionMode: PermissionMode; id: string } | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (open) {
@@ -521,7 +519,7 @@ export function ResumeSession({
           className="interaction-management-trigger"
           disabled={controller.busy}
           onClick={() => {
-            setYolo(preferences.yolo);
+            setPermissionMode(preferences.permissionMode);
             setOpen(true);
           }}
         >
@@ -550,28 +548,24 @@ export function ResumeSession({
         <form
           onSubmit={(event) => {
             event.preventDefault();
-            if (!request.current || request.current.yolo !== yolo)
-              request.current = { yolo, id: newRequestId() };
+            if (!request.current || request.current.permissionMode !== permissionMode)
+              request.current = { permissionMode, id: newRequestId() };
             onStart?.();
             void controller.start(() =>
               api.createSession({
                 resumeSessionId: session.id,
-                yolo,
+                permissionMode,
                 requestId: request.current!.id,
               }),
             );
             setOpen(false);
           }}
         >
-          <label className="check-row">
-            <input
-              type="checkbox"
-              checked={yolo}
-              disabled={controller.busy}
-              onChange={(event) => setYolo(event.target.checked)}
-            />
-            {t("enableYOLOMode")}
-          </label>
+          <PermissionModeSelect
+            value={permissionMode}
+            onChange={setPermissionMode}
+            disabled={controller.busy}
+          />
           <button type="submit" disabled={controller.busy || !session.resume.allowed}>
             {t("resumeSession")}
           </button>

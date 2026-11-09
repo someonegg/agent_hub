@@ -229,30 +229,35 @@ describe("observed management operations", () => {
       });
     },
   );
-  it("defaults yolo off, forwards opt-in, and includes it in request deduplication", async () => {
-    const { service, manager } = setup();
-    const input = { projectDirectory: "/project", worktree: false, requestId: "yolo-request" };
-    const first = service.create(input);
-    expect(service.create({ ...input, yolo: false })).toEqual(first);
-    expect(() => service.create({ ...input, yolo: true })).toThrow(/different parameters/);
-    await flush();
-    expect(manager.launch).toHaveBeenLastCalledWith({
-      operationId: first.operationId,
-      workingDirectory: "/project",
-      worktree: false,
-      yolo: false,
-      projectDirectory: "/project",
-    });
-    const second = service.create({ ...input, requestId: "yolo-enabled", yolo: true });
-    await flush();
-    expect(manager.launch).toHaveBeenLastCalledWith({
-      operationId: second.operationId,
-      workingDirectory: "/project",
-      worktree: false,
-      yolo: true,
-      projectDirectory: "/project",
-    });
-  });
+  it.each(["auto", "yolo"] as const)(
+    "defaults permission mode, forwards %s, and includes it in request deduplication",
+    async (mode) => {
+      const { service, manager } = setup();
+      const input = { projectDirectory: "/project", worktree: false, requestId: "yolo-request" };
+      const first = service.create(input);
+      expect(service.create({ ...input, permissionMode: "default" })).toEqual(first);
+      expect(() => service.create({ ...input, permissionMode: mode })).toThrow(
+        /different parameters/,
+      );
+      await flush();
+      expect(manager.launch).toHaveBeenLastCalledWith({
+        operationId: first.operationId,
+        workingDirectory: "/project",
+        worktree: false,
+        permissionMode: "default",
+        projectDirectory: "/project",
+      });
+      const second = service.create({ ...input, requestId: "yolo-enabled", permissionMode: mode });
+      await flush();
+      expect(manager.launch).toHaveBeenLastCalledWith({
+        operationId: second.operationId,
+        workingDirectory: "/project",
+        worktree: false,
+        permissionMode: mode,
+        projectDirectory: "/project",
+      });
+    },
+  );
   it("keeps timeout terminal and never relaunches on queries", async () => {
     const { service, manager, set, time } = setup();
     const op = service.create({
@@ -883,7 +888,7 @@ describe("safe resume operations", () => {
       operationId: op.operationId,
       workingDirectory: "/project",
       worktree: false,
-      yolo: false,
+      permissionMode: "default",
       resumeNativeId: f.original.sourceId,
       projectDirectory: f.original.projectDirectory,
     });
@@ -1052,23 +1057,26 @@ describe("safe resume operations", () => {
     expect(f.manager.launch).toHaveBeenCalledTimes(2);
   });
 
-  it("uses the original agent even with multiple configured sources and accepts only yolo", async () => {
-    const f = resumable();
-    f.registry.register("other", { ...f.manager });
-    const op = f.service.create({ ...request, yolo: true });
-    await flush();
-    expect(f.manager.launch).toHaveBeenCalledWith({
-      operationId: op.operationId,
-      workingDirectory: "/project",
-      worktree: false,
-      yolo: true,
-      resumeNativeId: f.original.sourceId,
-      projectDirectory: f.original.projectDirectory,
-    });
-    expect(() => f.service.create({ ...request, projectDirectory: "/other" } as never)).toThrow(
-      /only/,
-    );
-  });
+  it.each(["default", "auto", "yolo"] as const)(
+    "uses the original agent and forwards %s on resume",
+    async (mode) => {
+      const f = resumable();
+      f.registry.register("other", { ...f.manager });
+      const op = f.service.create({ ...request, permissionMode: mode });
+      await flush();
+      expect(f.manager.launch).toHaveBeenCalledWith({
+        operationId: op.operationId,
+        workingDirectory: "/project",
+        worktree: false,
+        permissionMode: mode,
+        resumeNativeId: f.original.sourceId,
+        projectDirectory: f.original.projectDirectory,
+      });
+      expect(() => f.service.create({ ...request, projectDirectory: "/other" } as never)).toThrow(
+        /only/,
+      );
+    },
+  );
 });
 
 describe("session upload cleanup", () => {
@@ -1226,7 +1234,7 @@ describe("creation project and working directories", () => {
       workingDirectory: "/existing-worktree/real",
       projectDirectory: "/project/real",
       worktree: true,
-      yolo: false,
+      permissionMode: "default",
     });
     f.set({
       sessions: [

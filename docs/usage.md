@@ -32,7 +32,7 @@ Choose **Other directory…** to enter a new absolute local directory.
 Choose an [Agent](#multiple-agents) and optional launch settings:
 
 - **Worktree:** start in a separate Git worktree for isolated changes.
-- **YOLO:** skip the runtime's approval prompts; Codex also disables its sandbox.
+- **Permission mode:** **Default** uses native configuration; **Auto** uses native automatic approval; **YOLO** skips approval prompts and also disables the Codex sandbox.
 
 Open an exited session and click **Resume** when available to continue it. Resume
 keeps the original Agent and project association, using an available original
@@ -90,8 +90,8 @@ for storage and cleanup details, or [preview upload history](images/ahub-uploads
 ## Browser settings
 
 Open **Settings** at the bottom of the sidebar to choose language, theme, the
-default Agent for new sessions, and Worktree/YOLO defaults. Changes save automatically
-in this browser. YOLO defaults also apply to resume; launch dialogs allow overrides.
+default Agent for new sessions, and Worktree and permission mode defaults. Changes save automatically
+in this browser. Permission mode defaults also apply to resume; launch dialogs allow overrides.
 
 The interface starts in English. Language changes take effect immediately
 and do not translate conversation or terminal content.
@@ -130,9 +130,13 @@ returned `Next after` value as `--after <value>` to read the next page.
 `--follow` keeps observing until `Ctrl+C`; it does not stop when a task finishes.
 
 Create defaults to the project directory and first configured Agent. Use `--cwd`
-to change the working directory while retaining the project association, or
-`--agent <nickname>` to select an Agent. Optional `--worktree` and `--yolo` control
-launch behavior; `resume <id>` retains the original Agent and accepts `--yolo`.
+to change the working directory while retaining the project association,
+`--agent <nickname>` to select an Agent, or `--worktree` for a separate worktree.
+`resume <id>` retains the original Agent.
+
+Both commands accept `--permission-mode <default|auto|yolo>`.
+`--yolo` is shorthand for `--permission-mode yolo`; the options cannot be combined.
+
 Use `create --task <name>` and `list --task <name>` to group sessions across projects.
 
 Input requires a connected, idle terminal by default. Use `send <id> --stdin`

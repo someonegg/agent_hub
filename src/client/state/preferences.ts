@@ -1,5 +1,7 @@
 import { useSyncExternalStore } from "react";
 
+import { isPermissionMode, type PermissionMode } from "../../shared/permission-mode";
+
 import { applyLanguage, isLanguage, type Language } from "../i18n";
 
 export interface Preferences {
@@ -7,7 +9,7 @@ export interface Preferences {
   defaultAgent: string;
   theme: "mist" | "warm";
   worktree: boolean;
-  yolo: boolean;
+  permissionMode: PermissionMode;
   enterToSend: boolean;
 }
 const key = "ahub.preferences.v1";
@@ -16,7 +18,7 @@ const defaults: Preferences = {
   defaultAgent: "",
   theme: "mist",
   worktree: false,
-  yolo: false,
+  permissionMode: "default",
   enterToSend: false,
 };
 function read(): Preferences {
@@ -27,7 +29,7 @@ function read(): Preferences {
       defaultAgent: typeof value.defaultAgent === "string" ? value.defaultAgent : "",
       theme: value.theme === "warm" ? "warm" : "mist",
       worktree: value.worktree === true,
-      yolo: value.yolo === true,
+      permissionMode: isPermissionMode(value.permissionMode) ? value.permissionMode : "default",
       enterToSend: value.enterToSend === true,
     };
   } catch {

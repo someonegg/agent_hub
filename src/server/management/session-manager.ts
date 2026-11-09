@@ -1,3 +1,4 @@
+import type { PermissionMode } from "../../shared/permission-mode.js";
 import { validProjectDirectory } from "../domain/project-directory.js";
 import type { DomainSession, TmuxKey } from "../domain/session-domain.js";
 import type { TmuxBinding } from "../interaction/transport.js";
@@ -25,7 +26,7 @@ export interface SessionLaunchOptions {
   /** Actual process working directory, resolved before launch. */
   readonly workingDirectory: string;
   readonly worktree: boolean;
-  readonly yolo: boolean;
+  readonly permissionMode: PermissionMode;
   /** Present for resume; absent for creation. */
   readonly resumeNativeId?: string;
   /** Original project association, retained even when launching in a worktree. */

@@ -1,4 +1,5 @@
 import type { SessionDetail, SessionSummary, TimelineItem } from "./domain.js";
+import type { PermissionMode } from "./permission-mode.js";
 
 export * from "./interaction.js";
 
@@ -138,7 +139,7 @@ export type CreateSessionRequest =
       taskName?: never;
       workingDirectory?: never;
       worktree?: never;
-      yolo?: boolean;
+      permissionMode?: PermissionMode;
       requestId: string;
     }
   | {
@@ -148,7 +149,7 @@ export type CreateSessionRequest =
       taskName?: string;
       workingDirectory?: string;
       worktree: boolean;
-      yolo?: boolean;
+      permissionMode?: PermissionMode;
       requestId: string;
     };
 

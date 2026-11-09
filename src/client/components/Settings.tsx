@@ -5,6 +5,7 @@ import type { SessionAgent } from "../../shared/api-contract";
 
 import { isLanguage, languageOptions } from "../i18n";
 import { updatePreferences, usePreferences } from "../state/preferences";
+import { PermissionModeSelect } from "./PermissionModeSelect";
 
 export function Settings({ agents }: { agents: readonly SessionAgent[] }) {
   const { t } = useTranslation("settings");
@@ -87,14 +88,10 @@ export function Settings({ agents }: { agents: readonly SessionAgent[] }) {
               />
               {t("worktree")}
             </label>
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={preferences.yolo}
-                onChange={(event) => updatePreferences({ yolo: event.target.checked })}
-              />
-              {t("yolo")}
-            </label>
+            <PermissionModeSelect
+              value={preferences.permissionMode}
+              onChange={(permissionMode) => updatePreferences({ permissionMode })}
+            />
           </fieldset>
           <label className="check-row">
             <input

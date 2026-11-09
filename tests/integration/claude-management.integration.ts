@@ -50,7 +50,7 @@ it("does not send bootstrap input to Claude's real directory trust dialog", asyn
       operationId,
       workingDirectory: directory,
       worktree: false,
-      yolo: false,
+      permissionMode: "default",
     })
     .then(
       () => null,

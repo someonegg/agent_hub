@@ -27,7 +27,7 @@ npx @someonegg/agent-hub@latest
 选择 [智能体](#多个智能体) 和可选的启动设置：
 
 - **Worktree：**在独立 Git worktree 中启动，隔离代码改动。
-- **YOLO：**跳过执行引擎的审批提示；Codex 还会禁用其沙盒。
+- **权限模式：**默认沿用原生配置；Auto 使用原生自动审批；YOLO 跳过审批提示，Codex 还会禁用其沙盒。
 
 打开已退出的会话，在可用时点击**恢复**继续。恢复保留原智能体和项目归属，使用可用的原工作目录或项目目录。
 恢复从其他位置启动的会话前，请确认原进程已经退出。
@@ -71,8 +71,8 @@ npx @someonegg/agent-hub@latest
 
 ## 浏览器设置
 
-在侧边栏底部打开**设置**，选择语言、主题、新会话默认智能体，以及 Worktree、YOLO 默认值。
-修改自动保存在当前浏览器。YOLO 默认值也用于恢复会话，启动对话框可覆盖默认值。
+在侧边栏底部打开**设置**，选择语言、主题、新会话默认智能体，以及 Worktree、权限模式默认值。
+修改自动保存在当前浏览器。权限模式默认值也用于恢复会话，启动对话框可覆盖默认值。
 
 界面初始为英文，切换语言立即生效，不翻译会话或终端原文。
 
@@ -107,8 +107,12 @@ ahub-cli session inspect <id> --follow
 `--follow` 持续观察直到按 `Ctrl+C` 停止，不会因任务完成自动结束。
 
 创建默认使用项目目录和第一个已配置智能体。用 `--cwd` 修改工作目录而保留项目归属，
-用 `--agent <nickname>` 选择智能体；可选 `--worktree` 和 `--yolo` 控制启动行为。
-`resume <id>` 保留原智能体，支持 `--yolo`。
+用 `--agent <nickname>` 选择智能体，或用 `--worktree` 在独立 worktree 中启动。
+`resume <id>` 保留原智能体。
+
+两者均支持 `--permission-mode <default|auto|yolo>`。
+`--yolo` 是 `--permission-mode yolo` 的简写，两者不能同时使用。
+
 用 `create --task <name>` 和 `list --task <name>` 跨项目分组会话。
 
 输入默认要求终端已连接且空闲。用 `send <id> --stdin` 接收管道输入，`terminal <id>` 查看终端，

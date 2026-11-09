@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { CreateSessionRequest, HubOperation } from "../../shared/api-contract.js";
+import { isPermissionMode } from "../../shared/permission-mode.js";
 import type { SessionInteractionService } from "../interaction/interaction-service.js";
 import { type PaneBindingManager, paneBindings } from "../interaction/pane-binding-manager.js";
 import type { RuntimeEvaluator } from "../interaction/runtime-capabilities.js";
@@ -116,6 +117,8 @@ export class OperationService {
   }
 
   create(input: CreateSessionRequest): HubOperation {
+    if (input.permissionMode !== undefined && !isPermissionMode(input.permissionMode))
+      throw new ManagementError(400, "permissionMode must be default, auto or yolo");
     if (input.resumeSessionId !== undefined) return this.#resume(input);
     let agent: string;
     try {
@@ -130,7 +133,7 @@ export class OperationService {
       input.taskName?.trim() || null,
       input.workingDirectory ?? input.projectDirectory,
       input.worktree,
-      input.yolo ?? false,
+      input.permissionMode ?? "default",
     ]);
     const duplicate = this.#duplicate(input.requestId, fingerprint);
     if (duplicate) return { ...duplicate };
@@ -144,12 +147,17 @@ export class OperationService {
 
   #resume(input: Extract<CreateSessionRequest, { resumeSessionId: string }>): HubOperation {
     if (
-      Object.keys(input).some((key) => !["resumeSessionId", "yolo", "requestId"].includes(key)) ||
+      Object.keys(input).some(
+        (key) => !["resumeSessionId", "permissionMode", "requestId"].includes(key),
+      ) ||
       !input.resumeSessionId.trim()
     )
-      throw new ManagementError(400, "Resume accepts only resumeSessionId, yolo and requestId");
+      throw new ManagementError(
+        400,
+        "Resume accepts only resumeSessionId, permissionMode and requestId",
+      );
     const sessionId = input.resumeSessionId;
-    const fingerprint = JSON.stringify(["resume", sessionId, input.yolo ?? false]);
+    const fingerprint = JSON.stringify(["resume", sessionId, input.permissionMode ?? "default"]);
     const duplicate = this.#duplicate(input.requestId, fingerprint);
     if (duplicate) return { ...duplicate };
     if (this.#active.has(sessionId))

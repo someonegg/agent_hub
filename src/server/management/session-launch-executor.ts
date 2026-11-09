@@ -42,7 +42,7 @@ export class SessionLaunchExecutor {
         operationId: entry.metadata.operationId,
         workingDirectory: working.directory,
         worktree: input.worktree,
-        yolo: input.yolo ?? false,
+        permissionMode: input.permissionMode ?? "default",
         projectDirectory: project.directory,
         ...(input.taskName?.trim() ? { taskName: input.taskName.trim() } : {}),
       });
@@ -92,7 +92,7 @@ export class SessionLaunchExecutor {
         operationId: entry.metadata.operationId,
         workingDirectory: directory,
         worktree: false,
-        yolo: input.yolo ?? false,
+        permissionMode: input.permissionMode ?? "default",
         resumeNativeId: session.sourceId!,
         projectDirectory: session.projectDirectory,
         ...(session.taskName ? { taskName: session.taskName } : {}),

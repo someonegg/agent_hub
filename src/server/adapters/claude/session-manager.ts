@@ -34,7 +34,11 @@ export class ClaudeSessionManager implements SessionManager {
       "claude",
       ...(options.resumeNativeId ? ["--resume", options.resumeNativeId] : []),
       ...(options.worktree ? ["--worktree"] : []),
-      ...(options.yolo ? ["--dangerously-skip-permissions"] : []),
+      ...(options.permissionMode === "auto"
+        ? ["--permission-mode", "auto"]
+        : options.permissionMode === "yolo"
+          ? ["--dangerously-skip-permissions"]
+          : []),
     ]);
     try {
       const deadline = Date.now() + BINDING_PROMPT_WAIT_MS;

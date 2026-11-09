@@ -4,28 +4,30 @@ import { CodexSessionManager } from "../../src/server/adapters/codex/session-man
 import { exitSteps } from "../../src/server/adapters/shared/session-management.js";
 import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
 
-it.each([
-  [false, false, []],
-  [true, true, ["--worktree", "--yolo"]],
-] as const)(
-  "passes only enabled creation flags (worktree=%s, yolo=%s)",
-  async (worktree, yolo, flags) => {
-    const tmux = new TmuxLauncher();
-    const launch = vi.spyOn(tmux, "launch").mockResolvedValue({
-      socketPath: "/tmp/test",
-      sessionName: "ahub-00000000-0000-0000-0000-000000000001",
-    });
-    const manager = new CodexSessionManager("/codex-home", tmux);
-    await manager.launch({
-      operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
-      workingDirectory: "/project with spaces",
-      worktree,
-      yolo,
-    });
-    const args = launch.mock.calls[0]![2];
-    expect(args.filter((arg) => arg === "--worktree" || arg === "--yolo")).toEqual(flags);
-  },
-);
+it.each(
+  ([false, true] as const).flatMap((resume) =>
+    (["default", "auto", "yolo"] as const).map(
+      (permissionMode) => [resume, permissionMode] as const,
+    ),
+  ),
+)("maps Codex launch mode (resume=%s, mode=%s)", async (resume, permissionMode) => {
+  const tmux = new TmuxLauncher();
+  const launch = vi
+    .spyOn(tmux, "launch")
+    .mockResolvedValue({ socketPath: "/tmp/test", sessionName: "test" });
+  await new CodexSessionManager("/codex-home", tmux).launch({
+    operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
+    workingDirectory: "/project",
+    worktree: true,
+    permissionMode,
+    ...(resume ? { resumeNativeId: "00000000-0000-4000-8000-000000000001" } : {}),
+  });
+  const args = launch.mock.calls[0]![2];
+  expect(args.filter((arg) => ["--yolo", "--approve-for-me"].includes(arg))).toEqual(
+    permissionMode === "auto" ? ["--approve-for-me"] : permissionMode === "yolo" ? ["--yolo"] : [],
+  );
+  expect(args).toContain("--worktree");
+});
 
 it("resumes an explicit UUID in the original CODEX_HOME with an operation binding prompt", async () => {
   const tmux = new TmuxLauncher();
@@ -39,7 +41,7 @@ it("resumes an explicit UUID in the original CODEX_HOME with an operation bindin
     operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
     workingDirectory: "/project",
     worktree: false,
-    yolo: true,
+    permissionMode: "yolo",
     resumeNativeId: nativeId,
   });
   const args = launch.mock.calls[0]![2];
@@ -61,7 +63,7 @@ it("resumes an explicit UUID in the original CODEX_HOME with an operation bindin
         operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
         workingDirectory: "/project",
         worktree: false,
-        yolo: false,
+        permissionMode: "default",
         resumeNativeId,
       }),
     ).toThrow(/Invalid/);
