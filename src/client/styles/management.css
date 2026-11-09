@@ -1,4 +1,5 @@
 .create-session {
+  font-size: var(--text-small);
   margin: 1rem 0;
   padding: 1rem;
   border: 1px solid var(--mist);
@@ -23,6 +24,7 @@
 }
 .create-session .check-row {
   margin-top: 0;
+  font-size: inherit;
 }
 .create-session label:not(.check-row) {
   display: grid;

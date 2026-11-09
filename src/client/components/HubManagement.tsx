@@ -253,6 +253,11 @@ export function CreateSession({
           disabled={controller.busy}
           onChange={setDirectory}
         />
+        <PermissionModeSelect
+          value={permissionMode}
+          onChange={setPermissionMode}
+          disabled={controller.busy}
+        />
         <label className="check-row">
           <input
             type="checkbox"
@@ -262,11 +267,6 @@ export function CreateSession({
           />
           {t("enableWorktree")}
         </label>
-        <PermissionModeSelect
-          value={permissionMode}
-          onChange={setPermissionMode}
-          disabled={controller.busy}
-        />
         <OperationStatus controller={controller} />
         <button
           type="submit"
