@@ -27,7 +27,7 @@ npx @someonegg/agent-hub@latest
 選擇 [智慧體](#多個智慧體) 和可選的啟動設定：
 
 - **Worktree：**在獨立 Git worktree 中啟動，隔離程式碼變更。
-- **YOLO：**略過執行引擎的核准提示；Codex 也會停用其沙盒。
+- **權限模式：**預設沿用原生設定；Auto 使用原生自動審批；YOLO 略過核准提示，Codex 也會停用其沙盒。
 
 開啟已退出的工作階段，在可用時點選**恢復**繼續。恢復保留原智慧體和專案歸屬，使用可用的原工作目錄或專案目錄。
 恢復從其他位置啟動的工作階段前，請確認原處理程序已經退出。
@@ -71,8 +71,8 @@ npx @someonegg/agent-hub@latest
 
 ## 瀏覽器設定
 
-在側邊欄底部開啟**設定**，選擇語言、主題、新工作階段預設智慧體，以及 Worktree、YOLO 預設值。
-修改自動儲存在目前瀏覽器。YOLO 預設值也用於恢復工作階段，啟動對話方塊可覆寫預設值。
+在側邊欄底部開啟**設定**，選擇語言、主題、新工作階段預設智慧體，以及 Worktree、權限模式預設值。
+修改自動儲存在目前瀏覽器。權限模式預設值也用於恢復工作階段，啟動對話方塊可覆寫預設值。
 
 介面初始為英文，切換語言立即生效，不翻譯工作階段或終端原文。
 
@@ -107,8 +107,12 @@ ahub-cli session inspect <id> --follow
 `--follow` 持續觀察直到按 `Ctrl+C` 停止，不會因任務完成自動結束。
 
 建立預設使用專案目錄和第一個已設定智慧體。用 `--cwd` 修改工作目錄而保留專案歸屬，
-用 `--agent <nickname>` 選擇智慧體；可選 `--worktree` 和 `--yolo` 控制啟動行為。
-`resume <id>` 保留原智慧體，支援 `--yolo`。
+用 `--agent <nickname>` 選擇智慧體，或用 `--worktree` 在獨立 worktree 中啟動。
+`resume <id>` 保留原智慧體。
+
+兩者均支援 `--permission-mode <default|auto|yolo>`。
+`--yolo` 是 `--permission-mode yolo` 的簡寫，兩者不能同時使用。
+
 用 `create --task <name>` 和 `list --task <name>` 跨專案分組工作階段。
 
 輸入預設要求終端已連線且閒置。用 `send <id> --stdin` 接收管線輸入，`terminal <id>` 檢視終端，

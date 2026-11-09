@@ -16,7 +16,14 @@ import { partitionMessages } from "../../src/client/i18n/namespaces";
 import { updatePreferences } from "../../src/client/state/preferences";
 
 afterEach(() => {
-  act(() => updatePreferences({ language: "en", defaultAgent: "", theme: "mist", yolo: false }));
+  act(() =>
+    updatePreferences({
+      language: "en",
+      defaultAgent: "",
+      theme: "mist",
+      permissionMode: "default",
+    }),
+  );
   vi.unstubAllGlobals();
 });
 
@@ -39,7 +46,7 @@ describe("language preferences", () => {
 });
 
 it("keeps old settings and rejects invalid persisted language values", () => {
-  const stored = JSON.stringify({ language: "fr", theme: "warm", yolo: true });
+  const stored = JSON.stringify({ language: "fr", theme: "warm", permissionMode: "yolo" });
   vi.stubGlobal("localStorage", { getItem: () => stored });
   window.dispatchEvent(new StorageEvent("storage", { key: "ahub.preferences.v1" }));
   expect(document.documentElement.lang).toBe("en");
@@ -176,3 +183,28 @@ it("preserves native diagnostics for unknown errors", () => {
   expect(screen.getByText("native diagnostic")).toBeInTheDocument();
   expect(screen.getByText(/本地 Hub 无法完成请求/)).toBeInTheDocument();
 });
+
+it.each(["auto", "yolo", "default", "invalid", null, undefined])(
+  "normalizes stored permission mode %s and ignores old yolo",
+  (permissionMode) => {
+    vi.stubGlobal("localStorage", {
+      getItem: () => JSON.stringify({ permissionMode, yolo: true, theme: "warm" }),
+      setItem: vi.fn(),
+    });
+    act(() => window.dispatchEvent(new StorageEvent("storage", { key: "ahub.preferences.v1" })));
+    render(<Settings agents={[]} />);
+    const select = screen.getByRole("combobox", { name: "Permission mode", hidden: true });
+    expect(select).toHaveValue(
+      ["auto", "yolo"].includes(permissionMode as string) ? permissionMode : "default",
+    );
+    fireEvent.change(select, { target: { value: "auto" } });
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      "ahub.preferences.v1",
+      expect.stringContaining('"permissionMode":"auto"'),
+    );
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      "ahub.preferences.v1",
+      expect.not.stringContaining('"yolo":'),
+    );
+  },
+);

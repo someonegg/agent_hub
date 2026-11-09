@@ -21,7 +21,7 @@ export class CodexSessionManager implements SessionManager {
     operationId,
     workingDirectory,
     worktree,
-    yolo,
+    permissionMode,
     resumeNativeId,
     projectDirectory,
     taskName,
@@ -36,7 +36,11 @@ export class CodexSessionManager implements SessionManager {
       "--no-daemon",
       "--no-alt-screen",
       ...(worktree ? ["--worktree"] : []),
-      ...(yolo ? ["--yolo"] : []),
+      ...(permissionMode === "auto"
+        ? ["--approve-for-me"]
+        : permissionMode === "yolo"
+          ? ["--yolo"]
+          : []),
       codexBindingCommand(operationId, projectDirectory, taskName ?? null),
     ]);
   }

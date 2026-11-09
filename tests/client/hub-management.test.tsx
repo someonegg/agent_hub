@@ -107,13 +107,16 @@ describe("hub management", () => {
       "Archive sessionDelete session",
     );
     fireEvent.click(screen.getByRole("button", { name: "Archive session" }));
-    expect(screen.getByRole("checkbox", { name: "Enable YOLO mode" })).not.toBeChecked();
+    expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("default");
     fireEvent.click(screen.getByRole("button", { name: "Create session" }));
     await flush();
     expect(archive).toHaveBeenCalledWith(session.id);
     expect(screen.getByText("Waiting for exit")).toBeInTheDocument();
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ yolo: false, requestId: expect.stringMatching(/^[a-f0-9]{32}$/) }),
+      expect.objectContaining({
+        permissionMode: "default",
+        requestId: expect.stringMatching(/^[a-f0-9]{32}$/),
+      }),
     );
   });
 
@@ -145,14 +148,16 @@ describe("hub management", () => {
     const onCreated = vi.fn();
     render(<CreateSession project="/project with spaces" projects={[]} onCreated={onCreated} />);
     fireEvent.click(screen.getByRole("checkbox", { name: "Enable worktree" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Enable YOLO mode" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Permission mode" }), {
+      target: { value: "yolo" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Create session" }));
     await flush();
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
         projectDirectory: "/project with spaces",
         worktree: true,
-        yolo: true,
+        permissionMode: "yolo",
       }),
     );
     expect(screen.getByRole("status")).toHaveTextContent("pending");
@@ -581,51 +586,58 @@ it.each([403, 503])(
   },
 );
 
-it("offers a yolo-only resume dialog and shares operation occupancy with the management menu", async () => {
-  const { ResumeSession, OperationStatus } = await import(
-    "../../src/client/components/HubManagement"
-  );
-  const create = vi
-    .spyOn(api, "createSession")
-    .mockResolvedValue({ ...pending, mode: "resume", sessionId: SESSION_ID });
-  const session = { ...baseSession, resume: { allowed: true, reason: null } };
-  function Harness() {
-    const controller = useHubOperation(session.id, vi.fn());
-    return (
-      <>
-        <ResumeSession session={session} controller={controller} />
-        <ManageSession session={session} onChanged={vi.fn()} controller={controller} />
-        <OperationStatus controller={controller} />
-      </>
+it.each(["auto", "yolo"] as const)(
+  "offers a %s resume dialog and shares operation occupancy with the management menu",
+  async (mode) => {
+    const { ResumeSession, OperationStatus } = await import(
+      "../../src/client/components/HubManagement"
     );
-  }
-  render(<Harness />);
-  fireEvent.click(screen.getByRole("button", { name: "Resume" }));
-  expect(screen.getByRole("dialog", { name: "Resume session" })).toBeVisible();
-  expect(screen.getByRole("heading", { name: "Resume session" })).toHaveFocus();
-  expect(screen.getByRole("checkbox", { name: "Enable YOLO mode" })).not.toBeChecked();
-  expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-  expect(screen.queryByRole("checkbox", { name: "Enable worktree" })).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("checkbox", { name: "Enable YOLO mode" }));
-  act(() => updatePreferences({ yolo: true }));
-  act(() => updatePreferences({ yolo: false }));
-  expect(screen.getByRole("checkbox", { name: "Enable YOLO mode" })).toBeChecked();
-  fireEvent.click(screen.getByRole("button", { name: "Close resume session" }));
-  fireEvent.click(screen.getByRole("button", { name: "Resume" }));
-  expect(screen.getByRole("checkbox", { name: "Enable YOLO mode" })).not.toBeChecked();
-  fireEvent.click(screen.getByRole("checkbox", { name: "Enable YOLO mode" }));
-  fireEvent.click(screen.getByRole("button", { name: "Resume session" }));
-  await flush();
-  expect(create).toHaveBeenCalledWith({
-    resumeSessionId: session.id,
-    yolo: true,
-    requestId: expect.any(String),
-  });
-  expect(screen.getByRole("button", { name: "Resume" })).toBeDisabled();
-  fireEvent.click(screen.getByRole("button", { name: "Session management" }));
-  expect(screen.getByRole("button", { name: "Archive session" })).toBeDisabled();
-  expect(screen.getByText("resume · pending")).toBeInTheDocument();
-});
+    const create = vi
+      .spyOn(api, "createSession")
+      .mockResolvedValue({ ...pending, mode: "resume", sessionId: SESSION_ID });
+    const session = { ...baseSession, resume: { allowed: true, reason: null } };
+    function Harness() {
+      const controller = useHubOperation(session.id, vi.fn());
+      return (
+        <>
+          <ResumeSession session={session} controller={controller} />
+          <ManageSession session={session} onChanged={vi.fn()} controller={controller} />
+          <OperationStatus controller={controller} />
+        </>
+      );
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    expect(screen.getByRole("dialog", { name: "Resume session" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Resume session" })).toHaveFocus();
+    expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("default");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Enable worktree" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Permission mode" }), {
+      target: { value: mode },
+    });
+    act(() => updatePreferences({ permissionMode: mode }));
+    act(() => updatePreferences({ permissionMode: "default" }));
+    expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue(mode);
+    fireEvent.click(screen.getByRole("button", { name: "Close resume session" }));
+    fireEvent.click(screen.getByRole("button", { name: "Resume" }));
+    expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("default");
+    fireEvent.change(screen.getByRole("combobox", { name: "Permission mode" }), {
+      target: { value: mode },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Resume session" }));
+    await flush();
+    expect(create).toHaveBeenCalledWith({
+      resumeSessionId: session.id,
+      permissionMode: mode,
+      requestId: expect.any(String),
+    });
+    expect(screen.getByRole("button", { name: "Resume" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Session management" }));
+    expect(screen.getByRole("button", { name: "Archive session" })).toBeDisabled();
+    expect(screen.getByText("resume · pending")).toBeInTheDocument();
+  },
+);
 
 it("initializes creation options only when opening the dialog", () => {
   const agents = [
@@ -633,28 +645,31 @@ it("initializes creation options only when opening the dialog", () => {
     { nickname: "work", runtimeName: "Codex" },
     { nickname: "other", runtimeName: "Codex" },
   ];
-  act(() => updatePreferences({ defaultAgent: "default" }));
+  act(() => updatePreferences({ defaultAgent: "default", permissionMode: "auto" }));
   const props = { agents, project: "/project", projects: [], onCreated: vi.fn() };
   const view = render(<CreateSession {...props} open={false} />);
   view.rerender(<CreateSession {...props} open />);
+  expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("auto");
   expect(screen.getByLabelText("Session agent")).toHaveValue("default");
   fireEvent.change(screen.getByLabelText("Session agent"), { target: { value: "work" } });
   fireEvent.change(screen.getByLabelText("Project directory"), { target: { value: "/manual" } });
   fireEvent.click(screen.getByRole("checkbox", { name: "Enable worktree" }));
-  fireEvent.click(screen.getByRole("checkbox", { name: "Enable YOLO mode" }));
-  act(() => updatePreferences({ defaultAgent: "other", worktree: true, yolo: true }));
-  act(() => updatePreferences({ worktree: false, yolo: false }));
+  fireEvent.change(screen.getByRole("combobox", { name: "Permission mode" }), {
+    target: { value: "yolo" },
+  });
+  act(() => updatePreferences({ defaultAgent: "other", worktree: true, permissionMode: "yolo" }));
+  act(() => updatePreferences({ worktree: false, permissionMode: "default" }));
   view.rerender(<CreateSession {...props} project="/updated" open />);
   expect(screen.getByLabelText("Project directory")).toHaveValue("/manual");
   expect(screen.getByRole("checkbox", { name: "Enable worktree" })).toBeChecked();
-  expect(screen.getByRole("checkbox", { name: "Enable YOLO mode" })).toBeChecked();
+  expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("yolo");
   expect(screen.getByLabelText("Session agent")).toHaveValue("work");
   view.rerender(<CreateSession {...props} open={false} />);
   view.rerender(<CreateSession {...props} open />);
   expect(screen.getByLabelText("Session agent")).toHaveValue("other");
   expect(screen.getByLabelText("Project directory")).toHaveValue("/project");
   expect(screen.getByRole("checkbox", { name: "Enable worktree" })).not.toBeChecked();
-  expect(screen.getByRole("checkbox", { name: "Enable YOLO mode" })).not.toBeChecked();
+  expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("default");
   act(() => updatePreferences({ defaultAgent: "" }));
 });
 

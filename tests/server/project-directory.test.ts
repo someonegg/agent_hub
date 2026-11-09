@@ -68,7 +68,7 @@ it("validates create directories, resolves symlinks and passes the explicit proj
     operationId: "00000000-0000-4000-8000-000000000001",
     workingDirectory: resolved.directory,
     worktree: true,
-    yolo: false,
+    permissionMode: "default",
     projectDirectory: "/original/project",
   });
   expect(launch.mock.calls[0]![2]).toContain("--worktree");

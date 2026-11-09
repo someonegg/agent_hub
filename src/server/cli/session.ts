@@ -12,6 +12,7 @@ import {
   type TerminalResponse,
   type TmuxTarget,
 } from "../../shared/api-contract.js";
+import { isPermissionMode } from "../../shared/permission-mode.js";
 import { TASK_NAME_ERROR, validTaskName } from "../../shared/task-name.js";
 import { normalizeMessage } from "../interaction/message.js";
 import { CommandError, commandFailure } from "./command-error.js";
@@ -29,8 +30,8 @@ import { waitForLaunch, waitForOperation } from "./session-wait.js";
 
 export const sessionHelp = `Usage: ahub-cli session <command> [options]
   list [--project <directory>] [--task <name>] [--all]
-  create --project <directory> [--task <name>] [--cwd <directory>] [--agent <nickname>] [--worktree] [--yolo]
-  resume <id> [--yolo]
+  create --project <directory> [--task <name>] [--cwd <directory>] [--agent <nickname>] [--worktree] [--permission-mode <default|auto|yolo> | --yolo]
+  resume <id> [--permission-mode <default|auto|yolo> | --yolo]
   send <id> (--message <text> | --stdin) [--force]
   inspect <id> [--limit 1-300] [--after <number>] [--follow [--count <N>]]
   terminal <id>
@@ -39,6 +40,7 @@ export const sessionHelp = `Usage: ahub-cli session <command> [options]
   handoff <id>
   exit <id> | archive <id> | delete <id>
 Options: --url <http(s)-url> --json --timeout <seconds> (default 15; follow: 30; create/resume/exit/archive/delete: 45)
+Permission mode: default preserves native configuration; auto uses native automatic approval; --yolo is shorthand for --permission-mode yolo.
 List: excludes archived sessions unless --all is set.
 Follow: timeout applies to each HTTP request; observation continues until stopped.
 Address: --url, AGENT_HUB_URL, http://127.0.0.1:4173
@@ -64,6 +66,7 @@ export function parseSessionArguments(args: string[], environmentUrl?: string) {
         agent: { type: "string" },
         worktree: { type: "boolean" },
         yolo: { type: "boolean" },
+        "permission-mode": { type: "string" },
         message: { type: "string" },
         stdin: { type: "boolean" },
         force: { type: "boolean" },
@@ -81,8 +84,8 @@ export function parseSessionArguments(args: string[], environmentUrl?: string) {
   const [command, id, ...keys] = positionals;
   const allowed: Record<string, string[]> = {
     list: ["project", "task", "all"],
-    create: ["task", "cwd", "project", "agent", "worktree", "yolo"],
-    resume: ["yolo"],
+    create: ["task", "cwd", "project", "agent", "worktree", "yolo", "permission-mode"],
+    resume: ["yolo", "permission-mode"],
     send: ["message", "stdin", "force"],
     inspect: ["limit", "after", "follow", "count"],
     terminal: [],
@@ -99,6 +102,16 @@ export function parseSessionArguments(args: string[], environmentUrl?: string) {
     if (!["url", "json", "timeout", "help", ...allowed[command]!].includes(key))
       throw new CommandError("invalid_arguments", `--${key} is not supported by ${command}`);
   }
+  const requestedPermissionMode = values["permission-mode"];
+  if (
+    requestedPermissionMode !== undefined &&
+    (!isPermissionMode(requestedPermissionMode) || values.yolo !== undefined)
+  )
+    throw new CommandError(
+      "invalid_arguments",
+      "Use --permission-mode default|auto|yolo or --yolo exclusively",
+    );
+  const permissionMode = values.yolo ? "yolo" : (requestedPermissionMode ?? "default");
   if (values.task !== undefined && !validTaskName(values.task))
     throw new CommandError("invalid_arguments", TASK_NAME_ERROR);
   const acceptsSessionId = command !== "list" && command !== "create";
@@ -171,7 +184,17 @@ export function parseSessionArguments(args: string[], environmentUrl?: string) {
   }
   if (command === "send" && values.message !== undefined)
     validateSendMessage(values.message, values.force);
-  return { values, positionals, command, id, keys, seconds, base, help: false as const };
+  return {
+    values,
+    positionals,
+    command,
+    id,
+    keys,
+    seconds,
+    base,
+    permissionMode,
+    help: false as const,
+  };
 }
 
 /** One invocation owns one deadline and never retries a submitted mutation. */
@@ -193,7 +216,7 @@ export async function runSessionCommand(args: string[]): Promise<void> {
       console.log(sessionHelp);
       return;
     }
-    const { command, id, keys, seconds, base } = parsed;
+    const { command, id, keys, seconds, base, permissionMode } = parsed;
     following = values.follow === true;
     if (!following) timer = setTimeout(() => abort.abort(), seconds * 1000);
     client = new SessionClient(base, abort.signal);
@@ -258,13 +281,17 @@ export async function runSessionCommand(args: string[]): Promise<void> {
           taskName: values.task?.trim(),
           ...(values.cwd === undefined ? {} : { workingDirectory: resolve(values.cwd) }),
           worktree: values.worktree ?? false,
-          yolo: values.yolo ?? false,
+          permissionMode,
           ...(values.agent === undefined ? {} : { agent: values.agent }),
           requestId: randomUUID(),
         };
       } else if (command === "resume") {
         operationPath = "/api/v1/sessions";
-        body = { resumeSessionId: id, yolo: values.yolo ?? false, requestId: randomUUID() };
+        body = {
+          resumeSessionId: id,
+          permissionMode,
+          requestId: randomUUID(),
+        };
       }
       if (launch) launchDiagnostics = { sessionId: command === "resume" ? id! : null, tmux: null };
       let operation = await api<HubOperation>(

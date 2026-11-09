@@ -1,3 +1,4 @@
+import { isPermissionMode } from "../../shared/permission-mode.js";
 import { TASK_NAME_ERROR, validTaskName } from "../../shared/task-name.js";
 import { ManagementError, type OperationService } from "../management/operation-service.js";
 import type { ApiRouteHandler } from "./api-route-handler.js";
@@ -50,21 +51,21 @@ export function createSessionManagementRoutes(operations?: OperationService): Ap
             typeof body.resumeSessionId !== "string" ||
             !body.resumeSessionId.trim() ||
             Object.keys(body).some(
-              (key) => !["resumeSessionId", "yolo", "requestId"].includes(key),
+              (key) => !["resumeSessionId", "permissionMode", "requestId"].includes(key),
             ) ||
-            (body.yolo !== undefined && typeof body.yolo !== "boolean")
+            (body.permissionMode !== undefined && !isPermissionMode(body.permissionMode))
           )
             throw new RequestBodyError(
               400,
               "invalid_json",
-              "Resume accepts only resumeSessionId, yolo and requestId",
+              "Resume accepts only resumeSessionId, permissionMode and requestId",
             );
           sendJson(
             response,
             202,
             operations.create({
               resumeSessionId: body.resumeSessionId,
-              yolo: body.yolo as boolean | undefined,
+              permissionMode: body.permissionMode,
               requestId: body.requestId,
             }),
           );
@@ -78,7 +79,7 @@ export function createSessionManagementRoutes(operations?: OperationService): Ap
                 "workingDirectory",
                 "taskName",
                 "worktree",
-                "yolo",
+                "permissionMode",
                 "requestId",
                 "agent",
               ].includes(key),
@@ -87,12 +88,12 @@ export function createSessionManagementRoutes(operations?: OperationService): Ap
           typeof body.projectDirectory !== "string" ||
           (body.workingDirectory !== undefined && typeof body.workingDirectory !== "string") ||
           typeof body.worktree !== "boolean" ||
-          (body.yolo !== undefined && typeof body.yolo !== "boolean")
+          (body.permissionMode !== undefined && !isPermissionMode(body.permissionMode))
         ) {
           throw new RequestBodyError(
             400,
             "invalid_json",
-            "projectDirectory and worktree are required; yolo must be a boolean if provided",
+            "projectDirectory and worktree are required; permissionMode must be default, auto or yolo if provided",
           );
         }
         if (body.taskName !== undefined && !validTaskName(body.taskName))
@@ -108,7 +109,7 @@ export function createSessionManagementRoutes(operations?: OperationService): Ap
               ? { workingDirectory: body.workingDirectory }
               : {}),
             worktree: body.worktree,
-            yolo: body.yolo ?? false,
+            permissionMode: body.permissionMode ?? "default",
             requestId: body.requestId,
           }),
         );

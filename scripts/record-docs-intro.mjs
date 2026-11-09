@@ -51,11 +51,13 @@ async function record(
   );
   let created = false;
   let stage = 0;
+  let resumable = false;
   const session = () => ({
     ...docsSession,
     id: "docs-demo-intro-session-000001",
     title: label("Improve the project dashboard"),
     messageCount: stage,
+    ...(resumable ? { status: "normal", resume: { allowed: true, reason: null } } : {}),
   });
   const interaction = connectedInteraction;
   const items = () =>
@@ -92,7 +94,7 @@ async function record(
       );
   const snapshot = () => ({
     session: session(),
-    interaction,
+    interaction: resumable ? { ...interaction, state: "disconnected" } : interaction,
     nextAfter: items().at(-1)?.ordinal ?? 0,
     stateRevision: String(stage),
     hasMore: false,
@@ -182,6 +184,17 @@ async function record(
     await demo.waitForFunction(
       () => document.querySelector("select[required]")?.value === "default",
     );
+    const permissionSelect = demo.getByRole("combobox", {
+      name: label("Permission mode"),
+      exact: true,
+    });
+    if ((await permissionSelect.inputValue()) !== "default")
+      throw new Error("Default permission mode changed");
+    for (const mode of ["auto", "yolo", "default"]) {
+      await permissionSelect.selectOption(mode);
+      if ((await permissionSelect.inputValue()) !== mode)
+        throw new Error("Permission selection failed");
+    }
     const agentSelect = demo.getByRole("combobox", { name: label("Session agent") });
     if ((await agentSelect.locator('option[value="work"]').textContent()) !== "work · Claude Code")
       throw new Error("Agent options must include the runtime name");
@@ -237,6 +250,14 @@ async function record(
       .click();
     await agentSelect.waitFor();
     await agentSelect.selectOption("work");
+    await permissionSelect.selectOption("auto");
+    const permissionBounds = await permissionSelect.boundingBox();
+    if (
+      !permissionBounds ||
+      permissionBounds.x < 0 ||
+      permissionBounds.x + permissionBounds.width > 391
+    )
+      throw new Error("Permission selector overflows mobile dialog");
     const mobileOverflow = await demo
       .getByRole("dialog", { name: label("New session"), exact: true })
       .evaluate((dialog) => {
@@ -254,6 +275,23 @@ async function record(
         );
       });
     if (mobileOverflow) throw new Error("Horizontal overflow in mobile agent selection");
+    await demo.getByRole("button", { name: label("Close new session"), exact: true }).click();
+    resumable = true;
+    await demo.goto(origin + "/sessions/" + session().id);
+    for (const width of [390, 1440]) {
+      await demo.setViewportSize({ width, height: 1000 });
+      await demo.getByRole("button", { name: label("Resume"), exact: true }).click();
+      const modeSelect = demo.getByRole("combobox", {
+        name: label("Permission mode"),
+        exact: true,
+      });
+      if ((await modeSelect.inputValue()) !== "default") throw new Error("Resume default changed");
+      for (const mode of ["auto", "yolo", "default"]) await modeSelect.selectOption(mode);
+      const bounds = await modeSelect.boundingBox();
+      if (!bounds || bounds.x < 0 || bounds.x + bounds.width > width + 1)
+        throw new Error("Resume permission selector overflows");
+      await demo.getByRole("button", { name: label("Close resume session"), exact: true }).click();
+    }
     console.log(`Captured ${frame} frames to ${frames}`);
   } catch (error) {
     throw new Error(error.message + "\n" + (await demo.locator("body").innerText()));

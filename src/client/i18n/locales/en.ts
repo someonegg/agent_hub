@@ -82,7 +82,8 @@ export const messages = {
   fileDownloadFailed: "Unable to download the file. Please try again.",
   download: "Download",
   dropFilesToUpload: "Drop files to upload",
-  enableYOLOMode: "Enable YOLO mode",
+  permissionMode: "Permission mode",
+  permissionModeDefault: "Default (use native configuration)",
   enableWorktree: "Enable worktree",
   ensureTheOriginalSessionHasExited: "Ensure the original session has exited.",
   error: "Error",
@@ -293,6 +294,5 @@ export const settings = {
   auto: "Auto",
   unavailable: "Unavailable agent",
   worktree: "Enable worktree by default",
-  yolo: "Enable YOLO by default",
   enter: "Enter to send (Shift+Enter for newline)",
 } as const;

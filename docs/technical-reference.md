@@ -96,10 +96,10 @@ Creation defaults `agent` to the first configured nickname. Unknown nicknames re
 Before launching sessions, configure and authenticate each agent's runtime CLI
 on `PATH`. The adapters use these commands and flags:
 
-| Runtime     | Create and resume                                                                      | Launch options                                               | History management                                                                            |
-| ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`, `--yolo` when selected                         | `codex archive <UUID>` and `codex delete <UUID> --force`                                      |
-| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`, `--dangerously-skip-permissions` when selected | The adapter deletes local session files directly; no native archive/delete command is invoked |
+| Runtime     | Create and resume                                                                      | Launch options                                                                       | History management                                                                            |
+| ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                               | `codex archive <UUID>` and `codex delete <UUID> --force`                                      |
+| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions` | The adapter deletes local session files directly; no native archive/delete command is invoked |
 
 See the [Codex adapter](../src/server/adapters/codex/session-manager.ts),
 [Claude Code adapter](../src/server/adapters/claude/session-manager.ts), and
@@ -108,7 +108,7 @@ See the [Codex adapter](../src/server/adapters/codex/session-manager.ts),
 ### Claude Code adapter
 
 Claude supports main-session reading, tmux interaction, create/resume, exit, and
-delete, with worktree/YOLO launch options. Archive and subagent reading are
+delete, with worktree/permission mode launch options. Archive and subagent reading are
 unavailable; native shell commands/output are excluded from conversations. Reading
 does not modify native history or depend on Codex internals. Filtering and limits
 are defined in [JSONL processing](session-jsonl-filtering.md#claude-code).
@@ -496,13 +496,13 @@ permanently, even if ownership returns.
 
 ## Asynchronous management
 
-| Endpoint                              | Body / result                                                                                                                                                    |
-| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /api/v1/sessions`               | New: `{ agent?, projectDirectory, workingDirectory?, taskName?, worktree, yolo?, requestId }`; resume: `{ resumeSessionId, yolo?, requestId }` → `202` operation |
-| `POST /api/v1/sessions/:id/exit`      | `{}` → `202` operation                                                                                                                                           |
-| `POST /api/v1/sessions/:id/archive`   | `{}` → `202` operation                                                                                                                                           |
-| `DELETE /api/v1/sessions/:id`         | `{}` → `202` operation                                                                                                                                           |
-| `GET /api/v1/operations/:operationId` | Current operation                                                                                                                                                |
+| Endpoint                              | Body / result                                                                                                                                                                        |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /api/v1/sessions`               | New: `{ agent?, projectDirectory, workingDirectory?, taskName?, worktree, permissionMode?, requestId }`; resume: `{ resumeSessionId, permissionMode?, requestId }` → `202` operation |
+| `POST /api/v1/sessions/:id/exit`      | `{}` → `202` operation                                                                                                                                                               |
+| `POST /api/v1/sessions/:id/archive`   | `{}` → `202` operation                                                                                                                                                               |
+| `DELETE /api/v1/sessions/:id`         | `{}` → `202` operation                                                                                                                                                               |
+| `GET /api/v1/operations/:operationId` | Current operation                                                                                                                                                                    |
 
 Creation requires `projectDirectory`; optional `workingDirectory` defaults to it.
 The adapter validates both as absolute existing local directories and resolves
@@ -546,7 +546,7 @@ method presence; Codex supports archive and Claude does not. Unsupported archive
 HTTP requests return `409 operation_not_supported`; lifecycle execution repeats
 the check before resolving targets, exiting, or invoking native effects.
 
-Create/resume share launch; worktree/YOLO are options. Resume occupies the session,
+Create/resume share launch; worktree and permission mode are options. Resume occupies the session,
 refreshes source once, records a binding baseline, and evaluates runtime once,
 reusing its directory. Prelaunch checks binding/operation validity without another
 external-change scan or filesystem/tmux atomicity. Native commands use the
@@ -561,9 +561,9 @@ delegate native history changes to the owning adapter.
 | Archive   | Refresh source; already archived succeeds. Validate unique native identity, exit, run native archive once (25-second command limit), confirm within 30 seconds.                                                                                                                                                                                                     |
 | Delete    | Run Exit validation and sequence first, then permanently remove history through the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove session JSONL and associated subagents directory). Exit, deletion, and same-source absence confirmation have separate 30-, 25-, and 30-second budgets. Initially absent in a successful snapshot succeeds. |
 
-Codex launches `ahub-<operationId>` with `--no-daemon --no-alt-screen`, optional
-`--worktree`/`--yolo` (off by default), and an initial native `! printf ...` shell binding command, whose recorded output
-provides the operation marker and project/task association. Resume uses
+Codex launches `ahub-<operationId>` using the [runtime CLI flags](#runtime-cli-compatibility)
+(`--worktree` is off by default) and an initial native `! printf ...` shell binding command.
+Its recorded output provides the operation marker and project/task association. Resume uses
 `codex resume <UUID>`, trying Working then Project Directory: skip invalid paths,
 fall back only on missing/non-directory paths. Launch from chosen real path,
 retain original project association; reject agent/projectDirectory/workingDirectory/worktree overrides.

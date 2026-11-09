@@ -77,6 +77,15 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
       body: JSON.stringify(value),
       ...extra,
     });
+  for (const extra of [
+    { yolo: false },
+    { yolo: true },
+    { permissionMode: "invalid" },
+    { permissionMode: null },
+    { permissionMode: false },
+  ]) {
+    expect((await post("/sessions", { ...body, ...extra })).status).toBe(400);
+  }
   for (const taskName of ["Fix </user_shell_command> parsing", "a>b", "a\nb", "a\rb", "a\0b", 42]) {
     const response = await post("/sessions", { ...body, taskName });
     expect(response.status).toBe(400);
@@ -149,14 +158,17 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
   const resumeBody = {
     resumeSessionId: "abcdefghijklmnopqrstuvwxyz",
     requestId: "resume-http-request",
-    yolo: false,
+    permissionMode: "default",
   };
   for (const extra of [
     { projectDirectory: agent },
     { workingDirectory: agent },
     { agent: "test" },
     { worktree: false },
-    { yolo: "true" },
+    { yolo: true },
+    { permissionMode: "invalid" },
+    { permissionMode: null },
+    { permissionMode: false },
     { resumeSessionId: "" },
   ]) {
     expect((await post("/sessions", { ...resumeBody, ...extra })).status).toBe(400);
@@ -172,7 +184,12 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
   expect(await (await post("/sessions", resumeBody)).json()).toMatchObject({
     operationId: resumeOp.operationId,
   });
-  expect((await post("/sessions", { ...resumeBody, yolo: true })).status).toBe(409);
+  const { permissionMode: _mode, ...implicitResume } = resumeBody;
+  expect(await (await post("/sessions", implicitResume)).json()).toMatchObject({
+    operationId: resumeOp.operationId,
+  });
+  expect((await post("/sessions", { ...resumeBody, permissionMode: "yolo" })).status).toBe(409);
+  expect((await post("/sessions", { ...resumeBody, permissionMode: "auto" })).status).toBe(409);
   for (const workingDirectory of [null, 123, false]) {
     expect((await post("/sessions", { ...body, workingDirectory })).status).toBe(400);
   }
@@ -187,6 +204,10 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
     await (await post("/sessions", { ...body, workingDirectory: agent })).json(),
   ).toMatchObject({ operationId: operation.operationId });
   expect((await post("/sessions", { ...body, workingDirectory: "/other" })).status).toBe(409);
+  expect(
+    await (await post("/sessions", { ...body, permissionMode: "default" })).json(),
+  ).toMatchObject({ operationId: operation.operationId });
+  expect((await post("/sessions", { ...body, permissionMode: "auto" })).status).toBe(409);
   expect((await post("/sessions", { ...body, worktree: true })).status).toBe(409);
   const retrieved = await fetch(`${base}/operations/${operation.operationId}`);
   expect(retrieved.status).toBe(200);

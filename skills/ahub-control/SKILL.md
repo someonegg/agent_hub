@@ -37,8 +37,10 @@ Describe specifications rather than prescribed steps or file-by-file edits. Trus
 
 - `create --project <directory>` sets project association and the default launch directory. Add `--cwd <directory>` to change the launch location while retaining the project association.
 - Add `--task <name>` when creating a session to assign an optional task name. Use `list --task <name>` to find matching sessions across projects.
-- Creation accepts `--agent <nickname>`, defaulting to the first configured Agent. Use `--worktree` and `--yolo` as authorized launch options, not universal defaults.
-- `resume <id>` retains the original Agent and uses an available original working or project directory. It accepts `--yolo` but no directory overrides.
+- Creation accepts `--agent <nickname>`, defaulting to the first configured Agent, and optional `--worktree`.
+- `resume <id>` retains the original Agent and uses an available original working or project directory; it accepts no directory overrides.
+- Both accept `--permission-mode <default|auto|yolo>`: `default` preserves native configuration; `auto` uses native automatic approval. Use Worktree and permission modes only as authorized, not universal defaults.
+  `--yolo` is shorthand for `--permission-mode yolo`; the options cannot be combined.
 - Successful create/resume means the session was observed live, connected, and idle. Save `sessionId` and `tmux` (`socketPath`, `sessionName`); diagnostics may be null.
 - Before sending, inspect and follow `nextAfter` until `hasMore=false`. Save the final `nextAfter` as the turn's baseline, then observe new replies from that position.
 - Consider the framing above when sending an assignment. Prefer `--stdin` from a file or pipe for long messages to avoid shell interpolation and quoting errors. `sent` confirms delivery only.

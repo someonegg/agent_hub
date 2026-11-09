@@ -297,7 +297,7 @@ it("waits for lifecycle completion and launch idle, mapping only public results"
         workingDirectory: resolve("relative-working"),
         agent: "second",
         worktree: true,
-        yolo: true,
+        permissionMode: "yolo",
       });
       expect(body.requestId).toBeTruthy();
       reply(
@@ -766,4 +766,43 @@ it("retries an out-of-range inspect once from the start", async () => {
     "/api/v1/sessions/id/messages?after=99",
     "/api/v1/sessions/id/messages?after=0",
   ]);
+});
+
+it.each([
+  ["--permission-mode", "invalid"],
+  ["--permission-mode", "default", "--yolo"],
+  ["--permission-mode", "auto", "--yolo"],
+  ["--permission-mode", "yolo", "--yolo"],
+])("rejects invalid or conflicting permission flags: %s", (...flags) => {
+  for (const args of [
+    ["create", "--project", "/project"],
+    ["resume", "id"],
+  ]) {
+    expect(() => parseSessionArguments([...args, ...flags])).toThrow(CommandError);
+  }
+});
+
+it.each([
+  [[], "default"],
+  [["--permission-mode", "default"], "default"],
+  [["--permission-mode", "auto"], "auto"],
+  [["--permission-mode", "yolo"], "yolo"],
+  [["--yolo"], "yolo"],
+] as const)("sends only the new permission field for %s", async (flags, permissionMode) => {
+  const seen: unknown[] = [];
+  const base = await serve((_req, res, body) => {
+    seen.push(body);
+    reply(res, { status: "failed", error: "stop after submission" });
+  });
+  for (const args of [
+    ["create", "--project", "/project"],
+    ["resume", "id"],
+  ]) {
+    await cli([...args, ...flags, "--url", base, "--json"]);
+  }
+  expect(seen).toHaveLength(2);
+  for (const body of seen) {
+    expect(body).toMatchObject({ permissionMode });
+    expect(body).not.toHaveProperty("yolo");
+  }
 });

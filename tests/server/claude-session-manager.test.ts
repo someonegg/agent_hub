@@ -33,7 +33,7 @@ it("validates identity and missing directories before starting Claude", async ()
       workingDirectory: "/test/project",
       resumeNativeId: "not-a-claude-id",
       worktree: false,
-      yolo: false,
+      permissionMode: "default" as const,
     }),
   ).rejects.toThrow("Invalid resume identity");
   expect(launch).not.toHaveBeenCalled();
@@ -75,9 +75,15 @@ it("validates independent V3 binding metadata, preserving pane validity for inva
   ).toEqual([]);
 });
 
-it.each([false, true])(
+it.each(
+  ([false, true] as const).flatMap((resume) =>
+    (["default", "auto", "yolo"] as const).map(
+      (permissionMode) => [resume, permissionMode] as const,
+    ),
+  ),
+)(
   "routes explicit Claude agent and native launch flags (resume=%s)",
-  async (resume) => {
+  async (resume, permissionMode) => {
     const tmux = new TmuxLauncher();
     const launch = vi.spyOn(tmux, "launch").mockRejectedValue(new Error("Stop before bootstrap"));
     const manager = new ClaudeSessionManager("/claude agent", tmux);
@@ -88,7 +94,7 @@ it.each([false, true])(
         workingDirectory: "/launch-directory",
         projectDirectory: "/project",
         worktree: !resume,
-        yolo: true,
+        permissionMode,
         ...(resume ? { resumeNativeId: nativeId } : {}),
       }),
     ).rejects.toThrow("Stop before bootstrap");
@@ -100,7 +106,11 @@ it.each([false, true])(
         "CLAUDE_CONFIG_DIR=/claude agent",
         "claude",
         ...(resume ? ["--resume", nativeId] : ["--worktree"]),
-        "--dangerously-skip-permissions",
+        ...(permissionMode === "auto"
+          ? ["--permission-mode", "auto"]
+          : permissionMode === "yolo"
+            ? ["--dangerously-skip-permissions"]
+            : []),
       ],
     );
   },
@@ -130,7 +140,7 @@ const launchOptions = {
   operationId: "00000000-0000-4000-8000-000000000001",
   workingDirectory: "/project",
   worktree: false,
-  yolo: false,
+  permissionMode: "default" as const,
 };
 const readyScreen = { content: "Welcome\n\n❯\u00a0\nStatus", cursorX: 2, cursorY: 2 };
 
@@ -226,7 +236,7 @@ it.each(["capture", "send"])("preserves recovery information when %s fails", asy
       operationId: "00000000-0000-4000-8000-000000000001",
       workingDirectory: "/project",
       worktree: false,
-      yolo: false,
+      permissionMode: "default" as const,
     }),
   ).rejects.toMatchObject({
     outcome: "unknown",
