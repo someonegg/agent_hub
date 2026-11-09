@@ -80,6 +80,10 @@ export function Settings({ agents }: { agents: readonly SessionAgent[] }) {
                 ))}
               </select>
             </label>
+            <PermissionModeSelect
+              value={preferences.permissionMode}
+              onChange={(permissionMode) => updatePreferences({ permissionMode })}
+            />
             <label className="check-row">
               <input
                 type="checkbox"
@@ -88,10 +92,6 @@ export function Settings({ agents }: { agents: readonly SessionAgent[] }) {
               />
               {t("worktree")}
             </label>
-            <PermissionModeSelect
-              value={preferences.permissionMode}
-              onChange={(permissionMode) => updatePreferences({ permissionMode })}
-            />
           </fieldset>
           <label className="check-row">
             <input

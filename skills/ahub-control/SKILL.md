@@ -39,8 +39,7 @@ Describe specifications rather than prescribed steps or file-by-file edits. Trus
 - Add `--task <name>` when creating a session to assign an optional task name. Use `list --task <name>` to find matching sessions across projects.
 - Creation accepts `--agent <nickname>`, defaulting to the first configured Agent, and optional `--worktree`.
 - `resume <id>` retains the original Agent and uses an available original working or project directory; it accepts no directory overrides.
-- Both accept `--permission-mode <default|auto|yolo>`: `default` preserves native configuration; `auto` uses native automatic approval. Use Worktree and permission modes only as authorized, not universal defaults.
-  `--yolo` is shorthand for `--permission-mode yolo`; the options cannot be combined.
+- Both accept `--permission-mode <default|auto|yolo>`: `default` preserves native configuration, `auto` uses native automatic approval, and `yolo` bypasses native approval checks. Use `auto` unless the user specifies otherwise.
 - Successful create/resume means the session was observed live, connected, and idle. Save `sessionId` and `tmux` (`socketPath`, `sessionName`); diagnostics may be null.
 - Before sending, inspect and follow `nextAfter` until `hasMore=false`. Save the final `nextAfter` as the turn's baseline, then observe new replies from that position.
 - Consider the framing above when sending an assignment. Prefer `--stdin` from a file or pipe for long messages to avoid shell interpolation and quoting errors. `sent` confirms delivery only.
@@ -52,8 +51,9 @@ Replace the example IDs, positions, and paths with actual values:
 ahub-cli project list --json
 # Only for a user-specified agent, resolve before adding --agent <nickname>:
 # ahub-cli agent list --json
-ahub-cli session create --project /absolute/project --json
+ahub-cli session create --project /absolute/project --permission-mode auto --json
 # Save sessionId; add --cwd /absolute/working-directory if needed.
+# To resume instead: ahub-cli session resume SESSION_ID --permission-mode auto --json
 
 ahub-cli session inspect SESSION_ID --json
 # If hasMore, continue with --after <nextAfter>; save the final nextAfter as BASELINE.
@@ -90,7 +90,7 @@ The CLI also rejects `send` messages whose first character is `/` (without trimm
 
 Interrupt does not require idle. Ctrl+C stops follow without interrupting session execution.
 
-If inspect/follow reports idle while awaiting a task result and there is no unhandled reply, question, or Plan, run `terminal <id>` to inspect the prompt and diagnose the stall.
+If inspect/follow reports idle while awaiting a task result and there is no unhandled reply, question, or Plan, run `terminal <id>` to inspect the prompt and diagnose the stall. The terminal may reveal a pending permission or approval prompt; use your judgment to respond, and ask the user when clarification or additional authorization is needed.
 
 ## Answer questions and Plans
 
