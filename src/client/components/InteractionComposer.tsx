@@ -16,7 +16,8 @@ import { RequestError } from "./RequestError";
 export function InteractionComposer({
   sessionId,
   interactionAvailable,
-  interactionBusy,
+  actionsDisabled,
+  interactionSending = false,
   composerExpanded,
   composerFocusRequest,
   previewExpanded,
@@ -31,7 +32,8 @@ export function InteractionComposer({
 }: {
   sessionId: string;
   interactionAvailable: boolean;
-  interactionBusy: boolean;
+  actionsDisabled: boolean;
+  interactionSending?: boolean;
   composerExpanded: boolean;
   composerFocusRequest: number;
   previewExpanded: boolean;
@@ -69,15 +71,16 @@ export function InteractionComposer({
     return () => document.removeEventListener("visibilitychange", blurWhenHidden);
   }, []);
   const [dragging, setDragging] = useState(false);
+  const interactionBlocked = actionsDisabled || interactionSending;
   const {
     uploadFiles: startUpload,
     uploadProgress,
     uploadError,
     setUploadError,
     isUploading,
-  } = useAttachmentUpload(sessionId, interactionAvailable, interactionBusy, addAttachment);
-  const inputUnavailable = !interactionAvailable || interactionBusy || !!uploadProgress;
-  const inputBlocked = () => !interactionAvailable || interactionBusy || isUploading();
+  } = useAttachmentUpload(sessionId, interactionAvailable, interactionBlocked, addAttachment);
+  const inputActionsDisabled = !interactionAvailable || actionsDisabled || !!uploadProgress;
+  const inputBlocked = () => !interactionAvailable || interactionBlocked || isUploading();
   const uploadFiles = async (files: File[]) => {
     if (!files.length || inputBlocked()) return;
     setDragging(false);
@@ -131,7 +134,8 @@ export function InteractionComposer({
   return (
     <AttachmentMenu
       interactionAvailable={interactionAvailable}
-      interactionBusy={interactionBusy}
+      actionsDisabled={actionsDisabled}
+      interactionSending={interactionSending}
       uploadProgress={uploadProgress}
       onFiles={(files) => void uploadFiles(files)}
       onError={setUploadError}
@@ -185,8 +189,9 @@ export function InteractionComposer({
         onDragOver={(event) => {
           if (!event.dataTransfer.types.includes("Files")) return;
           event.preventDefault();
-          event.dataTransfer.dropEffect = isUploading() || interactionBusy ? "none" : "copy";
-          setDragging(!isUploading() && !interactionBusy);
+          const blocked = isUploading() || interactionBlocked;
+          event.dataTransfer.dropEffect = blocked ? "none" : "copy";
+          setDragging(!blocked);
         }}
         onDragLeave={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false);
@@ -210,8 +215,10 @@ export function InteractionComposer({
         {dragging ? <p role="status">{t("dropFilesToUpload")}</p> : null}
         <AttachmentList
           attachments={attachments}
-          disabled={interactionBusy || !!uploadProgress}
-          onRemove={removeAttachment}
+          disabled={actionsDisabled || !!uploadProgress}
+          onRemove={(id) => {
+            if (!interactionSending) removeAttachment(id);
+          }}
         />
         <textarea
           ref={composer}
@@ -243,7 +250,7 @@ export function InteractionComposer({
               type="button"
               className="interaction-handoff"
               title={t("handOffThisPaneSBindingToTheActiveCodexSession")}
-              aria-disabled={inputUnavailable}
+              aria-disabled={inputActionsDisabled}
               onClick={() => void handoff().catch(() => undefined)}
             >
               {t("handoff")}
@@ -251,7 +258,7 @@ export function InteractionComposer({
             <button
               type="button"
               className="interaction-interrupt"
-              aria-disabled={inputUnavailable}
+              aria-disabled={inputActionsDisabled}
               onClick={interrupt}
             >
               {t("interrupt")}
@@ -262,7 +269,7 @@ export function InteractionComposer({
             <button
               type="button"
               className="interaction-send"
-              aria-disabled={inputUnavailable || messageIsBlank || messageTooLarge}
+              aria-disabled={inputActionsDisabled || messageIsBlank || messageTooLarge}
               onClick={() => void send().catch(() => undefined)}
             >
               {t("send")}

@@ -26,13 +26,13 @@ describe("session interaction state", () => {
       operation = result.current.handoffPaneBinding();
     });
     const failure = operation.catch((reason: unknown) => reason);
-    expect(result.current.interactionBusy).toBe(true);
+    expect(result.current.pendingOperation).toBe("handoff");
     await expect(result.current.handoffPaneBinding()).rejects.toThrow("already in progress");
     expect(handoffPaneBinding).toHaveBeenCalledTimes(1);
     await act(async () => pending.reject(new Error("handoffPaneBinding failed")));
     await failure;
     expect(result.current.error).toBe("handoffPaneBinding failed");
-    expect(result.current.interactionBusy).toBe(false);
+    expect(result.current.pendingOperation).toBeNull();
   });
 
   it("sends semantic key sequences through the unified client operation", async () => {
@@ -42,7 +42,7 @@ describe("session interaction state", () => {
     await act(async () => result.current.sendKeys(["interrupt", "BTab", "left"]));
 
     expect(sendKeys).toHaveBeenCalledWith("session-a", ["interrupt", "BTab", "left"]);
-    expect(result.current.interactionBusy).toBe(false);
+    expect(result.current.pendingOperation).toBeNull();
     expect(result.current.error).toBeNull();
   });
 
@@ -62,20 +62,21 @@ describe("session interaction state", () => {
     });
     const operationAResult = operationA.catch((reason: unknown) => reason);
     rerender({ sessionId: "session-b" });
+    expect(result.current.pendingOperation).toBeNull();
     let operationB!: Promise<void>;
     act(() => {
       operationB = result.current.sendMessage("second");
     });
-    expect(result.current.interactionBusy).toBe(true);
+    expect(result.current.pendingOperation).toBe("send");
 
     await act(async () => sessionA.reject(new Error("session A failed")));
     await expect(operationAResult).resolves.toMatchObject({ message: "session A failed" });
-    expect(result.current.interactionBusy).toBe(true);
+    expect(result.current.pendingOperation).toBe("send");
     expect(result.current.error).toBeNull();
 
     await act(async () => sessionB.resolve());
     await expect(operationB).resolves.toBeUndefined();
-    expect(result.current.interactionBusy).toBe(false);
+    expect(result.current.pendingOperation).toBeNull();
     expect(result.current.error).toBeNull();
   });
 });
@@ -93,6 +94,7 @@ it("serializes terminal writes without clearing or replacing composer errors", a
     write = result.current.sendTerminalKeys(["up"]);
   });
   const failure = write.catch(() => undefined);
+  expect(result.current.pendingOperation).toBe("send");
   await expect(result.current.sendMessage("again")).rejects.toThrow("already in progress");
   expect(result.current.error).toBe("send failed");
   await act(async () => {
@@ -100,5 +102,5 @@ it("serializes terminal writes without clearing or replacing composer errors", a
     await failure;
   });
   expect(result.current.error).toBe("send failed");
-  expect(result.current.interactionBusy).toBe(false);
+  expect(result.current.pendingOperation).toBeNull();
 });

@@ -42,7 +42,7 @@ function props(value: InteractionResponse | null) {
   return {
     sessionId: "session-a",
     interaction: value,
-    interactionBusy: false,
+    actionsDisabled: false,
     error: null,
     onDismissError: vi.fn(),
     onHandoffPaneBinding: vi.fn().mockResolvedValue(undefined),
@@ -173,7 +173,7 @@ describe("interaction region", () => {
     handlers.onSendKeys.mockClear();
     handlers.onSendMessage.mockClear();
     handlers.onExpandPreview.mockClear();
-    rerender(<StatefulInteractionRegion {...handlers} interactionBusy />);
+    rerender(<StatefulInteractionRegion {...handlers} actionsDisabled />);
 
     expect(screen.getByRole("textbox")).toBeEnabled();
     expect(screen.getByRole("textbox")).toHaveValue("draft");
@@ -234,7 +234,7 @@ describe("interaction region", () => {
       [["right"]],
     ]);
 
-    rerender(<StatefulInteractionRegion {...handlers} interactionBusy />);
+    rerender(<StatefulInteractionRegion {...handlers} actionsDisabled />);
     handlers.onSendKeys.mockClear();
     handlers.onExpandPreview.mockClear();
     for (const name of ["Enter", "Up", "BTab", "Left", "Down", "Right"]) {
@@ -292,7 +292,7 @@ it("keeps an expanded preview open and preserves edits made during delivery", as
   textarea.focus();
   fireEvent.change(textarea, { target: { value: "/plan" } });
   fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
-  view.rerender(<StatefulInteractionRegion {...handlers} interactionBusy />);
+  view.rerender(<StatefulInteractionRegion {...handlers} actionsDisabled />);
   expect(textarea).toBeEnabled();
   expect(textarea).toHaveFocus();
   fireEvent.change(textarea, { target: { value: "下一条消息" } });
@@ -326,7 +326,7 @@ it("preserves the collapsed preview and draft after handoff and disables Handoff
     "false",
   );
   handoff.focus();
-  view.rerender(<StatefulInteractionRegion {...handlers} interactionBusy />);
+  view.rerender(<StatefulInteractionRegion {...handlers} actionsDisabled />);
   expect(handoff).toHaveFocus();
   fireEvent.click(handoff);
   expect(handlers.onHandoffPaneBinding).toHaveBeenCalledOnce();
@@ -415,7 +415,7 @@ it("preserves expanded preview during and after handoff delivery", async () => {
 
 it("collapses the preview with its close button even while busy and restores toggle focus", () => {
   const handlers = props(interaction("connected"));
-  render(<InteractionRegion {...handlers} previewExpanded interactionBusy />);
+  render(<InteractionRegion {...handlers} previewExpanded actionsDisabled />);
   const body = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
   body.focus();
   fireEvent.click(screen.getByRole("button", { name: "Collapse terminal" }));
@@ -462,7 +462,7 @@ it("ignores interrupt shortcuts outside the preview, with other modifiers, or wh
     expect(fireEvent.keyDown(body, { key: "c", ...modifiers })).toBe(true);
   }
   expect(fireEvent.keyDown(screen.getByRole("textbox"), { key: "c", ctrlKey: true })).toBe(true);
-  view.rerender(<InteractionRegion {...handlers} previewExpanded interactionBusy />);
+  view.rerender(<InteractionRegion {...handlers} previewExpanded actionsDisabled />);
   expect(fireEvent.keyDown(body, { key: "c", ctrlKey: true })).toBe(false);
   expect(handlers.onSendKeys).not.toHaveBeenCalled();
   expect(handlers.onTogglePreview).not.toHaveBeenCalled();
@@ -488,7 +488,7 @@ it("preserves editing and unrelated keyboard actions and blocks sends while busy
   expect(handlers.onSendKeys).not.toHaveBeenCalled();
   fireEvent.click(body);
   expect(body).toHaveFocus();
-  view.rerender(<InteractionRegion {...handlers} interactionBusy previewExpanded />);
+  view.rerender(<InteractionRegion {...handlers} actionsDisabled previewExpanded />);
   expect(fireEvent.keyDown(body, { key: "Enter" })).toBe(false);
   expect(fireEvent.keyDown(body, { key: "Escape" })).toBe(false);
   expect(fireEvent.keyDown(body, { key: "1" })).toBe(false);
@@ -754,7 +754,7 @@ describe("image attachments", () => {
     const handlers = props(interaction("connected"));
     const view = render(<StatefulInteractionRegion {...handlers} />);
     const camera = screen.getByLabelText("Take photo");
-    view.rerender(<StatefulInteractionRegion {...handlers} interactionBusy />);
+    view.rerender(<StatefulInteractionRegion {...handlers} actionsDisabled />);
     expect(screen.getByRole("button", { name: "Attach files" })).not.toBeDisabled();
     fireEvent.change(camera, { target: { files: [new File(["x"], "a.jpg")] } });
     expect(screen.getByRole("alert")).toHaveTextContent("Session is busy");

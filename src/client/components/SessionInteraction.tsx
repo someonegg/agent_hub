@@ -71,7 +71,8 @@ export function SessionInteraction({
       operationStatus={operationStatus}
       interaction={interaction}
       onNavigate={onNavigate}
-      interactionBusy={controller.interactionBusy || !!managementBusy}
+      actionsDisabled={controller.pendingOperation === "handoff" || !!managementBusy}
+      interactionSending={controller.pendingOperation === "send"}
       error={controller.error}
       errorDetail={controller.errorDetail}
       onDismissError={controller.clearError}

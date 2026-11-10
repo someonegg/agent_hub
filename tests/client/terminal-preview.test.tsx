@@ -13,7 +13,7 @@ function props() {
     previewStopped: false,
     previewError: null as string | null,
     contentId: "terminal",
-    busy: false,
+    actionsDisabled: false,
     onSendKeys: vi.fn().mockResolvedValue(undefined),
     onRetry: vi.fn(),
     onToggle: vi.fn(),

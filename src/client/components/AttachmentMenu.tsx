@@ -14,7 +14,8 @@ import { LocalizedError } from "../i18n/localized-error";
 
 interface AttachmentMenuProps {
   interactionAvailable: boolean;
-  interactionBusy: boolean;
+  actionsDisabled: boolean;
+  interactionSending?: boolean;
   uploadProgress: string | null;
   onFiles: (files: File[]) => void;
   onError: (error: LocalizedError) => void;
@@ -24,7 +25,8 @@ interface AttachmentMenuProps {
 
 export function AttachmentMenu({
   interactionAvailable,
-  interactionBusy,
+  actionsDisabled,
+  interactionSending = false,
   uploadProgress,
   onFiles,
   onError,
@@ -44,6 +46,7 @@ export function AttachmentMenu({
   ] as const;
   const attachmentMenuId = useId();
   const openAttachments = () => {
+    if (interactionSending) return;
     setAttachmentsOpen(true);
   };
   const closeAttachments = (restoreFocus = true) => {
@@ -120,13 +123,13 @@ export function AttachmentMenu({
     };
   }, [attachmentsOpen]);
   useEffect(() => {
-    if (interactionBusy || !interactionAvailable) setAttachmentsOpen(false);
-  }, [interactionBusy, interactionAvailable]);
+    if (actionsDisabled || !interactionAvailable) setAttachmentsOpen(false);
+  }, [actionsDisabled, interactionAvailable]);
   const chooseFiles = (input: HTMLInputElement) => {
     const files = Array.from(input.files ?? []);
     input.value = "";
     if (!files.length) return;
-    if (!interactionAvailable || interactionBusy) {
+    if (!interactionAvailable || actionsDisabled || interactionSending) {
       onError(
         new LocalizedError(
           !interactionAvailable ? "reconnectBeforeAttachingFiles" : "sessionIsBusyTryAgainLater",
@@ -200,8 +203,9 @@ export function AttachmentMenu({
                   key={input === photoInput ? "photo" : input === imagesInput ? "images" : "files"}
                   type="button"
                   role="menuitem"
-                  disabled={!interactionAvailable || interactionBusy || !!uploadProgress}
+                  disabled={!interactionAvailable || actionsDisabled || !!uploadProgress}
                   onClick={() => {
+                    if (interactionSending) return;
                     input.current?.click();
                     closeAttachments();
                   }}
