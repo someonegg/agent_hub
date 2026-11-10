@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { messageFor } from "./request-errors";
 
 export function useSessionInteraction(sessionId: string) {
-  const [interactionBusy, setInteractionBusy] = useState(false);
+  const [pendingOperation, setPendingOperation] = useState<"send" | "handoff" | null>(null);
   const [errorDetail, setErrorDetail] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const activeSessionId = useRef(sessionId);
@@ -22,31 +22,40 @@ export function useSessionInteraction(sessionId: string) {
 
   useEffect(() => {
     setError(null);
-    setInteractionBusy(false);
+    setPendingOperation(null);
   }, [sessionId]);
 
-  const act = useCallback(async (operation: () => Promise<void>, reportError = true) => {
-    if (!mounted.current || writing.current)
-      throw new Error("An interaction is already in progress.");
-    writing.current = true;
-    const operationGeneration = ++generation.current;
-    setInteractionBusy(true);
-    if (reportError) setError(null);
-    try {
-      await operation();
-    } catch (reason) {
-      if (reportError && mounted.current && generation.current === operationGeneration) {
-        setErrorDetail(reason);
-        setError(messageFor(reason));
+  const act = useCallback(
+    async (
+      operation: () => Promise<void>,
+      {
+        reportError = true,
+        kind = "send",
+      }: { reportError?: boolean; kind?: "send" | "handoff" } = {},
+    ) => {
+      if (!mounted.current || writing.current)
+        throw new Error("An interaction is already in progress.");
+      writing.current = true;
+      const operationGeneration = ++generation.current;
+      setPendingOperation(kind);
+      if (reportError) setError(null);
+      try {
+        await operation();
+      } catch (reason) {
+        if (reportError && mounted.current && generation.current === operationGeneration) {
+          setErrorDetail(reason);
+          setError(messageFor(reason));
+        }
+        throw reason;
+      } finally {
+        if (generation.current === operationGeneration) writing.current = false;
+        if (mounted.current && generation.current === operationGeneration) {
+          setPendingOperation(null);
+        }
       }
-      throw reason;
-    } finally {
-      if (generation.current === operationGeneration) writing.current = false;
-      if (mounted.current && generation.current === operationGeneration) {
-        setInteractionBusy(false);
-      }
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     mounted.current = true;
@@ -57,14 +66,14 @@ export function useSessionInteraction(sessionId: string) {
   }, []);
 
   return {
-    interactionBusy,
+    pendingOperation,
     error,
     errorDetail: error === null ? null : errorDetail,
     clearError: () => setError(null),
     sendMessage: (message: string) => act(() => api.sendMessage(sessionId, message)),
-    handoffPaneBinding: () => act(() => api.handoffPaneBinding(sessionId)),
+    handoffPaneBinding: () => act(() => api.handoffPaneBinding(sessionId), { kind: "handoff" }),
     sendTerminalKeys: (keys: readonly InteractionKey[]) =>
-      act(() => api.sendKeys(sessionId, keys), false),
+      act(() => api.sendKeys(sessionId, keys), { reportError: false }),
     sendKeys: (keys: readonly InteractionKey[]) => act(() => api.sendKeys(sessionId, keys)),
   };
 }

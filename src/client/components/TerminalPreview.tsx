@@ -15,7 +15,8 @@ export function TerminalPreview({
   previewErrorDetail,
   previewExpanded,
   contentId,
-  busy,
+  actionsDisabled,
+  interactionSending = false,
   onSendKeys,
   onRetry,
   onToggle,
@@ -27,7 +28,8 @@ export function TerminalPreview({
   previewErrorDetail?: unknown;
   previewExpanded: boolean;
   contentId: string;
-  busy: boolean;
+  actionsDisabled: boolean;
+  interactionSending?: boolean;
   onSendKeys: (keys: readonly InteractionKey[]) => Promise<void>;
   onRetry: () => void;
   onToggle: () => void;
@@ -46,7 +48,7 @@ export function TerminalPreview({
     };
   }, [previewExpanded]);
   const sendKey = async (key: InteractionKey) => {
-    if (busy) return;
+    if (actionsDisabled || interactionSending) return;
     const generation = keyGeneration.current;
     setKeyError(null);
     try {
@@ -187,7 +189,7 @@ export function TerminalPreview({
                 className={`terminal-key terminal-key-${key}`}
                 tabIndex={-1}
                 aria-label={t(label)}
-                aria-disabled={busy}
+                aria-disabled={actionsDisabled}
                 onClick={() => void sendKey(key)}
               >
                 <span aria-hidden="true">{glyph}</span>

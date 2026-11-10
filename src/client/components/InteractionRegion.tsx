@@ -26,7 +26,9 @@ interface InteractionRegionProps {
 
   interaction: InteractionResponse | null;
   onNavigate?: (sessionId: string) => void;
-  interactionBusy: boolean;
+  actionsDisabled: boolean;
+  // Sending suppresses concurrent actions without disabling controls.
+  interactionSending?: boolean;
   error: string | null;
   errorDetail?: unknown;
   onDismissError: () => void;
@@ -54,7 +56,8 @@ export function InteractionRegion({
   operationStatus,
   interaction,
   onNavigate,
-  interactionBusy,
+  actionsDisabled,
+  interactionSending = false,
   error,
   errorDetail,
   onDismissError,
@@ -155,7 +158,8 @@ export function InteractionRegion({
             previewErrorDetail={previewErrorDetail}
             previewExpanded={previewExpanded}
             contentId={previewContentId}
-            busy={interactionBusy}
+            actionsDisabled={actionsDisabled}
+            interactionSending={interactionSending}
             onSendKeys={onSendTerminalKeys}
             onRetry={onRetryPreview}
             onToggle={() => {
@@ -262,7 +266,8 @@ export function InteractionRegion({
           <InteractionComposer
             sessionId={sessionId}
             interactionAvailable={interactionAvailable}
-            interactionBusy={interactionBusy}
+            actionsDisabled={actionsDisabled}
+            interactionSending={interactionSending}
             composerExpanded={inputExpanded}
             composerFocusRequest={composerFocusRequest}
             previewExpanded={previewExpanded}

@@ -14,7 +14,7 @@ function props() {
   return {
     sessionId: "composer-test",
     interactionAvailable: true,
-    interactionBusy: false,
+    actionsDisabled: false,
     composerExpanded: true,
     composerFocusRequest: 0,
     previewExpanded: false,
