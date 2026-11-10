@@ -185,7 +185,7 @@ describe("hub management", () => {
     render(<CreateSession project="/project with spaces" projects={[]} onCreated={onCreated} />);
     fireEvent.click(screen.getByRole("checkbox", { name: "Enable worktree" }));
     fireEvent.change(screen.getByRole("combobox", { name: "Permission mode" }), {
-      target: { value: "yolo" },
+      target: { value: "auto" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Create session" }));
     await flush();
@@ -193,7 +193,7 @@ describe("hub management", () => {
       expect.objectContaining({
         projectDirectory: "/project with spaces",
         worktree: true,
-        permissionMode: "yolo",
+        permissionMode: "auto",
       }),
     );
     expect(screen.getByRole("status")).toHaveTextContent("pending");
@@ -622,7 +622,7 @@ it.each([403, 503])(
   },
 );
 
-it.each(["auto", "yolo"] as const)(
+it.each(["auto"] as const)(
   "offers a %s resume dialog and shares operation occupancy with the management menu",
   async (mode) => {
     const { ResumeSession, OperationStatus } = await import(
@@ -681,24 +681,24 @@ it("initializes creation options only when opening the dialog", () => {
     { nickname: "work", runtimeName: "Codex" },
     { nickname: "other", runtimeName: "Codex" },
   ];
-  act(() => updatePreferences({ defaultAgent: "default", permissionMode: "auto" }));
+  act(() => updatePreferences({ defaultAgent: "default", permissionMode: "default" }));
   const props = { agents, project: "/project", projects: [], onCreated: vi.fn() };
   const view = render(<CreateSession {...props} open={false} />);
   view.rerender(<CreateSession {...props} open />);
-  expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("auto");
+  expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("default");
   expect(screen.getByLabelText("Session agent")).toHaveValue("default");
   fireEvent.change(screen.getByLabelText("Session agent"), { target: { value: "work" } });
   fireEvent.change(screen.getByLabelText("Project directory"), { target: { value: "/manual" } });
   fireEvent.click(screen.getByRole("checkbox", { name: "Enable worktree" }));
   fireEvent.change(screen.getByRole("combobox", { name: "Permission mode" }), {
-    target: { value: "yolo" },
+    target: { value: "auto" },
   });
-  act(() => updatePreferences({ defaultAgent: "other", worktree: true, permissionMode: "yolo" }));
+  act(() => updatePreferences({ defaultAgent: "other", worktree: true, permissionMode: "auto" }));
   act(() => updatePreferences({ worktree: false, permissionMode: "default" }));
   view.rerender(<CreateSession {...props} project="/updated" open />);
   expect(screen.getByLabelText("Project directory")).toHaveValue("/manual");
   expect(screen.getByRole("checkbox", { name: "Enable worktree" })).toBeChecked();
-  expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("yolo");
+  expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("auto");
   expect(screen.getByLabelText("Session agent")).toHaveValue("work");
   view.rerender(<CreateSession {...props} open={false} />);
   view.rerender(<CreateSession {...props} open />);

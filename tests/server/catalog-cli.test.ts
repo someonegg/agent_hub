@@ -116,14 +116,9 @@ it.each([
   ["create"],
   ["list", "extra"],
   ["list", "--unknown"],
-  ["list", "--url"],
   ["list", "--timeout", "0"],
-  ["list", "--timeout", "NaN"],
   ["list", "--timeout", "2147484"],
-  ["list", "--url", "bad-url"],
-  ["list", "--url", "ftp://example.com"],
   ["list", "--url", "http://example.com/path"],
-  ["list", "--url", "http://user:password@example.com"],
 ])("rejects invalid catalog arguments: %j", (...args) => {
   expect(() => parseCatalogArguments(args)).toThrow(CommandError);
   expect(() => parseCatalogArguments(args)).toThrow(

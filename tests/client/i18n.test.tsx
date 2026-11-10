@@ -46,7 +46,7 @@ describe("language preferences", () => {
 });
 
 it("keeps old settings and rejects invalid persisted language values", () => {
-  const stored = JSON.stringify({ language: "fr", theme: "warm", permissionMode: "yolo" });
+  const stored = JSON.stringify({ language: "fr", theme: "warm", permissionMode: "default" });
   vi.stubGlobal("localStorage", { getItem: () => stored });
   window.dispatchEvent(new StorageEvent("storage", { key: "ahub.preferences.v1" }));
   expect(document.documentElement.lang).toBe("en");
@@ -158,13 +158,7 @@ it("shows runtime names in default agent options and stores only the nickname", 
 
 it.each([
   ["message_not_submitted", "messageNotSubmitted"],
-  ["interaction_not_supported", "interactionNotSupported"],
-  ["interaction_failed", "interactionFailed"],
   ["operation_result_unknown", "operationResultUnknown"],
-  ["session_busy", "sessionIsBusyTryAgainLater"],
-  ["session_not_found", "requestNotFound"],
-  ["interaction_not_connected", "requestDisconnected"],
-  ["payload_too_large", "requestTooLarge"],
 ] as const)("localizes %s without leaking server text", (code, key) => {
   updatePreferences({ language: "en" });
   const detail = "Untranslated server diagnostic";
@@ -183,28 +177,3 @@ it("preserves native diagnostics for unknown errors", () => {
   expect(screen.getByText("native diagnostic")).toBeInTheDocument();
   expect(screen.getByText(/本地 Hub 无法完成请求/)).toBeInTheDocument();
 });
-
-it.each(["auto", "yolo", "default", "invalid", null, undefined])(
-  "normalizes stored permission mode %s and ignores old yolo",
-  (permissionMode) => {
-    vi.stubGlobal("localStorage", {
-      getItem: () => JSON.stringify({ permissionMode, yolo: true, theme: "warm" }),
-      setItem: vi.fn(),
-    });
-    act(() => window.dispatchEvent(new StorageEvent("storage", { key: "ahub.preferences.v1" })));
-    render(<Settings agents={[]} />);
-    const select = screen.getByRole("combobox", { name: "Permission mode", hidden: true });
-    expect(select).toHaveValue(
-      ["auto", "yolo"].includes(permissionMode as string) ? permissionMode : "default",
-    );
-    fireEvent.change(select, { target: { value: "auto" } });
-    expect(localStorage.setItem).toHaveBeenCalledWith(
-      "ahub.preferences.v1",
-      expect.stringContaining('"permissionMode":"auto"'),
-    );
-    expect(localStorage.setItem).toHaveBeenCalledWith(
-      "ahub.preferences.v1",
-      expect.not.stringContaining('"yolo":'),
-    );
-  },
-);

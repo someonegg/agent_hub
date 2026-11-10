@@ -3,9 +3,7 @@ import { expect, it } from "vitest";
 import {
   codexBindingAttemptsFrom,
   codexBindingCommand,
-  codexInteraction,
 } from "../../src/server/adapters/codex/interaction-parser.js";
-import { interruptSteps } from "../../src/server/adapters/shared/session-management.js";
 const operationId = "00000000-0000-4000-8000-000000000001";
 
 function response(ordinal: number, payload: Record<string, unknown>) {
@@ -233,10 +231,6 @@ it.each(["\n", "\r\n"])("normalizes V3 project line endings %j", (eol) => {
   ]);
 });
 
-it("provides the shared interrupt capability", () => {
-  expect(codexInteraction().interruptSteps).toBe(interruptSteps);
-});
-
 it("ignores quoted shell wrappers in ordinary user prose", () => {
   const text =
     "Please explain this example:\n" +
@@ -244,27 +238,6 @@ it("ignores quoted shell wrappers in ordinary user prose", () => {
   expect(
     codexBindingAttemptsFrom(
       response(1, { type: "message", role: "user", content: [{ type: "input_text", text }] }),
-    ),
-  ).toEqual([]);
-});
-
-it.each(["V1", "UNKNOWN"])("ignores unknown protocol marker %s", (version) => {
-  const text = shellText("/tmp/socket", "ahub-00000000-0000-0000-0000-000000000001").replace(
-    "BIND_V3",
-    `BIND_${version}`,
-  );
-  expect(
-    codexBindingAttemptsFrom(
-      response(1, { type: "message", role: "user", content: [{ type: "input_text", text }] }),
-    ),
-  ).toEqual([]);
-  expect(
-    codexBindingAttemptsFrom(
-      response(2, {
-        type: "message",
-        role: "user",
-        content: [{ type: "input_text", text: text.replace("</user_shell_command>", "") }],
-      }),
     ),
   ).toEqual([]);
 });

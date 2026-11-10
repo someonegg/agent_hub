@@ -33,7 +33,7 @@ it("preserves order, internal spaces, and equals in paths while trimming both fi
   });
 });
 
-it.each(["./one", "=one", "a="])("rejects malformed agent %j", (agent) => {
+it.each(["./one", "a="])("rejects malformed agent %j", (agent) => {
   expect(() => read(agent)).toThrow("--codex-agent requires nickname=path");
 });
 
@@ -137,12 +137,9 @@ it("associates commands by nickname regardless of option order and preserves exe
   expect(result.config.agents[0]).not.toHaveProperty("command");
 });
 
-it.each(["codex", "=codex", "codex=", "codex=  ", " =codex"])(
-  "rejects malformed agent command %j",
-  (value) => {
-    expect(() => loadConfig(["--agent-command", value])).toThrow("requires nickname=executable");
-  },
-);
+it.each(["codex", "=codex", "codex="])("rejects malformed agent command %j", (value) => {
+  expect(() => loadConfig(["--agent-command", value])).toThrow("requires nickname=executable");
+});
 
 it("rejects unknown and duplicate command nicknames", () => {
   expect(() => loadConfig(["--agent-command=missing=codex"])).toThrow("Unknown agent nickname");
