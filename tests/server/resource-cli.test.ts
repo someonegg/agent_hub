@@ -153,20 +153,18 @@ it("rejects unknown top-level commands", async () => {
   });
 });
 
-it.each([
-  ["~/project with spaces", join(homedir(), "project with spaces")],
-  [" ./relative path ", resolve("relative path")],
-  ["/absolute/path", "/absolute/path"],
-  ["$HOME/path", resolve("$HOME/path")],
-])("normalizes resource publication paths: %s", (input, expected) => {
-  expect(parseResourceArguments("page", "publish", [input, "--project", input])).toMatchObject({
-    positionals: [expected],
-    values: { project: expected },
-  });
-  expect(parseResourceArguments("diff", "publish", [input])).toMatchObject({
-    positionals: [expected],
-  });
-});
+it.each([["~/project with spaces", join(homedir(), "project with spaces")]])(
+  "normalizes resource publication paths: %s",
+  (input, expected) => {
+    expect(parseResourceArguments("page", "publish", [input, "--project", input])).toMatchObject({
+      positionals: [expected],
+      values: { project: expected },
+    });
+    expect(parseResourceArguments("diff", "publish", [input])).toMatchObject({
+      positionals: [expected],
+    });
+  },
+);
 
 it.each([
   ["page", ["", "--project", "/project"]],

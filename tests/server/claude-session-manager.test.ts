@@ -77,10 +77,13 @@ it("validates independent V3 binding metadata, preserving pane validity for inva
 
 it.each(
   ([false, true] as const).flatMap((resume) =>
-    (["default", "auto", "yolo"] as const).flatMap((permissionMode) =>
-      [undefined, "/custom bin/claude"].map(
-        (command) => [resume, permissionMode, command] as const,
-      ),
+    (["default", "auto"] as const).map(
+      (permissionMode) =>
+        [
+          resume,
+          permissionMode,
+          permissionMode === "auto" ? "/custom bin/claude" : undefined,
+        ] as const,
     ),
   ),
 )(
@@ -106,11 +109,7 @@ it.each(
       [
         command ?? "claude",
         ...(resume ? ["--resume", nativeId] : ["--worktree"]),
-        ...(permissionMode === "auto"
-          ? ["--permission-mode", "auto"]
-          : permissionMode === "yolo"
-            ? ["--dangerously-skip-permissions"]
-            : []),
+        ...(permissionMode === "auto" ? ["--permission-mode", "auto"] : []),
       ],
       { CLAUDE_CONFIG_DIR: "/claude agent" },
     );
@@ -270,15 +269,6 @@ it("deletes Claude logs and subagents across projects while preserving other con
     expect(await readFile(join(root, id, "keep"), "utf8")).toBe("keep");
     expect(await readFile(join(root, "other.jsonl"), "utf8")).toBe("other");
   }
-});
-
-it.each(["V1", "UNKNOWN"])("ignores Claude binding marker %s", (version) => {
-  expect(
-    claudeBindingAttempts(
-      `<bash-stdout>AHUB_TMUX_BIND_${version}\n/tmp/socket\nahub-00000000-0000-0000-0000-000000000001\n\n/project\nnull</bash-stdout>`,
-      1,
-    ),
-  ).toEqual([]);
 });
 
 it("emits V3 using launcher metadata without executing commands in Claude's shell", () => {

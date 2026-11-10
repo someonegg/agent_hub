@@ -10,9 +10,7 @@ import { createTempDirectory } from "../helpers/temp-directories.js";
 
 it.each(
   ([false, true] as const).flatMap((resume) =>
-    (["default", "auto", "yolo"] as const).map(
-      (permissionMode) => [resume, permissionMode] as const,
-    ),
+    (["default", "auto"] as const).map((permissionMode) => [resume, permissionMode] as const),
   ),
 )("maps Codex launch mode (resume=%s, mode=%s)", async (resume, permissionMode) => {
   const tmux = new TmuxLauncher();
@@ -27,8 +25,8 @@ it.each(
     ...(resume ? { resumeNativeId: "00000000-0000-4000-8000-000000000001" } : {}),
   });
   const args = launch.mock.calls[0]![2];
-  expect(args.filter((arg) => ["--yolo", "--approve-for-me"].includes(arg))).toEqual(
-    permissionMode === "auto" ? ["--approve-for-me"] : permissionMode === "yolo" ? ["--yolo"] : [],
+  expect(args.filter((arg) => arg === "--approve-for-me")).toEqual(
+    permissionMode === "auto" ? ["--approve-for-me"] : [],
   );
   expect(args).toContain("--worktree");
 });
@@ -45,13 +43,12 @@ it("resumes an explicit UUID in the original CODEX_HOME with an operation bindin
     operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
     workingDirectory: "/project",
     worktree: false,
-    permissionMode: "yolo",
+    permissionMode: "default",
     resumeNativeId: nativeId,
   });
   const args = launch.mock.calls[0]![2];
   expect(args.slice(0, 3)).toEqual(["codex", "resume", nativeId]);
   expect(launch.mock.calls[0]![3]).toEqual({ CODEX_HOME: "/original-agent" });
-  expect(args).toContain("--yolo");
   expect(args).not.toContain("--worktree");
   expect(args.at(-1)).toContain("54c105aa-3622-45bc-b4c4-e0fa9110d399");
   expect(manager.isValidNativeId(nativeId)).toBe(true);

@@ -229,11 +229,15 @@ describe("observed management operations", () => {
       });
     },
   );
-  it.each(["auto", "yolo"] as const)(
+  it.each(["auto"] as const)(
     "defaults permission mode, forwards %s, and includes it in request deduplication",
     async (mode) => {
       const { service, manager } = setup();
-      const input = { projectDirectory: "/project", worktree: false, requestId: "yolo-request" };
+      const input = {
+        projectDirectory: "/project",
+        worktree: false,
+        requestId: "permission-request",
+      };
       const first = service.create(input);
       expect(service.create({ ...input, permissionMode: "default" })).toEqual(first);
       expect(() => service.create({ ...input, permissionMode: mode })).toThrow(
@@ -247,7 +251,11 @@ describe("observed management operations", () => {
         permissionMode: "default",
         projectDirectory: "/project",
       });
-      const second = service.create({ ...input, requestId: "yolo-enabled", permissionMode: mode });
+      const second = service.create({
+        ...input,
+        requestId: "permission-enabled",
+        permissionMode: mode,
+      });
       await flush();
       expect(manager.launch).toHaveBeenLastCalledWith({
         operationId: second.operationId,
@@ -1057,7 +1065,7 @@ describe("safe resume operations", () => {
     expect(f.manager.launch).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["default", "auto", "yolo"] as const)(
+  it.each(["default", "auto"] as const)(
     "uses the original agent and forwards %s on resume",
     async (mode) => {
       const f = resumable();

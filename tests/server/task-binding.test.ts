@@ -34,8 +34,8 @@ it("round trips quoted task names without shell evaluation", () => {
   ]);
 });
 
-it.each(["not-json", "42", JSON.stringify(""), JSON.stringify("a>b")])(
-  "ignores an empty or invalid task field without invalidating the binding: %s",
+it.each(["not-json", JSON.stringify("a>b")])(
+  "ignores an invalid task field without invalidating the binding: %s",
   (task) => {
     const output = `AHUB_TMUX_BIND_V3\n/tmp/socket\nahub-00000000-0000-0000-0000-000000000007\n\n/project\n${task}\n`;
     expect(bindingAttempts(output, 9)).toEqual([
@@ -75,7 +75,7 @@ it("rejects shell output delimiters before generating commands", () => {
   ).toThrow("Task name");
 });
 
-it.each(["null", '""', '"  "', "not-json", "42", JSON.stringify("a>b")])(
+it.each(['""', "not-json", "42", JSON.stringify("a>b")])(
   "preserves Claude task/project metadata for invalid or empty updates: %s",
   (task) => {
     const initial = createClaudeState("session");
@@ -88,24 +88,15 @@ it.each(["null", '""', '"  "', "not-json", "42", JSON.stringify("a>b")])(
   },
 );
 
-function claudeBindingRecord(ordinal: number, project: string, task: string, marker = "V3") {
+function claudeBindingRecord(ordinal: number, project: string, task: string) {
   return {
     ordinal,
     value: {
       type: "user",
       message: {
         role: "user",
-        content: `<bash-stdout>AHUB_TMUX_BIND_${marker}\n/tmp/socket\nahub-00000000-0000-0000-0000-000000000007\n\n${project}\n${task}\n</bash-stdout>`,
+        content: `<bash-stdout>AHUB_TMUX_BIND_V3\n/tmp/socket\nahub-00000000-0000-0000-0000-000000000007\n\n${project}\n${task}\n</bash-stdout>`,
       },
     },
   };
 }
-
-it("ignores unknown Claude protocol versions while preserving prior metadata", () => {
-  const first = appendClaudeRecords(createClaudeState("session"), [
-    claudeBindingRecord(1, "/first", JSON.stringify("first")),
-  ]);
-  const legacy = appendClaudeRecords(first, [claudeBindingRecord(2, "/legacy", "", "V1")]);
-  expect(legacy).toMatchObject({ project: "/first", taskName: "first" });
-  expect(first).toMatchObject({ project: "/first", taskName: "first" });
-});

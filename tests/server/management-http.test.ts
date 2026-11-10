@@ -78,8 +78,6 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
       ...extra,
     });
   for (const extra of [
-    { yolo: false },
-    { yolo: true },
     { permissionMode: "invalid" },
     { permissionMode: null },
     { permissionMode: false },
@@ -165,7 +163,6 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
     { workingDirectory: agent },
     { agent: "test" },
     { worktree: false },
-    { yolo: true },
     { permissionMode: "invalid" },
     { permissionMode: null },
     { permissionMode: false },
@@ -188,7 +185,6 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
   expect(await (await post("/sessions", implicitResume)).json()).toMatchObject({
     operationId: resumeOp.operationId,
   });
-  expect((await post("/sessions", { ...resumeBody, permissionMode: "yolo" })).status).toBe(409);
   expect((await post("/sessions", { ...resumeBody, permissionMode: "auto" })).status).toBe(409);
   for (const workingDirectory of [null, 123, false]) {
     expect((await post("/sessions", { ...body, workingDirectory })).status).toBe(400);

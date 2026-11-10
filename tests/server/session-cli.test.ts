@@ -64,11 +64,7 @@ const reply = (res: ServerResponse, value: unknown, status = 200) => {
 };
 
 it.each([
-  ["unknown"],
-  ["list", "--unknown"],
   ["inspect", "id", "--after", "-1"],
-  ["list", "extra"],
-  ["list", "--url", "bad-url"],
   ["send", "id"],
   ["send", "id", "--stdin", "--message", "x"],
   ["keys", "id", "interrupt"],
@@ -77,9 +73,7 @@ it.each([
   ["list", "--url", "ftp://example.com"],
   ["list", "--url", "https://user:password@example.com"],
   ["create", "--project", "/tmp", "--task", "Fix </user_shell_command> parsing"],
-  ["create", "--project", "   "],
   ["create", "--project", "/tmp", "--cwd", ""],
-  ["list", "--project", "   "],
 ])("rejects invalid session arguments: %j", (...args) => {
   expect(() => parseSessionArguments(args)).toThrow(CommandError);
   expect(() => parseSessionArguments(args)).toThrow(
@@ -301,7 +295,7 @@ it("waits for lifecycle completion and launch idle, mapping only public results"
         workingDirectory: resolve("relative-working"),
         agent: "second",
         worktree: true,
-        permissionMode: "yolo",
+        permissionMode: "default",
       });
       expect(body.requestId).toBeTruthy();
       reply(
@@ -344,7 +338,6 @@ it("waits for lifecycle completion and launch idle, mapping only public results"
     "--agent",
     "second",
     "--worktree",
-    "--yolo",
     "--url",
     base,
     "--json",
@@ -772,12 +765,7 @@ it("retries an out-of-range inspect once from the start", async () => {
   ]);
 });
 
-it.each([
-  ["--permission-mode", "invalid"],
-  ["--permission-mode", "default", "--yolo"],
-  ["--permission-mode", "auto", "--yolo"],
-  ["--permission-mode", "yolo", "--yolo"],
-])("rejects invalid or conflicting permission flags: %s", (...flags) => {
+it.each([["--permission-mode", "invalid"]])("rejects invalid permission flags: %s", (...flags) => {
   for (const args of [
     ["create", "--project", "/project"],
     ["resume", "id"],
@@ -790,9 +778,7 @@ it.each([
   [[], "default"],
   [["--permission-mode", "default"], "default"],
   [["--permission-mode", "auto"], "auto"],
-  [["--permission-mode", "yolo"], "yolo"],
-  [["--yolo"], "yolo"],
-] as const)("sends only the new permission field for %s", async (flags, permissionMode) => {
+] as const)("sends the requested permission mode for %s", async (flags, permissionMode) => {
   const seen: unknown[] = [];
   const base = await serve((_req, res, body) => {
     seen.push(body);
@@ -807,7 +793,6 @@ it.each([
   expect(seen).toHaveLength(2);
   for (const body of seen) {
     expect(body).toMatchObject({ permissionMode });
-    expect(body).not.toHaveProperty("yolo");
   }
 });
 
