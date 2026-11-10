@@ -7,6 +7,7 @@ import type { InteractionResponse } from "../../src/shared/api-contract";
 import type { UploadAttachment } from "../../src/shared/uploads";
 
 import { InteractionRegion } from "../../src/client/components/InteractionRegion";
+import { setSessionComposerExpanded } from "../../src/client/state/composer-preferences";
 import { updatePreferences } from "../../src/client/state/preferences";
 import { SessionDraftProvider } from "../../src/client/state/session-drafts";
 
@@ -1042,6 +1043,33 @@ describe("composer entry state", () => {
       </SessionDraftProvider>
     );
   }
+
+  it("restores choices after provider replacement without persisting drafts", () => {
+    const view = render(session("persisted"));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "memory only" } });
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    view.unmount();
+    expect(sessionStorage.getItem("ahub.browser-state.v1")).not.toContain("memory only");
+    render(session("persisted"));
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Message Input" }));
+    expect(screen.getByRole("textbox")).toHaveValue("");
+  });
+
+  it("applies a resumed expansion to the mounted composer and retains it on reentry", () => {
+    const view = render(session("resumed", true));
+    const toggle = screen.getByRole("button", { name: "Message Input" });
+    // Save an explicit collapsed choice.
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+    toggle.focus();
+    act(() => setSessionComposerExpanded("resumed", true));
+    expect(screen.getByRole("textbox")).toBeVisible();
+    expect(screen.getByRole("textbox")).not.toHaveFocus();
+    view.unmount();
+    render(session("resumed", true));
+    expect(screen.getByRole("textbox")).toBeVisible();
+  });
 
   it("opens short sessions without focus and restores explicit choices ahead of defaults", () => {
     const view = render(session("short"));
