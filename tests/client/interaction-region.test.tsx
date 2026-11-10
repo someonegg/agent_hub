@@ -413,12 +413,12 @@ it("preserves expanded preview during and after handoff delivery", async () => {
   expect(handlers.onTogglePreview).not.toHaveBeenCalled();
 });
 
-it("collapses the preview with Escape without interrupting and restores toggle focus", () => {
+it("collapses the preview with its close button even while busy and restores toggle focus", () => {
   const handlers = props(interaction("connected"));
   render(<InteractionRegion {...handlers} previewExpanded interactionBusy />);
   const body = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
   body.focus();
-  expect(fireEvent.keyDown(body, { key: "Escape" })).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Collapse terminal" }));
   expect(handlers.onTogglePreview).toHaveBeenCalledExactlyOnceWith();
   expect(handlers.onSendKeys).not.toHaveBeenCalled();
   expect(screen.getByRole("button", { name: "Terminal" })).toHaveFocus();

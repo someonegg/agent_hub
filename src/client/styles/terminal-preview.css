@@ -1,4 +1,5 @@
 .terminal-preview {
+  position: relative;
   border: 1px solid var(--terminal-border);
   background: var(--terminal-surface);
   overflow: hidden;
@@ -165,4 +166,36 @@
 }
 .terminal-preview-notice summary {
   cursor: pointer;
+}
+
+.terminal-preview-close {
+  position: absolute;
+  z-index: 1;
+  top: 0.25rem;
+  right: 0.25rem;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--terminal-border);
+  border-radius: var(--radius-control);
+  color: var(--terminal-ink);
+  background: color-mix(in srgb, var(--terminal-output-surface) 88%, transparent);
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
+  touch-action: manipulation;
+}
+.terminal-preview-close:focus-visible {
+  outline: 2px solid var(--terminal-ink);
+  outline-offset: -3px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .terminal-preview-close {
+    opacity: 0.65;
+  }
+  .terminal-preview-close:is(:hover, :focus-visible) {
+    opacity: 1;
+  }
 }

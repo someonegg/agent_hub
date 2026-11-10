@@ -166,6 +166,7 @@ export const namespaceKeys = {
     "terminalControls",
     "terminalOutputExceededThePreviewLimitTheBeginningWasOmitted",
     "inputArea",
+    "collapseTerminalPreview",
     "terminalPreview",
     "terminalPreviewContent",
     "terminalPreviewUnavailable",

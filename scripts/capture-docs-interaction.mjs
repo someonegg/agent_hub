@@ -86,9 +86,9 @@ async function capture(
     )
       throw new Error("Composer collapse lost draft or attachments");
     await demo.getByLabel(label("Terminal content"), { exact: true }).focus();
-    await demo.keyboard.press("Escape");
+    await demo.getByRole("button", { name: label("Collapse terminal"), exact: true }).click();
     if (!(await previewToggle.evaluate((element) => document.activeElement === element)))
-      throw new Error("Terminal Escape lost switch focus");
+      throw new Error("Terminal close button lost switch focus");
     await previewToggle.click();
     if (!(await previewToggle.evaluate((element) => document.activeElement === element)))
       throw new Error("Preview expansion stole switch focus");
