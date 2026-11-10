@@ -1,8 +1,12 @@
+import { chmod, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { expect, it, vi } from "vitest";
 
 import { CodexSessionManager } from "../../src/server/adapters/codex/session-manager.js";
 import { exitSteps } from "../../src/server/adapters/shared/session-management.js";
 import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
+import { createTempDirectory } from "../helpers/temp-directories.js";
 
 it.each(
   ([false, true] as const).flatMap((resume) =>
@@ -45,13 +49,8 @@ it("resumes an explicit UUID in the original CODEX_HOME with an operation bindin
     resumeNativeId: nativeId,
   });
   const args = launch.mock.calls[0]![2];
-  expect(args.slice(0, 5)).toEqual([
-    "env",
-    "CODEX_HOME=/original-agent",
-    "codex",
-    "resume",
-    nativeId,
-  ]);
+  expect(args.slice(0, 3)).toEqual(["codex", "resume", nativeId]);
+  expect(launch.mock.calls[0]![3]).toEqual({ CODEX_HOME: "/original-agent" });
   expect(args).toContain("--yolo");
   expect(args).not.toContain("--worktree");
   expect(args.at(-1)).toContain("54c105aa-3622-45bc-b4c4-e0fa9110d399");
@@ -75,4 +74,46 @@ it("resumes an explicit UUID in the original CODEX_HOME with an operation bindin
 
 it("provides the shared exit capability", () => {
   expect(new CodexSessionManager("/test/home").exitSteps).toBe(exitSteps);
+});
+
+it("uses one literal executable for launch, archive, and delete", async () => {
+  const directory = await createTempDirectory("codex-command-");
+  const command = join(directory, "custom codex='literal'");
+  const output = join(directory, "calls");
+  await writeFile(
+    command,
+    `#!/usr/bin/env node
+const { appendFileSync } = require("node:fs");
+const call = { args: process.argv.slice(2), home: process.env.CODEX_HOME };
+appendFileSync(${JSON.stringify(output)}, JSON.stringify(call) + "\\n");
+`,
+  );
+  await chmod(command, 0o755);
+  const tmux = new TmuxLauncher();
+  const launch = vi
+    .spyOn(tmux, "launch")
+    .mockResolvedValue({ socketPath: "/tmp/test", sessionName: "test" });
+  const manager = new CodexSessionManager("/custom home", tmux, command);
+  const nativeId = "00000000-0000-4000-8000-000000000001";
+  for (const resumeNativeId of [undefined, nativeId]) {
+    await manager.launch({
+      operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
+      workingDirectory: "/project",
+      worktree: false,
+      permissionMode: "default",
+      ...(resumeNativeId ? { resumeNativeId } : {}),
+    });
+  }
+  expect(launch.mock.calls.map((call) => call[2][0])).toEqual([command, command]);
+  await manager.archive(nativeId);
+  await manager.delete(nativeId);
+  expect(
+    (await readFile(output, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line)),
+  ).toEqual([
+    { args: ["archive", nativeId], home: "/custom home" },
+    { args: ["delete", nativeId, "--force"], home: "/custom home" },
+  ]);
 });

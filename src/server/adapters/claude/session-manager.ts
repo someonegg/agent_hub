@@ -21,6 +21,7 @@ export class ClaudeSessionManager implements SessionManager {
     private readonly configDirectory: string,
     private readonly tmux = new TmuxLauncher(),
     private readonly readyScript?: string,
+    private readonly command = "claude",
   ) {}
   readonly interruptAfterBinding = true;
   isValidNativeId = validClaudeId;
@@ -28,18 +29,21 @@ export class ClaudeSessionManager implements SessionManager {
   async launch(options: SessionLaunchOptions) {
     if (options.resumeNativeId !== undefined && !this.isValidNativeId(options.resumeNativeId))
       throw new Error("Invalid resume identity");
-    const target = await this.tmux.launch(options.operationId, options.workingDirectory, [
-      "env",
-      `CLAUDE_CONFIG_DIR=${this.configDirectory}`,
-      "claude",
-      ...(options.resumeNativeId ? ["--resume", options.resumeNativeId] : []),
-      ...(options.worktree ? ["--worktree"] : []),
-      ...(options.permissionMode === "auto"
-        ? ["--permission-mode", "auto"]
-        : options.permissionMode === "yolo"
-          ? ["--dangerously-skip-permissions"]
-          : []),
-    ]);
+    const target = await this.tmux.launch(
+      options.operationId,
+      options.workingDirectory,
+      [
+        this.command,
+        ...(options.resumeNativeId ? ["--resume", options.resumeNativeId] : []),
+        ...(options.worktree ? ["--worktree"] : []),
+        ...(options.permissionMode === "auto"
+          ? ["--permission-mode", "auto"]
+          : options.permissionMode === "yolo"
+            ? ["--dangerously-skip-permissions"]
+            : []),
+      ],
+      { CLAUDE_CONFIG_DIR: this.configDirectory },
+    );
     try {
       const deadline = Date.now() + BINDING_PROMPT_WAIT_MS;
       let context = "";
@@ -127,5 +131,6 @@ export const createClaudeSessionManager = (
   configDirectory: string,
   socket?: string,
   readyScript?: string,
+  command?: string,
 ): SessionManager =>
-  new ClaudeSessionManager(configDirectory, new TmuxLauncher(socket), readyScript);
+  new ClaudeSessionManager(configDirectory, new TmuxLauncher(socket), readyScript, command);

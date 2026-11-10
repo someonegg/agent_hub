@@ -199,6 +199,8 @@ agent-hub \
 通过侧边栏智能体筛选器缩小范围。网页创建时，有效的智能体筛选或默认智能体偏好优先于第一项。
 完整规则见 [智能体路由（英文）](technical-reference.md#agent-identity-and-routing)。
 
+使用 `--agent-command '昵称=可执行文件'` 自定义命令，例如 `--agent-command 'work=/opt/bin/codex'`。详情见 `agent-hub --help`。
+
 ## 从其他设备访问
 
 Hub 没有应用层登录，任何能访问它的人都能阅读会话、发送输入和管理会话。

@@ -77,16 +77,18 @@ it("validates independent V3 binding metadata, preserving pane validity for inva
 
 it.each(
   ([false, true] as const).flatMap((resume) =>
-    (["default", "auto", "yolo"] as const).map(
-      (permissionMode) => [resume, permissionMode] as const,
+    (["default", "auto", "yolo"] as const).flatMap((permissionMode) =>
+      [undefined, "/custom bin/claude"].map(
+        (command) => [resume, permissionMode, command] as const,
+      ),
     ),
   ),
 )(
-  "routes explicit Claude agent and native launch flags (resume=%s)",
-  async (resume, permissionMode) => {
+  "routes explicit Claude agent and native launch flags (resume=%s, mode=%s, command=%s)",
+  async (resume, permissionMode, command) => {
     const tmux = new TmuxLauncher();
     const launch = vi.spyOn(tmux, "launch").mockRejectedValue(new Error("Stop before bootstrap"));
-    const manager = new ClaudeSessionManager("/claude agent", tmux);
+    const manager = new ClaudeSessionManager("/claude agent", tmux, undefined, command);
     const nativeId = "11111111-2222-4333-8444-555555555555";
     await expect(
       manager.launch({
@@ -102,9 +104,7 @@ it.each(
       "00000000-0000-4000-8000-000000000001",
       "/launch-directory",
       [
-        "env",
-        "CLAUDE_CONFIG_DIR=/claude agent",
-        "claude",
+        command ?? "claude",
         ...(resume ? ["--resume", nativeId] : ["--worktree"]),
         ...(permissionMode === "auto"
           ? ["--permission-mode", "auto"]
@@ -112,6 +112,7 @@ it.each(
             ? ["--dangerously-skip-permissions"]
             : []),
       ],
+      { CLAUDE_CONFIG_DIR: "/claude agent" },
     );
   },
 );

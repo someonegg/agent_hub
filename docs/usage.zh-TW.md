@@ -199,6 +199,8 @@ agent-hub \
 透過側邊欄智慧體篩選器縮小範圍。網頁建立時，有效的智慧體篩選或預設智慧體偏好優先於第一項。
 完整規則見 [智慧體路由（英文）](technical-reference.md#agent-identity-and-routing)。
 
+使用 `--agent-command '暱稱=可執行檔'` 自訂命令，例如 `--agent-command 'work=/opt/bin/codex'`。詳情見 `agent-hub --help`。
+
 ## 從其他裝置存取
 
 Hub 沒有應用層登入，任何能存取它的人都能閱讀工作階段、傳送輸入和管理工作階段。

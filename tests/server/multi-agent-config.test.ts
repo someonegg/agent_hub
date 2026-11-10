@@ -92,3 +92,64 @@ it("preserves interleaved adapter order", () => {
     },
   });
 });
+
+it("overrides default agent executables without replacing the default agents", () => {
+  const result = loadConfig([
+    "--agent-command=codex=codex-dev",
+    "--agent-command=claude=claude-dev",
+  ]);
+  expect(result).toMatchObject({
+    config: {
+      agents: expect.arrayContaining([
+        expect.objectContaining({ nickname: "codex", command: "codex-dev" }),
+        expect.objectContaining({ nickname: "claude", command: "claude-dev" }),
+      ]),
+    },
+  });
+  expect(commandLineHelp()).toContain("--agent-command <nickname=executable>");
+});
+
+it("associates commands by nickname regardless of option order and preserves executable characters", () => {
+  expect(
+    loadConfig([
+      "--agent-command",
+      " work = ./bin/my agent=a'$(literal) ",
+      "--codex-agent",
+      "work=/tmp/work",
+      "--codex-agent",
+      "other=/tmp/other",
+      "--claude-agent",
+      "personal=/tmp/personal",
+      "--agent-command",
+      "personal=~/bin/claude",
+    ]),
+  ).toMatchObject({
+    config: {
+      agents: [
+        { nickname: "work", command: resolve("bin/my agent=a'$(literal)") },
+        { nickname: "other" },
+        { nickname: "personal", command: join(homedir(), "bin/claude") },
+      ],
+    },
+  });
+  const result = loadConfig(["--codex-agent", "work=/tmp/work"]);
+  if (result.kind !== "run") throw new Error("Expected run config");
+  expect(result.config.agents[0]).not.toHaveProperty("command");
+});
+
+it.each(["codex", "=codex", "codex=", "codex=  ", " =codex"])(
+  "rejects malformed agent command %j",
+  (value) => {
+    expect(() => loadConfig(["--agent-command", value])).toThrow("requires nickname=executable");
+  },
+);
+
+it("rejects unknown and duplicate command nicknames", () => {
+  expect(() => loadConfig(["--agent-command=missing=codex"])).toThrow("Unknown agent nickname");
+  expect(() => loadConfig(["--agent-command=codex=one", "--agent-command= codex =two"])).toThrow(
+    "Duplicate agent command",
+  );
+  expect(() => loadConfig(["--codex-agent=work=/tmp/work", "--agent-command=codex=one"])).toThrow(
+    "Unknown agent nickname",
+  );
+});

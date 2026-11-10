@@ -239,6 +239,9 @@ Use the sidebar Agent filter to narrow sessions. For web creation, an active Age
 filter or valid default Agent preference takes priority over the first Agent.
 See [Agent routing](technical-reference.md#agent-identity-and-routing) for exact rules.
 
+Override an agent's executable with `--agent-command 'nickname=executable'`,
+for example `--agent-command 'work=/opt/bin/codex'`. See `agent-hub --help` for details.
+
 ## Access from other devices
 
 Hub has no application login. Anyone who can access it can read conversations,

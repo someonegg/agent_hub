@@ -11,6 +11,7 @@ export class CodexSessionManager implements SessionManager {
   constructor(
     private readonly configDirectory: string,
     private readonly tmux = new TmuxLauncher(),
+    private readonly command = "codex",
   ) {}
 
   resolveDirectory = resolveDirectory;
@@ -28,21 +29,24 @@ export class CodexSessionManager implements SessionManager {
   }: SessionLaunchOptions) {
     if (resumeNativeId !== undefined && !this.isValidNativeId(resumeNativeId))
       throw new Error("Invalid resume identity");
-    return this.tmux.launch(operationId, workingDirectory, [
-      "env",
-      `CODEX_HOME=${this.configDirectory}`,
-      "codex",
-      ...(resumeNativeId ? ["resume", resumeNativeId] : []),
-      "--no-daemon",
-      "--no-alt-screen",
-      ...(worktree ? ["--worktree"] : []),
-      ...(permissionMode === "auto"
-        ? ["--approve-for-me"]
-        : permissionMode === "yolo"
-          ? ["--yolo"]
-          : []),
-      codexBindingCommand(operationId, projectDirectory, taskName ?? null),
-    ]);
+    return this.tmux.launch(
+      operationId,
+      workingDirectory,
+      [
+        this.command,
+        ...(resumeNativeId ? ["resume", resumeNativeId] : []),
+        "--no-daemon",
+        "--no-alt-screen",
+        ...(worktree ? ["--worktree"] : []),
+        ...(permissionMode === "auto"
+          ? ["--approve-for-me"]
+          : permissionMode === "yolo"
+            ? ["--yolo"]
+            : []),
+        codexBindingCommand(operationId, projectDirectory, taskName ?? null),
+      ],
+      { CODEX_HOME: this.configDirectory },
+    );
   }
   exitSteps = exitSteps;
   async archive(nativeId: string) {
@@ -53,7 +57,7 @@ export class CodexSessionManager implements SessionManager {
   }
   async #command(args: string[]) {
     if (!this.isValidNativeId(args[1]!)) throw new Error("Session has no valid native UUID");
-    await execute("codex", args, {
+    await execute(this.command, args, {
       env: { ...process.env, CODEX_HOME: this.configDirectory },
       timeout: 25_000,
       maxBuffer: 64 * 1024,
@@ -64,4 +68,5 @@ export class CodexSessionManager implements SessionManager {
 export const createCodexSessionManager = (
   configDirectory: string,
   socket?: string,
-): SessionManager => new CodexSessionManager(configDirectory, new TmuxLauncher(socket));
+  command?: string,
+): SessionManager => new CodexSessionManager(configDirectory, new TmuxLauncher(socket), command);

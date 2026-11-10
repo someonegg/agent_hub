@@ -111,12 +111,12 @@ async function createAdapter(
     case "claude":
       return {
         source: await createClaudeSessionSource(agent.path, { agent: agent.nickname }),
-        manager: createClaudeSessionManager(agent.path, socket, claudeReadyScript),
+        manager: createClaudeSessionManager(agent.path, socket, claudeReadyScript, agent.command),
       };
     case "codex":
       return {
         source: await createCodexSessionSource(agent.path, { agent: agent.nickname }),
-        manager: createCodexSessionManager(agent.path, socket),
+        manager: createCodexSessionManager(agent.path, socket, agent.command),
       };
   }
 }
