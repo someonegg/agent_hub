@@ -788,9 +788,27 @@ async function capture(
     }
   }
 
+  async function verifyComposerPersistence() {
+    const input = demo.getByRole("textbox", { name: label("Message to agent") });
+    await input.fill("Draft stays in memory across composer toggles");
+    await composerToggle.click();
+    await demo.reload();
+    await composerToggle.waitFor();
+    if ((await composerToggle.getAttribute("aria-expanded")) !== "false")
+      throw new Error("Composer collapse was not restored after reload");
+    await composerToggle.click();
+    if (await input.inputValue()) throw new Error("Draft text was persisted across reload");
+    await demo.reload();
+    await composerToggle.waitFor();
+    if ((await composerToggle.getAttribute("aria-expanded")) !== "true")
+      throw new Error("Composer expansion was not restored after reload");
+  }
+
   await mockDocsTerminal(context, timestamp);
   try {
     await demo.goto(`${origin}/sessions/${session.id}`);
+    await prepareDesktopPreview();
+    await verifyComposerPersistence();
     await prepareDesktopPreview();
     const selectedProject = demo.getByRole("button", {
       name: new RegExp(
@@ -856,6 +874,13 @@ async function capture(
     await demo.getByRole("button", { name: label("Settings"), exact: true }).click();
     await enterToSend.uncheck();
     await demo.getByRole("button", { name: label("Close settings"), exact: true }).click();
+    // Exercise mobile entry defaults without the desktop's explicit composer choice.
+    await demo.evaluate((id) => {
+      const key = "ahub.browser-state.v1";
+      const state = JSON.parse(sessionStorage.getItem(key) ?? "{}");
+      delete state[`ahub.composer-expanded.${id}`];
+      sessionStorage.setItem(key, JSON.stringify(state));
+    }, session.id);
     await demo.setViewportSize({ width: 390, height: 844 });
     await demo.goto(origin);
     for (const project of ["atlas-dashboard", "harbor-api", "field-notes"]) {

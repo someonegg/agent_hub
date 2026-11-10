@@ -5,6 +5,8 @@ import type { HubOperation, InteractionResponse } from "../../src/shared/api-con
 
 import { api, ApiClientError } from "../../src/client/api/client";
 import { CreateSession, ManageSession } from "../../src/client/components/HubManagement";
+import { browserStorage } from "../../src/client/state/browser-storage";
+import { setSessionComposerExpanded } from "../../src/client/state/composer-preferences";
 import { updatePreferences } from "../../src/client/state/preferences";
 import { useHubOperation } from "../../src/client/state/use-hub-operation";
 import { baseSession, SESSION_ID } from "./session.fixtures";
@@ -27,6 +29,40 @@ const flush = async () => {
     for (let i = 0; i < 10; i++) await Promise.resolve();
   });
 };
+
+it.each([
+  ["resume", "succeeded", "true"],
+  ["resume", "pending", "false"],
+  ["resume", "failed", "false"],
+  ["new", "succeeded", "false"],
+] as const)("sets composer expansion for %s / %s to %s", async (mode, status, expected) => {
+  setSessionComposerExpanded(SESSION_ID, false);
+  const onSuccess = vi.fn(() => {
+    expect(browserStorage.getItem(`ahub.composer-expanded.${SESSION_ID}`)).toBe(expected);
+  });
+  const { result } = renderHook(() => useHubOperation(SESSION_ID, onSuccess));
+  await act(async () => {
+    await result.current.start(async () => ({ ...pending, mode, status, sessionId: SESSION_ID }));
+  });
+  expect(browserStorage.getItem(`ahub.composer-expanded.${SESSION_ID}`)).toBe(expected);
+  expect(onSuccess).toHaveBeenCalledTimes(status === "succeeded" ? 1 : 0);
+});
+
+it("expands the resumed target after recovering an operation from sessionStorage", async () => {
+  setSessionComposerExpanded(SESSION_ID, false);
+  sessionStorage.setItem("ahub.operation.create", pending.operationId);
+  vi.spyOn(api, "operation").mockResolvedValue({
+    ...pending,
+    mode: "resume",
+    status: "succeeded",
+    sessionId: SESSION_ID,
+  });
+  const onSuccess = vi.fn();
+  renderHook(() => useHubOperation("create", onSuccess));
+  await flush();
+  expect(onSuccess).toHaveBeenCalledTimes(1);
+  expect(browserStorage.getItem(`ahub.composer-expanded.${SESSION_ID}`)).toBe("true");
+});
 describe("hub management", () => {
   it("uses current interaction state for ordered access and exit actions", async () => {
     const command = "tmux attach-session -t test";

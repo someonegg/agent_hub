@@ -10,7 +10,8 @@ import type {
 } from "../../shared/api-contract";
 
 import { t } from "../i18n";
-import { useSessionComposerPreference, useSessionDraft } from "../state/session-drafts";
+import { useSessionComposerPreference } from "../state/composer-preferences";
+import { useSessionDraft } from "../state/session-drafts";
 import { InteractionComposer } from "./InteractionComposer";
 import { InternalLink } from "./InternalLink";
 import { TerminalPreview } from "./TerminalPreview";
@@ -87,6 +88,12 @@ export function InteractionRegion({
   const [composerExpanded, setComposerExpanded] = useState<boolean | null>(null);
   const [composerFocusRequest, setComposerFocusRequest] = useState(0);
   const inputExpanded = composerExpanded ?? true;
+  const previousPreference = useRef(preference.expanded);
+  useLayoutEffect(() => {
+    if (previousPreference.current === preference.expanded) return;
+    previousPreference.current = preference.expanded;
+    if (preference.expanded !== undefined) setComposerExpanded(preference.expanded);
+  }, [preference.expanded]);
   useLayoutEffect(() => {
     if (composerExpanded !== null || !messagesReady || !interactionAvailable) return;
     const scroll = flow.current?.closest<HTMLElement>(".message-scroll");

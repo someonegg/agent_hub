@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { HubOperation } from "../../shared/api-contract";
 
 import { api, ApiClientError } from "../api/client";
+import { setSessionComposerExpanded } from "./composer-preferences";
 import { createRequestChannel } from "./request-channel";
 import { messageFor } from "./request-errors";
 import {
@@ -104,6 +105,8 @@ export function useHubOperation(scope: string, onSuccess: (operation: HubOperati
       commit(run, { type: "receive", operation: next });
       if (next.status === "succeeded" && !run.reported) {
         run.reported = true;
+        if (next.mode === "resume" && next.sessionId)
+          setSessionComposerExpanded(next.sessionId, true);
         success.current(next);
       }
     },
