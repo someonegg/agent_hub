@@ -56,9 +56,8 @@ A green **Live** badge indicates a connected terminal. Send prompts from the
 message input. By default, **Shift+Enter** sends and **Enter** inserts a newline.
 Enable **Enter to send** in [Settings](#browser-settings) to reverse this.
 
-Expand **Terminal Preview** to inspect the CLI. Use **Interrupt** or press
-**Ctrl+C** in the preview to interrupt; **Esc** collapses it. **Working** and
-**Idle** reflect terminal output, not task completion.
+Expand **Terminal Preview** to inspect the CLI. Click **Interrupt** to stop the current operation.
+**Working** and **Idle** reflect terminal output, not task completion.
 
 Sent prompts appear as **Pending** until conversation messages update; pure slash
 commands skip this preview. Failed sends retain your draft. Draft text and

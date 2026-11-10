@@ -114,6 +114,7 @@ it.each([
   ["Enter", "enter"],
   ["ArrowLeft", "left"],
   ["0", "0"],
+  ["Escape", "interrupt"],
 ])("maps physical %s in the preview and prevents defaults", (physical, key) => {
   const handlers = props();
   render(<TerminalPreview {...handlers} />);
@@ -174,4 +175,14 @@ it("follows new terminal output near the end and preserves a scrolled reading po
     />,
   );
   expect(content.scrollTop).toBe(400);
+});
+
+it("keeps close-button keyboard activation local instead of sending Enter to the terminal", async () => {
+  const handlers = props();
+  const user = userEvent.setup();
+  render(<TerminalPreview {...handlers} />);
+  screen.getByRole("button", { name: "Collapse terminal" }).focus();
+  await user.keyboard("{Enter}");
+  expect(handlers.onToggle).toHaveBeenCalledOnce();
+  expect(handlers.onSendKeys).not.toHaveBeenCalled();
 });

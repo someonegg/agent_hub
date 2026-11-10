@@ -78,15 +78,10 @@ export function TerminalPreview({
       event.nativeEvent.keyCode === 229
     )
       return;
-    if (event.ctrlKey) {
-      if (event.key.toLowerCase() !== "c") return;
+    if (event.ctrlKey || event.key === "Escape") {
+      if (event.ctrlKey && event.key.toLowerCase() !== "c") return;
       event.preventDefault();
       void sendKey("interrupt");
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onToggle();
       return;
     }
     if (
@@ -106,6 +101,15 @@ export function TerminalPreview({
       className="terminal-preview"
       aria-label={t("terminalPreview")}
     >
+      <button
+        type="button"
+        className="terminal-preview-close"
+        aria-label={t("collapseTerminalPreview")}
+        title={t("collapseTerminalPreview")}
+        onClick={onToggle}
+      >
+        <span aria-hidden="true">×</span>
+      </button>
       {previewExpanded ? (
         <div
           id={contentId}

@@ -195,6 +195,7 @@ export const messages: Record<keyof typeof english, string> = {
   superseded: "已被替代",
   takePhoto: "拍照",
   inputArea: "訊息輸入",
+  collapseTerminalPreview: "收合終端",
   terminalPreview: "終端",
   terminalPreviewConnectionClosed: "終端連線已關閉",
   terminalPreviewConnectionFailed: "終端連線失敗",

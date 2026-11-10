@@ -197,6 +197,7 @@ export const messages = {
   superseded: "Superseded",
   takePhoto: "Take photo",
   inputArea: "Message Input",
+  collapseTerminalPreview: "Collapse terminal",
   terminalPreview: "Terminal",
   terminalPreviewConnectionClosed: "Terminal connection closed",
   terminalPreviewConnectionFailed: "Terminal connection failed",
