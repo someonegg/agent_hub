@@ -22,13 +22,18 @@ export function attachCommand(socket: string | undefined, session: string): stri
   ].join(" ");
 }
 
-/** Launch argv directly; user values are never interpreted by a shell. */
+/** Launch argv without interpreting user values as shell syntax. */
 export class TmuxLauncher {
   readonly transport = new TmuxInteractionService();
 
   constructor(readonly socketPath?: string) {}
 
-  async launch(id: string, directory: string, command: readonly string[]): Promise<TmuxBinding> {
+  async launch(
+    id: string,
+    directory: string,
+    command: readonly string[],
+    environment: Readonly<Record<string, string>> = {},
+  ): Promise<TmuxBinding> {
     const sessionName = `ahub-${id}`;
     if (!validTmuxSessionName(sessionName))
       throw new SessionLaunchError("not_started", "Invalid tmux session name", null);
@@ -46,15 +51,17 @@ export class TmuxLauncher {
           "#{socket_path}",
           "-s",
           sessionName,
-          "-e",
-          `AHUB_TMUX_SESSION_NAME=${sessionName}`,
+          ...Object.entries({ ...environment, AHUB_TMUX_SESSION_NAME: sessionName }).flatMap(
+            ([name, value]) => ["-e", `${name}=${value}`],
+          ),
           "-x",
           "120",
           "-y",
           "40",
           "-c",
           directory,
-          ...command,
+          // tmux treats a single command as shell text; quote the executable literally.
+          ...(command.length === 1 ? [`exec ${shellQuote(command[0]!)}`] : command),
         ],
         { timeout: 5_000 },
       ));

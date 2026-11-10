@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { parseArgs } from "node:util";
 
-import { resolveHomeDirectory } from "../config.js";
+import { resolveHomeDirectory, resolvePathOption } from "../config.js";
 import { DiffStore } from "../hosting/diff-store.js";
 import { HostingStore } from "../hosting/store.js";
 import { CommandError } from "./command-error.js";
@@ -129,6 +129,19 @@ export function parseResourceArguments(
         "invalid_arguments",
         `Option --${option} is not supported for ${resource} ${action}`,
       );
+  }
+  if (action === "publish") {
+    try {
+      positionals[0] = resolvePathOption("source", positionals[0]);
+      if (values.project !== undefined) {
+        values.project = resolvePathOption("project", values.project);
+      }
+    } catch (error) {
+      throw new CommandError(
+        "invalid_arguments",
+        error instanceof Error ? error.message : "Invalid path",
+      );
+    }
   }
   return { values, positionals, help: false as const };
 }

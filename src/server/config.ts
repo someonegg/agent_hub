@@ -25,6 +25,7 @@ export interface AgentConfig {
   nickname: string;
   path: string;
   adapter?: "codex" | "claude";
+  command?: string;
 }
 
 export interface ServerConfig {
@@ -71,6 +72,7 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
     allowPositionals: false,
     strict: true,
     options: {
+      "agent-command": { type: "string", multiple: true },
       "codex-agent": { type: "string", multiple: true },
       "claude-agent": { type: "string", multiple: true },
       host: { type: "string" },
@@ -113,10 +115,24 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       else if (code !== "EACCES" && code !== "EPERM") throw error;
     }
   }
-  const agents = entries.map(({ option, value }) => ({
+  const agents: AgentConfig[] = entries.map(({ option, value }) => ({
     ...parseAgent(value, option, names, paths),
     ...(option === "claude-agent" ? { adapter: "claude" as const } : {}),
   }));
+  for (const value of values["agent-command"] ?? []) {
+    const separator = value.indexOf("=");
+    const nickname = value.slice(0, separator).trim();
+    const executable = value.slice(separator + 1).trim();
+    if (separator < 0 || !nickname || !executable) {
+      throw new Error("--agent-command requires nickname=executable with non-empty fields");
+    }
+    const agent = agents.find((agent) => agent.nickname === nickname);
+    if (!agent) throw new Error(`Unknown agent nickname for --agent-command: ${nickname}`);
+    if (agent.command !== undefined) throw new Error(`Duplicate agent command: ${nickname}`);
+    agent.command = executable.includes("/")
+      ? resolvePathOption("agent-command", executable)
+      : executable;
+  }
   const certificatePath = nonEmptyOption("ssl-cert", values["ssl-cert"]);
   const privateKeyPath = nonEmptyOption("ssl-key", values["ssl-key"]);
   const certificateAuthorityPath = nonEmptyOption("ssl-ca", values["ssl-ca"]);
@@ -182,6 +198,10 @@ Options:
                        Codex agent; repeat for multiple agents
   --claude-agent <nickname=path>
                        Claude Code agent; repeat for multiple agents
+  --agent-command <nickname=executable>
+                       Override an agent executable; repeat for multiple agents.
+                       Filename uses PATH; paths resolve from the Hub working directory.
+                       No shell parsing; use a wrapper script for fixed arguments.
   Default agents: codex=~/.codex, claude=~/.claude (Claude first if ~/.codex is absent).
   Any explicit agent replaces both defaults; argument order determines the default agent.
   --host <host>        Listen host (default: 127.0.0.1)
@@ -238,7 +258,7 @@ function parseAgent(
   return { nickname, path };
 }
 
-function resolvePathOption(name: string, value: string): string {
+export function resolvePathOption(name: string, value: string): string {
   const path = nonEmptyOption(name, value)!;
   return resolve(path.startsWith("~/") ? resolve(homedir(), path.slice(2)) : path);
 }

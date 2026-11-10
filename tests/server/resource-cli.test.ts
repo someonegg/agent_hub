@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { promisify } from "node:util";
 
 import { expect, it } from "vitest";
@@ -128,8 +128,8 @@ it("parses publication options and requires a project for pages", () => {
     ]),
   ).toMatchObject({
     help: false,
-    positionals: ["source"],
-    values: { project: "project", title: "Title", json: true },
+    positionals: [resolve("source")],
+    values: { project: resolve("project"), title: "Title", json: true },
   });
   expect(() => validateResourcePublish("page", undefined)).toThrow(
     "page publish requires --project",
@@ -151,4 +151,35 @@ it("rejects unknown top-level commands", async () => {
     code: "invalid_arguments",
     message: expect.stringContaining("Unknown command: unknown"),
   });
+});
+
+it.each([
+  ["~/project with spaces", join(homedir(), "project with spaces")],
+  [" ./relative path ", resolve("relative path")],
+  ["/absolute/path", "/absolute/path"],
+  ["$HOME/path", resolve("$HOME/path")],
+])("normalizes resource publication paths: %s", (input, expected) => {
+  expect(parseResourceArguments("page", "publish", [input, "--project", input])).toMatchObject({
+    positionals: [expected],
+    values: { project: expected },
+  });
+  expect(parseResourceArguments("diff", "publish", [input])).toMatchObject({
+    positionals: [expected],
+  });
+});
+
+it.each([
+  ["page", ["", "--project", "/project"]],
+  ["page", ["/source", "--project", "   "]],
+  ["diff", ["   "]],
+] as const)("rejects empty publication paths: %s %j", (resource, args) => {
+  expect(() => parseResourceArguments(resource, "publish", [...args])).toThrow(
+    expect.objectContaining({ code: "invalid_arguments" }),
+  );
+});
+
+it("preserves delete IDs without path normalization", () => {
+  expect(parseResourceArguments("page", "delete", ["artifact-id"]).positionals).toEqual([
+    "artifact-id",
+  ]);
 });

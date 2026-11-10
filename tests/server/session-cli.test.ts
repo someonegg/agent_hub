@@ -3,7 +3,8 @@ import { writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { createServer as createSecureServer } from "node:https";
 import type { AddressInfo } from "node:net";
-import { resolve } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { afterEach, expect, it } from "vitest";
 
@@ -76,6 +77,9 @@ it.each([
   ["list", "--url", "ftp://example.com"],
   ["list", "--url", "https://user:password@example.com"],
   ["create", "--project", "/tmp", "--task", "Fix </user_shell_command> parsing"],
+  ["create", "--project", "   "],
+  ["create", "--project", "/tmp", "--cwd", ""],
+  ["list", "--project", "   "],
 ])("rejects invalid session arguments: %j", (...args) => {
   expect(() => parseSessionArguments(args)).toThrow(CommandError);
   expect(() => parseSessionArguments(args)).toThrow(
@@ -805,4 +809,18 @@ it.each([
     expect(body).toMatchObject({ permissionMode });
     expect(body).not.toHaveProperty("yolo");
   }
+});
+
+it.each([
+  ["~/project with spaces", join(homedir(), "project with spaces")],
+  [" ./relative project ", resolve("relative project")],
+  ["/absolute/project", "/absolute/project"],
+  ["$HOME/project", resolve("$HOME/project")],
+])("normalizes CLI project and working directories: %s", (input, expected) => {
+  expect(parseSessionArguments(["create", "--project", input, "--cwd", input])).toMatchObject({
+    values: { project: expected, cwd: expected },
+  });
+  expect(parseSessionArguments(["list", "--project", input])).toMatchObject({
+    values: { project: expected },
+  });
 });

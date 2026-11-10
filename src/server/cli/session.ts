@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 
 import {
@@ -14,6 +13,7 @@ import {
 } from "../../shared/api-contract.js";
 import { isPermissionMode } from "../../shared/permission-mode.js";
 import { TASK_NAME_ERROR, validTaskName } from "../../shared/task-name.js";
+import { resolvePathOption } from "../config.js";
 import { normalizeMessage } from "../interaction/message.js";
 import { CommandError, commandFailure } from "./command-error.js";
 import { output, outputFailure } from "./output.js";
@@ -122,6 +122,11 @@ export function parseSessionArguments(args: string[], environmentUrl?: string) {
     throw new CommandError("invalid_arguments", "Invalid session command arguments");
   if (command === "create" && !values.project)
     throw new CommandError("invalid_arguments", "create requires --project");
+  for (const option of ["project", "cwd"] as const) {
+    if (values[option] !== undefined) {
+      values[option] = validateArguments(() => resolvePathOption(option, values[option]!));
+    }
+  }
   if (
     command === "send" &&
     Number(values.message !== undefined) + Number(values.stdin === true) !== 1
@@ -225,7 +230,7 @@ export async function runSessionCommand(args: string[]): Promise<void> {
     let result: CliResult;
     if (command === "list") {
       const list = await api<SessionListResponse>("/api/v1/sessions");
-      const project = values.project === undefined ? undefined : resolve(values.project);
+      const project = values.project;
       const task = values.task?.trim();
       const taskList =
         task === undefined
@@ -277,9 +282,9 @@ export async function runSessionCommand(args: string[]): Promise<void> {
       if (command === "create") {
         operationPath = "/api/v1/sessions";
         body = {
-          projectDirectory: resolve(values.project!),
+          projectDirectory: values.project!,
           taskName: values.task?.trim(),
-          ...(values.cwd === undefined ? {} : { workingDirectory: resolve(values.cwd) }),
+          ...(values.cwd === undefined ? {} : { workingDirectory: values.cwd }),
           worktree: values.worktree ?? false,
           permissionMode,
           ...(values.agent === undefined ? {} : { agent: values.agent }),

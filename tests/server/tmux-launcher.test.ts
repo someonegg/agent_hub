@@ -65,6 +65,7 @@ it.each([undefined, "/configured/socket path"])(
       "00000000-0000-0000-0000-000000000007",
       "/project",
       ["codex", "--no-daemon"],
+      { CODEX_HOME: "/config with spaces" },
     );
     const args = execute.mock.calls[0]![1] as string[];
     expect(args.slice(0, socket ? 2 : 1)).toEqual(socket ? ["-S", socket] : ["new-session"]);
@@ -73,6 +74,8 @@ it.each([undefined, "/configured/socket path"])(
       "ahub-00000000-0000-0000-0000-000000000007",
     ]);
     expect(args).toContain("AHUB_TMUX_SESSION_NAME=ahub-00000000-0000-0000-0000-000000000007");
+    expect(args).toContain("CODEX_HOME=/config with spaces");
+    expect(args.slice(-2)).toEqual(["codex", "--no-daemon"]);
     expect(args).not.toContain("-L");
     if (!socket) expect(args).not.toContain("-S");
     expect(binding.socketPath).toBe("/actual/tmux.sock");
@@ -168,4 +171,11 @@ it("preserves trailing spaces in the actual socket path", async () => {
     socketPath: "/actual/socket ",
     sessionName: "ahub-00000000-0000-0000-0000-000000000007",
   });
+});
+
+it("quotes a lone executable for tmux's single-command shell behavior", async () => {
+  await new TmuxLauncher().launch("00000000-0000-0000-0000-000000000007", "/project", [
+    "/tools/custom agent",
+  ]);
+  expect(execute.mock.calls[0]![1].at(-1)).toBe("exec '/tools/custom agent'");
 });
