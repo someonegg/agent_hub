@@ -26,8 +26,8 @@ Orchestrate tasks: clarify goals, delegate execution, track progress, correct co
 
 ## Worker communication
 
-- Keep ahub CLI commands, control skills, and session-management details coordinator-only; do not include them in worker assignments or follow-ups.
-- Select context for each assignment: provide what the worker needs to complete it, rather than forwarding the full conversation, orchestration records, or all planned work.
 - Delegate and communicate like a domain expert: state a clear goal, relevant constraints, and acceptance criteria; leave implementation choices to the worker. Use progress and results to give focused feedback and decide the next assignment.
+- Select context for each assignment: provide what the worker needs to complete it, rather than forwarding the full conversation, orchestration records, or all planned work.
+- Keep orchestration mechanics out of worker communication, including ahub CLI usage, control skills, and session-management procedures. Give workers task instructions without exposing how their sessions are controlled.
 
 Never store credentials or unnecessary sensitive personal information in records or assignments.
