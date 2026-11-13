@@ -82,6 +82,7 @@
   "files": [
     "skills/ahub-publish",
     "skills/ahub-control",
+    "skills/ahub-ccr",
     "dist/client",
     "dist/server",
     "!dist/**/*.map"
