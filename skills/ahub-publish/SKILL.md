@@ -1,11 +1,18 @@
 ---
 name: ahub-publish
 description: Publish static pages or review diffs to an existing Agent Hub. Use only when the user explicitly requests `ahub-publish` by name.
+metadata:
+  version: "1.0.0"
+  author: someonegg
 ---
 
 # Publish to Agent Hub
 
 Publish static pages and review diffs using an existing Hub. Do not manage or probe services, or configure network access.
+
+## Prerequisites
+
+Agent Hub must be installed. See the [Agent Hub project homepage](https://github.com/someonegg/agent_hub) for installation, startup instructions, and runtime requirements. Publication writes directly to local storage and does not require a running server; viewing published pages and diffs requires Hub running with `--hosting`.
 
 ## Check the environment
 
