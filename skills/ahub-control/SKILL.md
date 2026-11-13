@@ -1,18 +1,11 @@
 ---
 name: ahub-control
 description: Manage agent sessions through an existing Agent Hub using ahub-cli session. Use only when the user explicitly requests `ahub-control` by name.
-metadata:
-  version: "1.0.0"
-  author: someonegg
 ---
 
 # Coordinate sessions through Agent Hub
 
 The CLI reports runtime state, replies, input requests, and diagnostics. The caller verifies deliverables and decides whether the task is complete. Create, control, or clean up only sessions within the authorized task scope.
-
-## Prerequisites
-
-Agent Hub must be installed and already running. See the [Agent Hub project homepage](https://github.com/someonegg/agent_hub) for installation, startup instructions, and runtime requirements. Reuse the running service rather than starting a new Hub for each invocation.
 
 ## Check the environment and target
 
