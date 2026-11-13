@@ -1,6 +1,6 @@
 ---
 name: ahub-control
-description: Manage agent sessions through an existing Agent Hub using ahub-cli session. Use only when the user explicitly requests `ahub-control` by name.
+description: Manage agent sessions through an existing Agent Hub using ahub-cli session. Use when the user explicitly requests `ahub-control` by name or when ahub-ccr requires session control.
 ---
 
 # Coordinate sessions through Agent Hub

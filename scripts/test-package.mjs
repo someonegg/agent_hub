@@ -74,7 +74,7 @@ try {
   const sessionHelp = await exec(cli, ["session", "--help"], { cwd: temporary });
   assert.match(sessionHelp.stdout, /Usage: ahub-cli session/);
   assert.match(sessionHelp.stdout, /inspect/);
-  for (const skill of ["ahub-publish", "ahub-control"]) {
+  for (const skill of ["ahub-publish", "ahub-control", "ahub-ccr"]) {
     const skillPath = (await exec(cli, ["skill", "path", skill], { cwd: temporary })).stdout.trim();
     assert.equal(
       await readFile(join(skillPath, "SKILL.md"), "utf8"),

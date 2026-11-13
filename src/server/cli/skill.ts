@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { CommandError } from "./command-error.js";
 
-const bundledSkills = ["ahub-publish", "ahub-control"];
+const bundledSkills = ["ahub-publish", "ahub-control", "ahub-ccr"];
 const usage = `Usage: ahub-cli skill path <${bundledSkills.join(" | ")}>`;
 
 export async function runSkillCommand(args: string[]): Promise<void> {
