@@ -24,4 +24,10 @@ Orchestrate tasks: clarify goals, delegate execution, track progress, correct co
 8. Verify artifacts and evidence against acceptance criteria before accepting an agent's reported results. Have agents resolve gaps before delivery.
 9. Report the outcome, validation, and limitations. Distinguish verified facts from agent reports and unverified judgments.
 
+## Worker communication
+
+- Keep ahub CLI commands, control skills, and session-management details coordinator-only; do not include them in worker assignments or follow-ups.
+- Select context for each assignment: provide what the worker needs to complete it, rather than forwarding the full conversation, orchestration records, or all planned work.
+- Delegate and communicate like a domain expert: state a clear goal, relevant constraints, and acceptance criteria; leave implementation choices to the worker. Use progress and results to give focused feedback and decide the next assignment.
+
 Never store credentials or unnecessary sensitive personal information in records or assignments.
