@@ -10,8 +10,6 @@ const session = (id: string, projectDirectory: string | null, extra = {}) => ({
   projectDirectory,
   title: id,
   status: "normal" as const,
-  parentId: null,
-  isChild: false,
   updatedAt: null,
   ...extra,
 });
@@ -23,13 +21,11 @@ const list: SessionListResponse = {
     session("a", "/one/app"),
     session("b", "/one/app"),
     session("c", "/two/app", { status: "archived" as const }),
-    session("orphan", "/two/app", { isChild: true }),
     session("unknown", null),
-    session("child", "/one/app", { isChild: true, parentId: "a" }),
   ],
 };
 describe("project navigation derivation", () => {
-  it("counts only visible main sessions, hides empty projects, and disambiguates names", () => {
+  it("counts only visible sessions, hides empty projects, and disambiguates names", () => {
     expect(
       catalogGroups(list, false).map((group) => [
         group.directory,
@@ -81,16 +77,9 @@ describe("project navigation derivation", () => {
   });
 });
 
-it("locates a child under its main ancestor project and terminates broken parent chains", () => {
-  const children: SessionListResponse = {
-    ...list,
-    sessions: [
-      ...list.sessions,
-      session("different-directory", "/two/app", { isChild: true, parentId: "a" }),
-      session("cycle", "/two/app", { isChild: true, parentId: "cycle" }),
-    ],
-  };
-  expect(projectForSession(children, "different-directory")).toBe("/one/app");
-  expect(projectForSession(children, "orphan")).toBe("/two/app");
-  expect(projectForSession(children, "cycle")).toBe("/two/app");
+it("locates the current session project", () => {
+  expect(projectForSession(list, "a")).toBe("/one/app");
+  expect(projectForSession(list, "c")).toBe("/two/app");
+  expect(projectForSession(list, "unknown")).toBeNull();
+  expect(projectForSession(list, "missing")).toBeUndefined();
 });

@@ -110,12 +110,12 @@ export function HubSidebar({
       </div>
       <nav
         ref={projectNav}
-        aria-label={t("projectsAndMainSessions")}
+        aria-label={t("projectsAndSessions")}
         onScroll={(event) => persistScroll(event.currentTarget)}
       >
         {catalog.listLoading ? <p role="status">{t("loadingSessions")}</p> : null}
         {catalog.list && groups.length === 0 ? (
-          <p className="hub-empty">{t("noMainSessionsYet")}</p>
+          <p className="hub-empty">{t("noSessionsYet")}</p>
         ) : null}
         {groups.map((group) => {
           const groupName = group.directory === null ? t("unknownProject") : group.name;

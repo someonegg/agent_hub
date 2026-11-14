@@ -58,7 +58,7 @@ export function sessionMetadata(overrides: Partial<SessionMetadata> = {}): Sessi
     projectDirectory: null,
     createdAt: null,
     updatedAt: null,
-    parentThreadId: null,
+    excluded: false,
     archived: false,
     ...overrides,
   };

@@ -2,7 +2,7 @@
 
 The [Codex](../src/server/adapters/codex/) and
 [Claude Code](../src/server/adapters/claude/) adapters decode complete JSONL lines
-and publish only conversation messages and user input. Metadata, relationships,
+and publish only conversation messages and user input. Metadata,
 pane bindings, and runtime facts are extracted independently of conversation
 publication. See the [technical reference](technical-reference.md#reader-and-automatic-updates)
 for pagination and long polling, and [loading guarantees](technical-reference.md#discovery-and-caching)
@@ -43,12 +43,12 @@ renumbered.
 
 ## Claude Code
 
-Main records with sidechain/subagent provenance, API copies, thinking, ordinary
+Main records with auxiliary provenance, API copies, thinking, ordinary
 tool calls/results, local commands, interruption notices and shell wrappers are
 excluded from conversation output. Ordinary assistant text is retained regardless
 of model. Each complete JSONL line is processed independently without message-ID
 aggregation; block order determines consecutive item ordinals/IDs starting at 1.
-`parentUuid` is a message link, never a parent session.
+`parentUuid` links native messages.
 
 Assistant phase uses only that row's `message.stop_reason`: `tool_use` → `update`,
 `end_turn` → `response`, all other values → `null`. `ExitPlanMode.input.plan`

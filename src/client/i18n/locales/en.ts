@@ -32,8 +32,6 @@ export const messages = {
   capturingTerminalPane: "Capturing terminal pane…",
   changedFiles: "Changed files",
   checkTheCurrentStateBeforeTryingAgain: "Check the current state before trying again.",
-  childSessions: "Child sessions",
-  childSessionsLabel: "Child sessions ·",
   chooseFiles: "Choose files",
   chooseImages: "Choose images",
   closeImagePreview: "Close image preview",
@@ -124,7 +122,7 @@ export const messages = {
     "No agent session detected yet. Attach to tmux to check startup progress.",
   noAnswerRecorded: "No answer recorded.",
 
-  noMainSessionsYet: "No main sessions yet",
+  noSessionsYet: "No sessions yet",
   noPublishedWebPages: "No published web pages.",
   noUploadsYet: "No uploads yet.",
 
@@ -136,7 +134,6 @@ export const messages = {
 
   pagePosition: "Page position",
   pages: "Pages",
-  parentSession: "Parent session",
   pendingAttachments: "Pending attachments",
   BTab: "BTab",
   planContentUnavailable: "Plan content unavailable.",
@@ -150,7 +147,7 @@ export const messages = {
   projectDirectoryLabel: "Project directory",
   projectHub: "Project hub",
   projects: "Projects",
-  projectsAndMainSessions: "Projects and main sessions",
+  projectsAndSessions: "Projects and sessions",
   publishedPages: "Published pages",
   publishedSnapshots: "Published snapshots",
 
@@ -239,10 +236,9 @@ export const messages = {
   tmuxAccessLabel: "tmux access",
   backToList: "← Back to list",
   backToSession: "← Back to session",
-  parentSessionLabel: "← Parent session",
 
   filesChanged_other: "{{count, number}} files changed",
-  projectSessions: "{{project}}, {{count, number}} main sessions",
+  projectSessions: "{{project}}, {{count, number}} sessions",
   newProjectSession: "New session in {{project}}",
   previewFile: "Preview {{filename}}",
   removeFile: "Remove {{filename}}",

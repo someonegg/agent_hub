@@ -30,10 +30,10 @@ The reader's normalized session domain, generation snapshot, and HTTP DTOs are i
 
 Chosen option: "Introduce high-level session source adapters that return normalized entries", because each adapter can own its unstable storage compatibility surface while the repository consumes one source-neutral contract.
 
-Each source instance has a private stable instance key and a public opaque instance ID. Adapters return source-local stable session identities, native parent identities, normalized session content, a source signature, and diagnostics. The aggregate snapshot generates global opaque IDs from the source instance key and local identity, links parents only within a source instance, and publishes one immutable generation.
+Each source instance has a private stable instance key and a public opaque instance ID. Adapters return source-local stable session identities, native identities, normalized session content, a source signature, and diagnostics. The aggregate snapshot generates global opaque IDs from the source instance key and local identity, publishes one immutable generation.
 
 Adapters publish immutable values; reference reuse is an optimization, never a
-requirement. Source-local identities and parent links remain scoped to their agent.
+requirement. Source-local identities remain scoped to their agent.
 The [current adapter contract](../technical-reference.md#adapter-publication-and-diagnostics)
 and [identity rules](../technical-reference.md#session-identity) define publication,
 registration, duplicate selection, diagnostics, and recoverable I/O behavior.
@@ -51,7 +51,6 @@ registration, duplicate selection, diagnostics, and recoverable I/O behavior.
 - Adapters have a larger contract and must normalize identity and operational failures correctly.
 - Adapter implementations must use immutable publication rather than mutating previously returned values in place.
 - Source-local identity mistakes can still cause unstable IDs, so contract tests are required.
-- Cross-source parent relationships are intentionally unsupported.
 - The initial ID migration invalidates path-derived session URLs.
 - Diagnostics no longer appear in the UI; inspect server stderr for partial read
   failures. Release client and server together without a legacy diagnostic-field

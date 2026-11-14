@@ -16,7 +16,7 @@ npx @someonegg/agent-hub@latest
 
 ## 閱讀工作階段
 
-在側邊欄選擇專案和主工作階段，子工作階段從父工作階段中開啟。訊息從頭開始隨捲動載入，到達末尾後自動更新。
+在側邊欄選擇專案和工作階段。訊息從頭開始隨捲動載入，到達末尾後自動更新。
 勾選**已封存**可瀏覽唯讀的封存工作階段。可收藏工作階段位址。
 
 最新載入的計畫自動展開。使用**顯示**或**隱藏**控制個別計畫，也可同時展開多個計畫。
@@ -103,7 +103,7 @@ ahub-cli session inspect <id> --follow
 ```
 
 使用 `list` 或 `create` 傳回的 Hub ID。`list` 預設不含封存工作階段，傳入 `--all` 可包含；
-`inspect` 也接受子工作階段 ID。將傳回的 `Next after` 值傳給 `--after <value>` 讀取下一頁。
+將傳回的 `Next after` 值傳給 `--after <value>` 讀取下一頁。
 `--follow` 持續觀察直到按 `Ctrl+C` 停止，不會因任務完成自動結束。
 
 建立預設使用專案目錄和第一個已設定智慧體。用 `--cwd` 修改工作目錄而保留專案歸屬，
@@ -186,7 +186,7 @@ Agent Hub 預設使用 `~/.agent-hub`，不會自動遷移舊資料。如需使�
 
 ### 多個智慧體
 
-智慧體是獨立擁有設定、Skills、記憶和模型設定的身分。Codex 和 Claude Code 是執行引擎，任務中衍生的身分稱為子智慧體。智慧體目錄在 Codex 中包含 `sessions/`，在 Claude Code 中包含 `projects/`。
+智慧體是獨立擁有設定、Skills、記憶和模型設定的身分。Codex 和 Claude Code 是執行引擎。智慧體目錄在 Codex 中包含 `sessions/`，在 Claude Code 中包含 `projects/`。
 每個智慧體需使用唯一暱稱和目錄：
 
 ```sh

@@ -93,7 +93,7 @@ export function mapList(
 ): CliSessionList {
   return {
     sessions: list.sessions
-      .filter((s) => !s.isChild && (includeArchived || s.status !== "archived"))
+      .filter((s) => includeArchived || s.status !== "archived")
       .map((s) => ({
         id: s.id,
         title: s.title,

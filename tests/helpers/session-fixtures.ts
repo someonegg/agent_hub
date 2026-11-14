@@ -18,9 +18,6 @@ export function sessionDetail(overrides: Partial<SessionDetail> = {}): SessionDe
     updatedAt: null,
     status: "normal",
     resume: { allowed: false, reason: "Unavailable" },
-    parentId: null,
-    childIds: [],
-    subagent: null,
     sourceId: "session",
     ...overrides,
   };

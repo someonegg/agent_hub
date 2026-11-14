@@ -242,22 +242,6 @@ body:has(.session-layout) {
   gap: 1rem;
   padding: 0;
 }
-.child-sessions {
-  display: grid;
-  gap: 0;
-  margin: 0;
-}
-.child-sessions a {
-  min-height: 44px;
-  color: var(--current);
-  text-decoration: none;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  border: 0;
-  border-top: 1px solid var(--mist);
-  padding: 12px 15px;
-  font-size: 0.875rem;
-}
 .reader-header .eyebrow {
   margin-bottom: 12px;
 }
@@ -277,20 +261,6 @@ body:has(.session-layout) {
   margin: 0;
   font: var(--text-small) var(--body-font);
   overflow-wrap: anywhere;
-}
-.parent-session,
-.child-session-group {
-  border: 1px solid var(--mist);
-  border-radius: var(--radius-panel);
-  margin: 24px 0 8px;
-  font-size: 0.875rem;
-}
-.parent-session a {
-  border-top: 0;
-}
-.child-session-group summary {
-  padding: 12px 15px;
-  color: var(--ink-soft);
 }
 #session-title:focus {
   outline: none;

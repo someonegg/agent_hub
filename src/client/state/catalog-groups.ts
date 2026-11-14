@@ -31,7 +31,7 @@ export function catalogGroups(
     updatedAt: -Infinity,
   });
   for (const session of list.sessions) {
-    if (session.isChild || (!includeArchived && session.status === "archived")) continue;
+    if (!includeArchived && session.status === "archived") continue;
     const group = groups.get(session.projectDirectory) ?? groups.get(null)!;
     group.sessions.push(session);
   }
@@ -61,20 +61,9 @@ function compareId(a: string, b: string) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-/** A child may use another working directory; navigation belongs to its main ancestor. */
 export function projectForSession(
   list: SessionListResponse | null,
   id: string | null,
 ): string | null | undefined {
-  if (list === null || id === null) return undefined;
-  const sessions = new Map(list.sessions.map((session) => [session.id, session]));
-  let current = sessions.get(id);
-  const visited = new Set<string>();
-  while (current?.isChild && current.parentId !== null && !visited.has(current.id)) {
-    visited.add(current.id);
-    const parent = sessions.get(current.parentId);
-    if (!parent) break;
-    current = parent;
-  }
-  return current?.projectDirectory;
+  return list?.sessions.find((session) => session.id === id)?.projectDirectory;
 }

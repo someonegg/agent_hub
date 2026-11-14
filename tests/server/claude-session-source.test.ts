@@ -109,8 +109,6 @@ describe("Claude JSONL adapter", () => {
       workingDirectory: "/test/latest-cwd",
       projectDirectory: "/test/original-project",
       taskName: "Task",
-      parentId: null,
-      subagent: null,
     });
     expect(entry.origin).toMatchObject({
       agent: "glm",

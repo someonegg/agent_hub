@@ -26,7 +26,8 @@ Codex scans `rollout-*.jsonl` under `sessions/` and `archived_sessions/`;
 depth 8 (root = 0), without cycle detection or real-path deduplication.
 Logical paths determine discovery order, fallback identity, and cache keys.
 
-Both adapters cache by source-relative path, size, and `mtimeMs`. Changes that
+For ordinary sessions, both adapters cache by source-relative path, size, and
+`mtimeMs`. Changes that
 preserve these fields, including permission-only changes, do not trigger reads.
 Growing files reuse decoded prefixes when SHA-256 probes match the first 4 KiB
 and up to 4 KiB before the previous EOF. A single open handle reads to observed
@@ -38,17 +39,25 @@ by an append can escape detection; see [ADR-0012](adr/0012-use-checkpointed-incr
 Loaded archives remain cached until restart or restoration, even after in-place
 edits. Discovery, removal, advisory metadata refresh, and failed-load retries continue.
 
+Codex filters auxiliary rollouts inside the adapter before normalization and
+binding extraction. It probes at most 64 KiB of complete JSONL lines, falling back
+to full identity decoding when needed. Confirmed exclusions and duplicate files
+stay excluded by source-relative path until discovery observes their absence or
+the source is rebuilt. File changes and loss of an accepted original do not clear
+exclusions. Ordinary sessions retain incremental checkpoints. See
+[ADR-0026](adr/0026-filter-non-primary-rollouts-in-adapters.md).
+
 ### Session identity
 
-Native IDs and parent relationships are agent-scoped. Shared services check native
+Native IDs are agent-scoped. Shared services check native
 ID presence; format validation belongs to the owning adapter (both current adapters
 require UUIDs). Missing native IDs use path identity.
 
 Duplicates retain the accepted readable rollout, otherwise the first fully
-readable candidate in logical path order. Codex retains only fingerprints and
-native IDs for confirmed duplicates, skipping unchanged candidates while the
-winner remains valid. Claude identifies candidates by filename before decoding.
-Changed candidates and replacements are reloaded; missing paths leave the caches.
+readable candidate in logical path order. Codex caches confirmed duplicate
+exclusions as described above. Claude identifies candidates by filename before
+decoding and reloads changed candidates and replacements; missing paths leave
+its caches.
 
 ### Adapter publication and diagnostics
 
@@ -74,10 +83,9 @@ not native session IDs. Message reads also validate ordinal bounds. See
 ### Agent identity and routing
 
 An Agent owns configuration, Skills, memory, and model settings. Codex and Claude
-Code are Runtimes; task-spawned identities are Subagents. Agent catalog entries
+Code are Runtimes. Agent catalog entries
 expose `nickname`, `runtimeName`, and management capabilities. Session origins expose
-`agent`, `runtimeName`, and nullable `runtimeVersion`; session details expose
-nullable `subagent` identity (`taskName`, `nickname`, `role`).
+`agent`, `runtimeName`, and nullable `runtimeVersion`.
 
 Agent nicknames route publicly; configured absolute paths namespace internally. Renaming/reordering agents preserves session IDs; moving an agent changes them.
 Projects merge by directory across agents; agent paths remain private.
@@ -108,7 +116,7 @@ See the [Codex adapter](../src/server/adapters/codex/session-manager.ts),
 ### Claude Code adapter
 
 Claude supports main-session reading, tmux interaction, create/resume, exit, and
-delete, with worktree/permission mode launch options. Archive and subagent reading are
+delete, with worktree/permission mode launch options. Archive is
 unavailable; native shell commands/output are excluded from conversations. Reading
 does not modify native history or depend on Codex internals. Filtering and limits
 are defined in [JSONL processing](session-jsonl-filtering.md#claude-code).
@@ -149,7 +157,7 @@ See [adapter implementation](../src/server/adapters/claude/session-manager.ts).
 
 An adapter publishes an immutable `NormalizedSession`: session metadata, an ordered
 `timeline`, and optional interaction configuration. Session metadata includes source
-identity, directories, task association, parent/child relationships, archive state,
+identity, directories, task association, archive state,
 and log diagnostics. The API maps metadata into `SessionSummary` and `SessionDetail`,
 combining archive facts with observed runtime status and resume availability.
 
@@ -172,14 +180,14 @@ loaded input requests and responses by `callId` into cards. See
 `GET /api/v1/sessions` returns a complete catalog snapshot:
 `{ revision, agents, projects, sessions }`. Clients filter and group sessions locally.
 
-| Collection | Fields                                                                                                        |
-| ---------- | ------------------------------------------------------------------------------------------------------------- |
-| `agents`   | `nickname`, `runtimeName`, and `management: { archive }`, including empty agents                              |
-| `projects` | `directory`                                                                                                   |
-| `sessions` | `id`, `agent`, `title`, `projectDirectory`, optional `taskName`, `status`, `parentId`, `isChild`, `updatedAt` |
+| Collection | Fields                                                                                 |
+| ---------- | -------------------------------------------------------------------------------------- |
+| `agents`   | `nickname`, `runtimeName`, and `management: { archive }`, including empty agents       |
+| `projects` | `directory`                                                                            |
+| `sessions` | `id`, `agent`, `title`, `projectDirectory`, optional `taskName`, `status`, `updatedAt` |
 
 Reads/updates resolve titles from valid owning-agent `thread_name`, then original title. Missing directories yield
-`projectDirectory: null`; `isChild` preserves declared parentage even without `parentId`.
+`projectDirectory: null`.
 
 Only `after` (43-character base64url revision) is accepted; invalid/extra queries return `400`.
 
@@ -191,11 +199,10 @@ Only `after` (43-character base64url revision) is accepted; invalid/extra querie
 | Over 100 waiters                            | `429`, `Retry-After: 2`  |
 
 Waiters share a 1.5-second probe, stopped when idle; disconnect/shutdown releases
-them. Revisions cover agents, titles, projects, task associations, effective runtime status,
-and relationships. Timestamps, conversation content, and diagnostics are excluded.
+them. Revisions cover agents, titles, projects, task associations, effective runtime status. Timestamps, conversation content, and diagnostics are excluded.
 
 Browser sorting uses best-effort `updatedAt`, retaining newer snapshot/reader
-timestamps in memory. Projects follow their latest visible main session; IDs
+timestamps in memory. Projects follow their latest visible session; IDs
 break ties, invalid times sort last, and hidden pages pause requests.
 
 Status is `normal | live | archived`: archive wins; Live requires an observed
@@ -296,9 +303,8 @@ in [session-output.ts](../src/server/cli/session-output.ts).
 | Input/handoff | `{ sessionId, status: "sent" }`                                                     |
 | Lifecycle     | `{ sessionId, status: "succeeded" }`; create/resume also include `tmux`             |
 
-`list` excludes children, including orphans; `--project` filters project association,
-not launch/worktree location. Explicit IDs, including children, go directly to
-endpoints without catalog lookup or parent redirection. Nullable metadata remains
+`--project` filters project association, not launch/worktree location. Explicit IDs
+go directly to endpoints without catalog lookup. Nullable metadata remains
 null; absent task names remain omitted. Inspect includes the owning agent's nickname
 and current interaction, with `tmux: { socketPath, sessionName } | null`.
 
@@ -553,13 +559,13 @@ external-change scan or filesystem/tmux atomicity. Native commands use the
 [owning adapter's agent environment](#agent-identity-and-routing). Shared services
 delegate native history changes to the owning adapter.
 
-| Operation | Validation and confirmation                                                                                                                                                                                                                                                                                                                                         |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Create    | Project and effective working directories independently resolve to existing real paths; equal inputs share resolution. Confirm operation marker, target, project, valid bind within 60 seconds after launch.                                                                                                                                                        |
-| Resume    | Require unarchived unique valid native identity, plus no binding, confirmed session exit, or explicit transfer. Invalid/uncertain bindings deny resume. Confirm original identity, marker, project, live owned target.                                                                                                                                              |
-| Exit      | Validate latest bind; interrupt/EOF then force-close the tmux session if needed. Confirm session absence within 30 seconds; query errors/ownership changes mean `unknown`. Unbound succeeds, missing fails; archived uses same checks.                                                                                                                              |
-| Archive   | Refresh source; already archived succeeds. Validate unique native identity, exit, run native archive once (25-second command limit), confirm within 30 seconds.                                                                                                                                                                                                     |
-| Delete    | Run Exit validation and sequence first, then permanently remove history through the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove session JSONL and associated subagents directory). Exit, deletion, and same-source absence confirmation have separate 30-, 25-, and 30-second budgets. Initially absent in a successful snapshot succeeds. |
+| Operation | Validation and confirmation                                                                                                                                                                                                                                                                                                                                           |
+| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create    | Project and effective working directories independently resolve to existing real paths; equal inputs share resolution. Confirm operation marker, target, project, valid bind within 60 seconds after launch.                                                                                                                                                          |
+| Resume    | Require unarchived unique valid native identity, plus no binding, confirmed session exit, or explicit transfer. Invalid/uncertain bindings deny resume. Confirm original identity, marker, project, live owned target.                                                                                                                                                |
+| Exit      | Validate latest bind; interrupt/EOF then force-close the tmux session if needed. Confirm session absence within 30 seconds; query errors/ownership changes mean `unknown`. Unbound succeeds, missing fails; archived uses same checks.                                                                                                                                |
+| Archive   | Refresh source; already archived succeeds. Validate unique native identity, exit, run native archive once (25-second command limit), confirm within 30 seconds.                                                                                                                                                                                                       |
+| Delete    | Run Exit validation and sequence first, then permanently remove history through the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove session JSONL and associated per-session directory). Exit, deletion, and same-source absence confirmation have separate 30-, 25-, and 30-second budgets. Initially absent in a successful snapshot succeeds. |
 
 Codex launches `ahub-<operationId>` using the [runtime CLI flags](#runtime-cli-compatibility)
 (`--worktree` is off by default) and an initial native `! printf ...` shell binding command.

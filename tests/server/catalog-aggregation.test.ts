@@ -36,8 +36,8 @@ describe("catalog source aggregation", () => {
 
   it("retains readable sessions despite truncated diagnostics and duplicate local identities", async () => {
     const first = testSource("first", []);
-    const healthy = testSource("healthy", [sourceEntry("one", null, "Healthy")]);
-    const duplicate = sourceEntry("same", null, "Duplicate");
+    const healthy = testSource("healthy", [sourceEntry("one", "Healthy")]);
+    const duplicate = sourceEntry("same", "Duplicate");
     const broken = testSource("broken", [duplicate, duplicate]);
     const noisy: SessionSource = {
       ...first,
@@ -90,20 +90,20 @@ describe("catalog source aggregation", () => {
     await expect(new CatalogSnapshotStore([source]).current()).rejects.toThrow("source invariant");
   });
 
-  it("namespaces source identities, links parents locally, and ignores source order", async () => {
+  it("namespaces source identities, ignores source order", async () => {
     const sourceA = testSource("source-a", [
-      sourceEntry("parent", null, "Source A parent"),
-      sourceEntry("child-z", "parent", "Source A child Z"),
-      sourceEntry("child-a", "parent", "Source A child A"),
+      sourceEntry("shared", "Source A shared"),
+      sourceEntry("session-z", "Source A session Z"),
+      sourceEntry("session-a", "Source A session A"),
     ]);
     const sourceAWithReorderedEntries = testSource("source-a", [
-      sourceEntry("parent", null, "Source A parent"),
-      sourceEntry("child-a", "parent", "Source A child A"),
-      sourceEntry("child-z", "parent", "Source A child Z"),
+      sourceEntry("shared", "Source A shared"),
+      sourceEntry("session-a", "Source A session A"),
+      sourceEntry("session-z", "Source A session Z"),
     ]);
     const sourceB = testSource("source-b", [
-      sourceEntry("parent", null, "Source B parent"),
-      sourceEntry("child", "missing-in-source-b", "Source B child"),
+      sourceEntry("shared", "Source B shared"),
+      sourceEntry("another", "Source B another"),
     ]);
     const first = await new CatalogSnapshotStore([sourceA, sourceB]).current();
     const reordered = await new CatalogSnapshotStore([sourceB, sourceA]).current();
@@ -122,25 +122,11 @@ describe("catalog source aggregation", () => {
     const byTitle = new Map(
       [...first.sessions.values()].map((value) => [value.session.title, value.session]),
     );
-    expect(byTitle.get("Source A parent")?.id).not.toBe(byTitle.get("Source B parent")?.id);
-    expect(byTitle.get("Source A child A")?.parentId).toBe(byTitle.get("Source A parent")?.id);
-    expect(byTitle.get("Source A child Z")?.parentId).toBe(byTitle.get("Source A parent")?.id);
-    expect(byTitle.get("Source B child")?.parentId).toBeNull();
-    const parent = byTitle.get("Source A parent")!;
-    expect(parent.childIds).toEqual([...parent.childIds].sort());
-    expect(parent.childIds).toEqual(
-      [...reorderedEntries.sessions.values()].find(
-        (value) => value.session.title === "Source A parent",
-      )!.session.childIds,
-    );
+    expect(byTitle.get("Source A shared")?.id).not.toBe(byTitle.get("Source B shared")?.id);
   });
 });
 
-function sourceEntry(
-  nativeSessionId: string,
-  parentNativeSessionId: string | null,
-  title: string,
-): SourceSessionEntry {
+function sourceEntry(nativeSessionId: string, title: string): SourceSessionEntry {
   const origin = {
     sourceType: "test",
     agent: "replaced-by-source",
@@ -150,7 +136,6 @@ function sourceEntry(
   return {
     localId: nativeSessionId,
     nativeSessionId,
-    parentNativeSessionId,
     origin,
     normalized: {
       ...normalized,
@@ -160,8 +145,6 @@ function sourceEntry(
         sourceId: nativeSessionId,
         origin,
         title,
-        parentId: parentNativeSessionId,
-        childIds: [],
       },
     },
   };

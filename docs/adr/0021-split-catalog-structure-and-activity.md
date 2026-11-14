@@ -13,13 +13,13 @@ to catalog revisions. The response also includes agent metadata; see the
 ## Context and Problem Statement
 
 Catalog pagination and periodic summary refreshes repeatedly transfer metadata and
-couple ordering, relationships, and diagnostics. A separate activity API and cache
+couple ordering and diagnostics. A separate activity API and cache
 would add another request lifecycle merely to keep advisory timestamps current.
 
 ## Decision Drivers
 
 - Timestamp and conversation changes must not retransmit catalog structure.
-- Detect changes to parent relationships, archive state, projects, and display titles.
+- Detect changes to archive state, projects, and display titles.
 - Reuse fingerprints, incremental reads, shared snapshots, and refresh coalescing.
 - Avoid dedicated timestamp requests, caches, and timers.
 
@@ -35,8 +35,7 @@ Return complete `{ revision, projects, sessions }` snapshots. Each session carri
 nullable `updatedAt`, but the revision hashes only the structure after canonical ID
 sorting. Resolve display titles with the display-title resolver on each probe;
 the underlying snapshot signature cannot substitute for the presentation revision.
-`isChild` reflects a declared parent relationship; `parentId` reflects only a
-resolved link. Details retain a separate type with full metadata.
+Details retain a separate type with full metadata.
 
 `after` is the only list query parameter. Matching revisions wait up to 25 seconds
 with shared 1.5-second probes, at most 100 waiters, and no probing when idle.
@@ -57,7 +56,7 @@ revision. Catalog diagnostics are server-only and deduplicated by content.
 ### Positive Consequences
 
 - Active conversations do not repeatedly transmit structure.
-- Complete data keeps project counts and direct-child relationships consistent.
+- Complete data keeps project counts consistent.
 - Title changes wake structure subscribers; timestamps and content do not.
 - One catalog request lifecycle replaces separate structure and activity channels.
 

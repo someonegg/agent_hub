@@ -11,7 +11,7 @@ it("loads documentation catalogs without native Node.js type stripping", () => {
         language,
         label("Settings"),
         label("Remove photo.png"),
-        label("{{project}}, {{count, number}} main sessions", { project: "atlas", count: 2 }),
+        label("{{project}}, {{count, number}} sessions", { project: "atlas", count: 2 }),
       ];
     };
     const capture = captureSource(scenario, "zh-CN");
@@ -22,5 +22,5 @@ it("loads documentation catalogs without native Node.js type stripping", () => {
     ["--no-experimental-strip-types", "--input-type=module", "--eval", source],
     { encoding: "utf8" },
   );
-  expect(JSON.parse(output)).toEqual(["zh-CN", "设置", "移除 photo.png", "atlas，2 个主会话"]);
+  expect(JSON.parse(output)).toEqual(["zh-CN", "设置", "移除 photo.png", "atlas，2 个会话"]);
 });

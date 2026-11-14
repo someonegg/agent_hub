@@ -21,7 +21,6 @@ interface SessionReaderProps {
   managementBusy?: boolean;
   management?: ReactNode;
   onNavigate?: (sessionId: string) => void;
-  related?: ReactNode;
   context: SessionMessagesResponse;
   readerLoading: boolean;
   readerBusy: boolean;
@@ -37,7 +36,6 @@ export function SessionReader({
   managementBusy,
   management,
   onNavigate,
-  related,
   context,
   readerLoading,
   readerBusy,
@@ -138,7 +136,6 @@ export function SessionReader({
               management={management}
               session={context.session}
             />
-            {related}
             {items.length === 0 && !readerLoading && !messagePreview ? (
               <EmptyState title={t("thisSessionHasNoMessages")}>
                 {t("waitForTheSessionToUpdate")}

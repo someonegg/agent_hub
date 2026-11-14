@@ -30,7 +30,6 @@ function entry(diagnostics: readonly DomainDiagnostic[] = []): SourceSessionEntr
   return {
     localId: "one",
     nativeSessionId: "native",
-    parentNativeSessionId: null,
     origin: normalized.session.origin,
     normalized: { ...normalized, session: { ...normalized.session, diagnostics } },
   };

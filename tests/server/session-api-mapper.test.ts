@@ -17,8 +17,6 @@ const session = domainSession({
   projectDirectory: "/project",
   createdAt: "2026-07-28T00:00:00Z",
   updatedAt: "2026-07-28T01:00:00Z",
-  childIds: ["child"],
-  subagent: { taskName: "task", nickname: null, role: "worker" },
   warningCount: 1,
   diagnostics: [
     {
@@ -40,43 +38,36 @@ describe("session API mapping", () => {
       title: session.title,
       projectDirectory: "/project",
       status: "normal",
-      parentId: null,
-      isChild: false,
       updatedAt: session.updatedAt,
     });
     const detail = mapper.sessionDetail(session);
-    detail.childIds.push("mutated");
+    expect(detail).toEqual({
+      resume: { allowed: false, reason: "Runtime validation unavailable" },
+      id: session.id,
+      origin: session.origin,
+      title: session.title,
+      workingDirectory: "/project",
+      projectDirectory: "/project",
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      status: "normal",
+      sourceId: session.sourceId,
+    });
     expect(detail).not.toHaveProperty("diagnostics");
     expect(detail).not.toHaveProperty("warningCount");
-    expect(session.childIds).toEqual(["child"]);
     expect(session.diagnostics[0]!.message).toBe("Partial");
     expect(detail.origin).not.toBe(session.origin);
     expect(detail.origin).not.toHaveProperty("formatVersion");
     expect(detail.origin.runtimeVersion).toBe("1.0.0");
   });
 
-  it("excludes child-only projects while retaining child sessions in the catalog", () => {
-    const mapper = new SessionApiMapper();
-    const catalog = mapper.list([
+  it("includes every adapter session project", () => {
+    const catalog = new SessionApiMapper().list([
       session,
-      { ...session, id: "child", parentId: session.id, projectDirectory: "/child-only" },
-      {
-        ...session,
-        id: "orphan-child",
-        isChild: true,
-        projectDirectory: "/orphan-only",
-      },
-      { ...session, id: "shared-child", parentId: session.id },
+      { ...session, id: "two", projectDirectory: "/other" },
     ]);
-
-    expect(catalog.projects).toEqual([{ directory: "/project" }]);
-    expect(catalog.sessions).toHaveLength(4);
-    expect(catalog.sessions.filter((item) => item.isChild).map((item) => item.id)).toEqual([
-      "child",
-      "orphan-child",
-      "shared-child",
-    ]);
-    expect(mapper.list([{ ...session, isChild: true }]).projects).toEqual([]);
+    expect(catalog.projects).toEqual([{ directory: "/other" }, { directory: "/project" }]);
+    expect(catalog.sessions).toHaveLength(2);
   });
 
   it("resolves display titles consistently and falls back to the original title", () => {

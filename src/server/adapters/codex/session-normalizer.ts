@@ -121,9 +121,6 @@ export class DefaultSessionNormalizer implements SessionNormalizer {
       createdAt: metadata.createdAt,
       updatedAt: metadata.updatedAt,
       archived: metadata.archived,
-      parentId: metadata.parentThreadId,
-      childIds: [],
-      subagent: metadata.subagent ?? null,
       warningCount,
       diagnostics,
     };

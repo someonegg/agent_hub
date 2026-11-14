@@ -27,8 +27,6 @@ const base = {
     createdAt: null,
     updatedAt: null,
     resume: { allowed: true, reason: null, secret: "secret" },
-    parentId: "secret",
-    childIds: ["secret"],
     sourceId: "secret",
   },
   nextAfter: 44,
@@ -46,7 +44,7 @@ const base = {
 } as unknown as SessionMessagesResponse;
 const record = { id: "record", ordinal: 42, timestamp: null, secret: "secret" };
 
-it("maps the list with a field whitelist and excludes ordinary and orphan children", () => {
+it("maps the list with a field whitelist", () => {
   const response = {
     agents: [{ nickname: "default", runtimeName: "Codex" }],
     projects: [{ directory: "/project" }],
@@ -59,12 +57,8 @@ it("maps the list with a field whitelist and excludes ordinary and orphan childr
         agent: "default",
         projectDirectory: "/project",
         updatedAt: null,
-        isChild: false,
-        parentId: null,
         secret: "secret",
       },
-      { id: "child", isChild: true, parentId: "main", projectDirectory: "/project" },
-      { id: "orphan", isChild: true, parentId: null, projectDirectory: "/project" },
       {
         id: "missing",
         title: "missing",

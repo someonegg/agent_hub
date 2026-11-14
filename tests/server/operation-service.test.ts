@@ -41,9 +41,6 @@ function session(id = "session", operationId?: string): DomainSession {
     workingDirectory: "/project",
     createdAt: null,
     updatedAt: null,
-    parentId: null,
-    childIds: [],
-    subagent: null,
     warningCount: 0,
     diagnostics: [],
     origin: {

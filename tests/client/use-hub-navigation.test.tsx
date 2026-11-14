@@ -6,7 +6,7 @@ import type { SessionListResponse } from "../../src/shared/api-contract";
 
 import { browserStorage } from "../../src/client/state/browser-storage";
 import { useHubNavigation } from "../../src/client/state/use-hub-navigation";
-import { CHILD_ID, listBody, SESSION_ID } from "./session.fixtures";
+import { listBody, OTHER_SESSION_ID, SESSION_ID } from "./session.fixtures";
 
 beforeEach(() => {
   sessionStorage.clear();
@@ -73,18 +73,18 @@ it("expands a new destination when it appears in a later catalog snapshot", () =
   const { result, rerender } = renderHook(({ list }) => useHubNavigation(list), {
     initialProps: { list: listBody },
   });
-  act(() => result.current.navigate(CHILD_ID));
+  act(() => result.current.navigate(OTHER_SESSION_ID));
   expect(result.current.navigation.expanded).toEqual([]);
   rerender({
     list: {
       ...listBody,
-      sessions: [...listBody.sessions, { ...listBody.sessions[0]!, id: CHILD_ID }],
+      sessions: [...listBody.sessions, { ...listBody.sessions[0]!, id: OTHER_SESSION_ID }],
     },
   });
   expect(result.current.navigation.expanded).toEqual(["/project/reader"]);
 });
 
-it("opens the main ancestor's project for a child without closing other projects", () => {
+it("opens the session project without closing other projects", () => {
   const list: SessionListResponse = {
     ...listBody,
     projects: [...listBody.projects, { directory: "/project/worktree" }],
@@ -92,17 +92,15 @@ it("opens the main ancestor's project for a child without closing other projects
       ...listBody.sessions,
       {
         ...listBody.sessions[0]!,
-        id: CHILD_ID,
-        parentId: SESSION_ID,
-        isChild: true,
+        id: OTHER_SESSION_ID,
         projectDirectory: "/project/worktree",
       },
     ],
   };
   const { result } = renderHook(() => useHubNavigation(list));
   act(() => result.current.toggleProject("other"));
-  act(() => result.current.navigate(CHILD_ID));
-  expect(result.current.navigation.expanded).toEqual(["other", "/project/reader"]);
+  act(() => result.current.navigate(OTHER_SESSION_ID));
+  expect(result.current.navigation.expanded).toEqual(["other", "/project/worktree"]);
 });
 
 it("reopens the destination project on browser history navigation", () => {

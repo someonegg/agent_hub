@@ -16,7 +16,7 @@ npx @someonegg/agent-hub@latest
 
 ## 阅读会话
 
-在侧边栏选择项目和主会话，子会话从父会话中打开。消息从头开始随滚动加载，到达末尾后自动更新。
+在侧边栏选择项目和会话。消息从头开始随滚动加载，到达末尾后自动更新。
 勾选**已归档**可浏览只读的归档会话。可收藏会话地址。
 
 最新加载的计划自动展开。使用**显示**或**隐藏**控制单个计划，也可同时展开多个计划。
@@ -103,7 +103,7 @@ ahub-cli session inspect <id> --follow
 ```
 
 使用 `list` 或 `create` 返回的 Hub ID。`list` 默认不含归档会话，传入 `--all` 可包含；
-`inspect` 也接受子会话 ID。将返回的 `Next after` 值传给 `--after <value>` 读取下一页。
+将返回的 `Next after` 值传给 `--after <value>` 读取下一页。
 `--follow` 持续观察直到按 `Ctrl+C` 停止，不会因任务完成自动结束。
 
 创建默认使用项目目录和第一个已配置智能体。用 `--cwd` 修改工作目录而保留项目归属，
@@ -186,7 +186,7 @@ Agent Hub 默认使用 `~/.agent-hub`，不会自动迁移旧数据。如需使�
 
 ### 多个智能体
 
-智能体是独立拥有配置、Skills、记忆和模型设置的身份。Codex 和 Claude Code 是执行引擎，任务中派生的身份称为子智能体。智能体目录在 Codex 中包含 `sessions/`，在 Claude Code 中包含 `projects/`。
+智能体是独立拥有配置、Skills、记忆和模型设置的身份。Codex 和 Claude Code 是执行引擎。智能体目录在 Codex 中包含 `sessions/`，在 Claude Code 中包含 `projects/`。
 每个智能体需使用唯一昵称和目录：
 
 ```sh

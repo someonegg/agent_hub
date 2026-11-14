@@ -6,7 +6,7 @@ import type { HubOperation, SessionListResponse } from "../../src/shared/api-con
 import { api, ApiClientError } from "../../src/client/api/client";
 import { App } from "../../src/client/App";
 import { browserStorage } from "../../src/client/state/browser-storage";
-import { baseSession, CHILD_ID, firstPage, listBody, SESSION_ID } from "./session.fixtures";
+import { baseSession, firstPage, listBody, OTHER_SESSION_ID, SESSION_ID } from "./session.fixtures";
 
 // @vitest-environment jsdom
 
@@ -20,13 +20,6 @@ const catalog: SessionListResponse = {
       id: archiveId,
       title: "Archived trace",
       status: "archived" as const,
-    },
-    {
-      ...listBody.sessions[0]!,
-      id: CHILD_ID,
-      parentId: SESSION_ID,
-      title: "Child trace",
-      isChild: true,
     },
   ],
 };
@@ -55,11 +48,10 @@ beforeEach(() => {
           session: {
             ...baseSession,
             id,
-            parentId: id === CHILD_ID ? SESSION_ID : null,
             status: "archived" as const,
             title:
-              id === CHILD_ID
-                ? "Child trace"
+              id === OTHER_SESSION_ID
+                ? "Another trace"
                 : id === archiveId
                   ? "Archived trace"
                   : baseSession.title,
@@ -83,32 +75,6 @@ describe("unified hub", () => {
       expect(api.sessions).toHaveBeenCalledTimes(1);
     },
   );
-
-  it("remembers child session expansion and collapse after remounting", async () => {
-    window.history.replaceState(null, "", `/sessions/${SESSION_ID}`);
-    let view = render(<App />);
-    await flush();
-    const group = () => screen.getByText("Child sessions · 1").closest("details")!;
-    expect(group()).not.toHaveAttribute("open");
-    group().open = true;
-    fireEvent(group(), new Event("toggle"));
-    await flush();
-    view.unmount();
-
-    vi.mocked(api.sessions).mockResolvedValueOnce(catalog);
-    view = render(<App />);
-    await flush();
-    expect(group()).toHaveAttribute("open");
-    group().open = false;
-    fireEvent(group(), new Event("toggle"));
-    await flush();
-    view.unmount();
-
-    vi.mocked(api.sessions).mockResolvedValueOnce(catalog);
-    render(<App />);
-    await flush();
-    expect(group()).not.toHaveAttribute("open");
-  });
 
   it("offers a agent link below a missing session error without redirecting automatically", async () => {
     window.history.replaceState(null, "", `/sessions/${SESSION_ID}`);
@@ -155,6 +121,15 @@ describe("unified hub", () => {
   it.each([false, true])(
     "respects creation dialog dismissal on completion: %s",
     async (dismiss) => {
+      vi.mocked(api.sessions)
+        .mockReset()
+        .mockResolvedValueOnce({
+          ...catalog,
+          sessions: [
+            ...catalog.sessions,
+            { ...listBody.sessions[0]!, id: OTHER_SESSION_ID, status: "archived" },
+          ],
+        });
       vi.useFakeTimers();
       const pending: HubOperation = {
         phase: null,
@@ -171,7 +146,7 @@ describe("unified hub", () => {
       vi.spyOn(api, "operation").mockResolvedValue({
         ...pending,
         status: "succeeded",
-        sessionId: CHILD_ID,
+        sessionId: OTHER_SESSION_ID,
       });
       render(<App />);
       await flush();
@@ -197,13 +172,23 @@ describe("unified hub", () => {
           "aria-expanded",
           "true",
         );
-        expect(window.location.pathname).toBe(`/sessions/${CHILD_ID}`);
-        expect(screen.getByRole("heading", { name: "Child trace" })).toBeInTheDocument();
+        expect(window.location.pathname).toBe(`/sessions/${OTHER_SESSION_ID}`);
+        expect(screen.getByRole("heading", { name: "Another trace" })).toBeInTheDocument();
       }
       expect(screen.queryByRole("link", { name: "Open session" })).toBeNull();
     },
   );
   it("expands the destination project when following the bound-session link", async () => {
+    vi.mocked(api.sessions)
+      .mockReset()
+      .mockResolvedValueOnce({
+        ...catalog,
+        sessions: [
+          ...catalog.sessions,
+          { ...listBody.sessions[0]!, id: OTHER_SESSION_ID, projectDirectory: "/destination" },
+        ],
+        projects: [...catalog.projects, { directory: "/destination" }],
+      });
     window.history.replaceState(null, "", `/sessions/${SESSION_ID}`);
     vi.mocked(api.messages).mockImplementation(async (id, query) =>
       query.wait
@@ -216,7 +201,7 @@ describe("unified hub", () => {
               supported: true,
               state: "superseded",
               activity: null,
-              supersededBySessionId: CHILD_ID,
+              supersededBySessionId: OTHER_SESSION_ID,
               attachCommand: null,
             },
           },
@@ -230,8 +215,8 @@ describe("unified hub", () => {
     );
     fireEvent.click(screen.getByRole("link", { name: "Go to bound session" }));
     await flush();
-    expect(window.location.pathname).toBe(`/sessions/${CHILD_ID}`);
-    expect(screen.getByRole("button", { name: /^reader.*1/ })).toHaveAttribute(
+    expect(window.location.pathname).toBe(`/sessions/${OTHER_SESSION_ID}`);
+    expect(screen.getByRole("button", { name: /^destination.*1/ })).toHaveAttribute(
       "aria-expanded",
       "true",
     );
@@ -240,9 +225,9 @@ describe("unified hub", () => {
   it("opens nothing on agent, toggles archived records, and retains navigation through history", async () => {
     render(<App />);
     await flush();
-    const nav = screen.getByRole("navigation", { name: "Projects and main sessions" });
+    const nav = screen.getByRole("navigation", { name: "Projects and sessions" });
     expect(within(nav).getAllByRole("link")).toHaveLength(1);
-    expect(screen.queryByRole("link", { name: /Child trace/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Another trace/ })).not.toBeInTheDocument();
     expect(api.messages).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("checkbox", { name: "Archived" }));
     expect(within(nav).getAllByRole("link")).toHaveLength(2);
@@ -250,10 +235,6 @@ describe("unified hub", () => {
     await flush();
     expect(window.location.pathname).toBe(`/sessions/${SESSION_ID}`);
     expect(screen.getByRole("heading", { name: "Reader work" })).toBeInTheDocument();
-    const childGroup = screen.getByText("Child sessions · 1").closest("details")!;
-    expect(childGroup).not.toHaveAttribute("open");
-    fireEvent.click(screen.getByText("Child sessions · 1"));
-    expect(screen.getByRole("link", { name: "Child trace" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Back to list/ }));
     await flush();
     expect(window.location.pathname).toBe("/");
@@ -269,37 +250,6 @@ describe("unified hub", () => {
     expect(screen.getByRole("heading", { name: "Archived trace" })).toBeInTheDocument();
   });
 
-  it("keeps the parent link when its summary is unavailable and retains nested children", async () => {
-    window.history.replaceState(null, "", `/sessions/${CHILD_ID}`);
-    vi.mocked(api.sessions)
-      .mockReset()
-      .mockResolvedValueOnce({
-        ...catalog,
-        sessions: [
-          catalog.sessions.find((session) => session.id === CHILD_ID)!,
-          {
-            ...listBody.sessions[0]!,
-            id: "grandchild",
-            title: "Nested child",
-            parentId: CHILD_ID,
-            isChild: true,
-          },
-        ],
-      })
-      .mockImplementation(() => new Promise(() => {}));
-    render(<App />);
-    await flush();
-    expect(
-      within(screen.getByRole("navigation", { name: "Parent session" })).getByRole("link", {
-        name: "← Parent session",
-      }),
-    ).toHaveAttribute("href", `/sessions/${SESSION_ID}`);
-    fireEvent.click(screen.getByText("Child sessions · 1"));
-    expect(screen.getByRole("link", { name: "Nested child" })).toHaveAttribute(
-      "href",
-      "/sessions/grandchild",
-    );
-  });
   it("uses project-prefilled creation dialogs and persists collapsed projects", async () => {
     render(<App />);
     await flush();
@@ -332,17 +282,25 @@ describe("unified hub", () => {
 });
 
 describe("hub link entry points", () => {
-  it("preserves modified child clicks and navigates on primary click", async () => {
+  it("preserves modified session clicks and navigates on primary click", async () => {
     window.history.replaceState(null, "", `/sessions/${SESSION_ID}`);
+    vi.mocked(api.sessions)
+      .mockReset()
+      .mockResolvedValueOnce({
+        ...catalog,
+        sessions: [
+          ...catalog.sessions,
+          { ...listBody.sessions[0]!, id: OTHER_SESSION_ID, title: "Another trace" },
+        ],
+      });
     render(<App />);
     await flush();
-    fireEvent.click(screen.getByText("Child sessions · 1"));
-    const child = screen.getByRole("link", { name: "Child trace" });
-    expect(fireEvent.click(child, { metaKey: true })).toBe(true);
-    expect(fireEvent.click(child, { button: 2 })).toBe(true);
+    const other = screen.getByRole("link", { name: /Another trace/ });
+    expect(fireEvent.click(other, { metaKey: true })).toBe(true);
+    expect(fireEvent.click(other, { button: 2 })).toBe(true);
     expect(window.location.pathname).toBe(`/sessions/${SESSION_ID}`);
-    fireEvent.click(child);
-    expect(window.location.pathname).toBe(`/sessions/${CHILD_ID}`);
+    fireEvent.click(other);
+    expect(window.location.pathname).toBe(`/sessions/${OTHER_SESSION_ID}`);
   });
 });
 
@@ -412,9 +370,7 @@ it("aggregates and filters merged projects, remembers the agent and keeps a dire
   await flush();
   const sidebar = screen.getByRole("complementary", { name: "Session list" });
   expect(within(sidebar).getByRole("link", { name: /Work trace/ })).toHaveTextContent("work");
-  expect(within(sidebar).getAllByRole("button", { name: /reader, 2 main sessions/ })).toHaveLength(
-    1,
-  );
+  expect(within(sidebar).getAllByRole("button", { name: /reader, 2 sessions/ })).toHaveLength(1);
   expect(screen.getByText("Agent: default")).toBeInTheDocument();
   expect(within(sidebar).getByRole("option", { name: "work · Claude Code" })).toHaveValue("work");
   expect(within(sidebar).getByRole("option", { name: "empty · Codex" })).toHaveValue("empty");
@@ -428,7 +384,7 @@ it("aggregates and filters merged projects, remembers the agent and keeps a dire
   fireEvent.change(screen.getByRole("combobox", { name: "Filter by agent" }), {
     target: { value: "empty" },
   });
-  expect(within(sidebar).getByText("No main sessions yet")).toBeInTheDocument();
+  expect(within(sidebar).getByText("No sessions yet")).toBeInTheDocument();
   fireEvent.click(within(sidebar).getByRole("button", { name: "New session" }));
   expect(screen.getByLabelText("Session agent")).toHaveValue("empty");
   expect(

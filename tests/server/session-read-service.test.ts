@@ -255,9 +255,6 @@ function normalizedSession(
       createdAt: timestamp,
       updatedAt: timestamp,
       archived: false,
-      parentId: null,
-      childIds: [],
-      subagent: null,
       warningCount: 0,
       diagnostics: [],
     },
@@ -265,15 +262,10 @@ function normalizedSession(
   };
 }
 
-function sourceEntry(
-  localId: string,
-  normalized: NormalizedSession,
-  parentNativeSessionId: string | null = null,
-): SourceSessionEntry {
+function sourceEntry(localId: string, normalized: NormalizedSession): SourceSessionEntry {
   return {
     localId,
     nativeSessionId: localId,
-    parentNativeSessionId,
     origin: TEST_ORIGIN,
     normalized,
   };

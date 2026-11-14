@@ -217,7 +217,7 @@ it("consumes late-arriving older binds for their pane without changing the sessi
   });
 });
 
-it("keeps the accepted duplicate, ignores its competitors' claims, and fully loads the first replacement", async () => {
+it("keeps the accepted duplicate, ignores its competitors' claims, and retains exclusions until their paths disappear", async () => {
   const agent = await createTempDirectory("duplicate-rollouts-");
   await mkdir(join(agent, "sessions"));
   const a = join(agent, "sessions/rollout-a.jsonl");
@@ -253,7 +253,7 @@ it("keeps the accepted duplicate, ignores its competitors' claims, and fully loa
     log.mock.calls.filter(([item]) => item.code === "duplicate_native_session_id"),
   ).toHaveLength(1);
   await sessions.refresh();
-  // Unchanged duplicate candidates retain only their identity and fingerprint.
+  // Excluded paths are not reopened.
   expect(source.lastRefreshTelemetry()).toMatchObject({ fullFiles: 0, appendFiles: 0 });
   expect(
     log.mock.calls.filter(([item]) => item.code === "duplicate_native_session_id"),
@@ -272,13 +272,25 @@ it("keeps the accepted duplicate, ignores its competitors' claims, and fully loa
   expect(
     log.mock.calls.filter(([item]) => item.code === "duplicate_native_session_id"),
   ).toHaveLength(1);
+  // Even a replacement with a new identity stays excluded until its path disappears.
+  await writeFile(c, line({ type: "session_meta", payload: { id: "replacement" } }));
   await unlink(b);
   await sessions.refresh();
-  expect(source.lastRefreshTelemetry()).toMatchObject({ fullFiles: 1, appendFiles: 0 });
-  expect((await sessions.managementSnapshot()).sessions).toMatchObject([{ id, title: "A" }]);
-  expect(bindings.latest(id)).toMatchObject({
-    sessionName: "ahub-00000000-0000-0000-0000-000000000002",
+  expect(source.lastRefreshTelemetry()).toMatchObject({
+    fullFiles: 0,
+    appendFiles: 0,
+    probeBytes: 0,
+    decodeBytes: 0,
   });
+  expect((await sessions.managementSnapshot()).sessions).toEqual([]);
+  await unlink(a);
+  await sessions.refresh();
+  await writeFile(
+    a,
+    meta("A") + message(2, shell(socket, "ahub-00000000-0000-0000-0000-000000000002")),
+  );
+  await sessions.refresh();
+  expect((await sessions.managementSnapshot()).sessions).toMatchObject([{ id, title: "A" }]);
   await appendFile(a, message(3, shell(socket, "ahub-00000000-0000-0000-0000-000000000005")));
   await sessions.refresh();
   expect(source.lastRefreshTelemetry()).toMatchObject({ fullFiles: 0, appendFiles: 1 });

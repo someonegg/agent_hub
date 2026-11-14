@@ -17,8 +17,7 @@ By default, Hub reads Codex sessions from `~/.codex` and Claude Code sessions fr
 
 ## Read conversations
 
-Choose a project and main session in the sidebar; open child sessions from the
-parent conversation. Messages load from the beginning as you scroll, then update
+Choose a project and session in the sidebar. Messages load from the beginning as you scroll, then update
 automatically at the end. Use **Archived** to browse read-only archived sessions.
 You can bookmark a session URL.
 
@@ -124,7 +123,7 @@ ahub-cli session inspect <id> --follow
 ```
 
 Use a Hub ID returned by `list` or `create`. `list` excludes archived sessions
-unless `--all` is supplied; `inspect` also accepts child session IDs. Pass the
+unless `--all` is supplied. Pass the
 returned `Next after` value as `--after <value>` to read the next page.
 `--follow` keeps observing until `Ctrl+C`; it does not stop when a task finishes.
 
@@ -223,7 +222,7 @@ Agent Hub uses `~/.agent-hub` by default and does not migrate old data. To use a
 ### Multiple agents
 
 An Agent is an identity with its own configuration, Skills, memory, and model settings.
-Codex and Claude Code are Runtimes; identities spawned within a task are Subagents.
+Codex and Claude Code are Runtimes.
 Each Agent has a unique nickname and directory, containing `sessions/` for Codex
 or `projects/` for Claude Code:
 

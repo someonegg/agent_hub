@@ -15,9 +15,6 @@ export const docsSession = {
   updatedAt: docsTimestamp,
   status: "live",
   resume: { allowed: false, reason: "Session is already live" },
-  parentId: null,
-  childIds: [],
-  subagent: null,
   messageCount: 0,
   sourceId: null,
 };

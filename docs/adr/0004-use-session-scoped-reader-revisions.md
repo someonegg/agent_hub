@@ -27,16 +27,16 @@ The immutable catalog snapshot used one global generation for both session-list 
 
 ## Decision Outcome
 
-Chosen option: "Derive a session revision from the final aggregate session view and expose a separate opaque token", because the aggregate view is the first boundary that contains every reader-visible field, including linked parent and child relationships.
+Chosen option: "Derive a session revision from the final aggregate session view and expose a separate opaque token", because the aggregate view is the first boundary that contains every reader-visible field.
 
-Session detail, item pages, tool detail, and directive detail use a string `sessionRevision`. After relationship linking, the repository canonicalizes the published `childIds` array by opaque ID in code-unit ascending order, then computes an internal digest from that exact final normalized session order. An unchanged digest reuses the current revision; a changed, deleted-and-reappeared, or otherwise new incarnation receives a 192-bit opaque token derived from a random per-process key and a monotonic sequence. The digest remains server-private, and revision state is published atomically with the immutable catalog snapshot.
+Session detail, item pages, tool detail, and directive detail use a string `sessionRevision`. The repository computes an internal digest from the final normalized session view. An unchanged digest reuses the current revision; a changed, deleted-and-reappeared, or otherwise new incarnation receives a 192-bit opaque token derived from a random per-process key and a monotonic sequence. The digest remains server-private, and revision state is published atomically with the immutable catalog snapshot.
 
 This decision refines the timeline consistency boundary established by ADR-0001 while retaining its whole-file snapshots, serialized refresh, bounded responses, and ordinal pagination.
 
 ### Positive Consequences
 
 - Unrelated live sessions no longer interrupt timeline pages or lazy detail.
-- Replacement, truncation, metadata, relationship, timeline, and lazy-detail changes still invalidate old requests safely.
+- Replacement, truncation, metadata, timeline, and lazy-detail changes still invalidate old requests safely.
 - Source adapters remain responsible for normalization and storage caching, not aggregate API version semantics.
 - Cryptographically derived opaque tokens avoid exposing fingerprints or counters and do not require retaining every historical revision to prevent process-local reuse.
 - Catalog pagination retains the global consistency semantics it needs.
