@@ -58,8 +58,9 @@ with question IDs `<callId>:<index>`. Structured answers take precedence; explic
 rejection is `aborted`, uninterpretable results are `unavailable`. No approval UI,
 permission-mode, annotations or multi-select domain fields are synthesized.
 
-Project association uses valid V1/V2 shell binding metadata, otherwise the first
-valid cwd; execution uses the latest valid cwd.
+Project association uses valid V3 shell binding metadata, otherwise the first
+valid cwd; execution uses the latest valid cwd. See the
+[binding protocol](technical-reference.md#binding-format-and-ownership).
 
 Titles prefer the latest nonempty
 `custom-title`, then `ai-title`, then first ordinary user text; otherwise the title is

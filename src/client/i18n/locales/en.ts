@@ -241,8 +241,6 @@ export const messages = {
   backToSession: "← Back to session",
   parentSessionLabel: "← Parent session",
 
-  characters: "{{count, number}} characters",
-
   filesChanged_other: "{{count, number}} files changed",
   projectSessions: "{{project}}, {{count, number}} main sessions",
   newProjectSession: "New session in {{project}}",

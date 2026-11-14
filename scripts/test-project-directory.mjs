@@ -1,11 +1,14 @@
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { promisify } from "node:util";
+
+import { createServer } from "vite";
 
 const directory = await mkdtemp(join(tmpdir(), "ahub-project-directory-"));
 const session = `project-directory-${Date.now()}`;
-async function verify(page, output) {
+async function verify(page, output, origin) {
   await page.route("**/api/v1/**", (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/v1/capabilities") return route.fulfill({ json: { hosting: true } });
@@ -24,7 +27,7 @@ async function verify(page, output) {
       },
     });
   });
-  await page.goto("http://127.0.0.1:4187");
+  await page.goto(origin);
   for (const viewport of [
     { width: 1440, height: 1000 },
     { width: 492, height: 410 },
@@ -61,18 +64,29 @@ async function verify(page, output) {
   }
   return "Native project selection and explicit custom entry checks passed";
 }
-const source = join(directory, "verify.js");
-await writeFile(source, `(page) => (${verify.toString()})(page, ${JSON.stringify(directory)})`);
-const cli = (...args) => {
-  const result = execFileSync("playwright-cli", [`-s=${session}`, ...args], { encoding: "utf8" });
-  if (result.includes("### Error")) throw new Error(result);
-  return result;
+const exec = promisify(execFile);
+const cli = async (...args) => {
+  const { stdout } = await exec("playwright-cli", [`-s=${session}`, ...args]);
+  if (stdout.includes("### Error")) throw new Error(stdout);
+  return stdout;
 };
+const server = await createServer({
+  root: resolve(import.meta.dirname, ".."),
+  server: { host: "127.0.0.1", port: 0, open: false },
+});
 try {
-  cli("open", "about:blank");
-  const result = cli("run-code", "--filename", source);
+  await server.listen();
+  const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
+  const source = join(directory, "verify.js");
+  await writeFile(
+    source,
+    `(page) => (${verify.toString()})(page, ${JSON.stringify(directory)}, ${JSON.stringify(origin)})`,
+  );
+  await cli("open", "about:blank");
+  const result = await cli("run-code", "--filename", source);
   if (!result.includes("### Result")) throw new Error(result);
   console.log(`Project directory browser checks passed; screenshots: ${directory}`);
 } finally {
-  cli("close");
+  await cli("close").catch(() => {});
+  await server.close();
 }
