@@ -1,42 +1,34 @@
 # Task Lifecycle
 
-This lifecycle defines task records, execution, acceptance, and cleanup for goals managed through ahub-ccr.
+Each task represents one coherent goal and may span repositories and execution sessions. A conversation may contain concurrent tasks; never share execution sessions across tasks.
 
-## 1. Record or Recover
+## 1. Create or Recover the Record
 
-Each task represents one coherent goal and may span repositories and execution sessions. A conversation may contain multiple tasks. Tasks may run concurrently. Never reuse execution sessions across tasks.
+Before substantive work, copy [the template](../assets/task/) to `~/.agent-hub/ccr/tasks/<task-id>/`. Resolve `~` against the current user's home directory. Use a UTC timestamp plus a random suffix, such as `20261031T060000Z-a8c41f20`; never overwrite an existing directory.
 
-Before starting substantive work, copy [the template](../assets/task/) to a new `~/.agent-hub/ccr/tasks/<task-id>/` directory. Resolve `~` against the current user’s home directory, never against the skill installation or current repository. Use a UTC timestamp plus a random suffix, such as `20261031T060000Z-a8c41f20`. Never overwrite an existing directory.
+- `task.yaml` holds current state. Follow its field definitions and use absolute paths for original repositories and workspaces.
+- `progress.md` holds append-only decisions, progress, evidence, and corrections with UTC timestamps.
+- Optional `artifacts/` holds necessary task-local evidence. Link to other deliverables rather than copying repositories, worktrees, or Hub transcripts. Never record credentials or unnecessary sensitive personal information.
 
-- `task.yaml`: current goal, constraints, acceptance criteria, absolute original repository paths, workspaces, execution sessions, status, and next action.
-- `progress.md`: append-only decisions, progress, evidence, and corrections, with UTC timestamps.
+Preserve task history through cleanup, skill updates, and skill removal. Do not migrate records or change their IDs without an explicit migration request.
 
-Keep completed records for recovery; ordinary cleanup removes execution resources, not task history. Skill updates and removal must not delete task data. Do not migrate existing records or change their IDs without an explicit migration request.
+Record the resolved Hub origin in `hub_url` and reuse it throughout the task. Use `task.yaml.id` as `--task` for every execution session, across repositories.
 
-Find tasks through `~/.agent-hub/ccr/tasks/*/task.yaml`; automatic commits and a shared index are unnecessary. Only the owning orchestration session may write records. Record its session ID in `owner_session_id`; if unavailable, use `null` and record the ownership context and limitation in `progress.md`. Verify ownership and record a transfer before resuming elsewhere; do not write concurrently.
+To recover a task, find its record through `~/.agent-hub/ccr/tasks/*/task.yaml`, read both files, and verify workspaces, branches, and merge states.
 
-Store necessary task-local evidence in an optional `artifacts/` directory. Record other deliverables by location instead of copying repositories, worktrees, or Hub transcripts into task storage. Never record credentials or unnecessary sensitive personal information.
+On recovery, before retrying an uncertain startup, and before closure, reconcile Hub sessions with the record:
 
-Record the resolved Hub origin in `hub_url` and use it consistently, including during recovery.
+```sh
+ahub-cli session list --task <task-id> --json
+```
 
-Use `task.yaml.id` as the stable Hub task name (`--task`) for every execution session in this task, across repositories.
-
-Update records and `updated_at` at delegation, startup, status changes, significant decisions, acceptance, merges, and closure:
-
-- Record delegation intent before startup and actual identifiers immediately afterward.
-- Use `null` for unavailable identifiers and state what needs verification.
-
-When scope changes, update the goal, constraints, and acceptance criteria. Give each criterion a stable ID and description; update its status and evidence as results arrive, including the checked commit or artifact version. Record deliverable locations in `result.deliverables` and validation evidence; finalize them at acceptance or closure.
-
-On recovery:
-
-1. Read both files and verify sessions, worktrees, branches, and merge states.
-2. Query `ahub-cli session list --task <task-id> --json`, reconcile sessions with local records, and continue existing sessions before creating replacements.
-3. Mark unknown facts and the next verification step. Append corrections; do not delete history.
+Continue existing sessions before creating replacements. Mark unknown facts and their next verification step; append corrections to history.
 
 ## 2. Start Isolated Execution
 
-Use the `ahub-control` skill to create execution sessions. Omit `--agent` unless the user or project specifies an Agent.
+Use the `ahub-control` skill to manage execution sessions. Omit `--agent` unless the user or project specifies an Agent.
+
+Record the assignment before startup and actual identifiers immediately afterward. Add each workspace once to `workspaces`, and reference it from sessions through `workspace_ids`. Record actual paths and Git state, including the target branch when merging is required; use `null` for unavailable values and note what needs verification.
 
 For repository modifications, create an isolated worktree for the first execution session:
 
@@ -44,23 +36,19 @@ For repository modifications, create an isolated worktree for the first executio
 ahub-cli session create --project <repository-directory> --task <task-id> --worktree --permission-mode auto --json
 ```
 
-Later stages use separate sessions in the same worktree. Keep the original project association and pass the existing worktree as the working directory:
+Continue in existing sessions for clarification and corrections. When a later stage requires a separate session, reuse the existing worktree while preserving the original project association:
 
 ```sh
 ahub-cli session create --project <repository-directory> --task <task-id> --cwd <existing-worktree-directory> --permission-mode auto --json
 ```
 
-Before authorizing modifications, verify the session's actual working directory and give the agent the isolated path. Follow the project's branch conventions; if Git isolation is unavailable, mark the task blocked. Do not initialize Git without authorization.
+Before authorizing modifications, verify the session's actual working directory and give the agent the isolated path. Follow project branch conventions. If Git isolation is unavailable, mark the task blocked; do not initialize Git without authorization.
 
-After startup, record the workspace and session:
+For work that does not modify a repository, omit `--worktree` and record the reason and actual working directory. Use merge status `not_required` when no merge applies. Original directories are never task-owned cleanup resources.
 
-- Add each workspace once to task-level `workspaces`, with a stable task-local `id`, `project_id`, `working_directory`, branch, and HEAD. For detached HEAD, set branch to `null`. Record the actual target branch when merging is required.
-- Add each session to `execution_sessions`, using `workspace_ids` to reference existing workspace records.
-- If startup has an uncertain result, query sessions by `--task` and reconcile the records before retrying.
+## 3. Track, Validate, and Merge
 
-For work that does not modify a repository, omit `--worktree`. Record the reason and actual working directory, set unavailable Git fields to `null`, and use merge status `not_required` when no merge applies. Exclude the original directory from task-owned cleanup resources.
-
-## 3. Track and Accept
+At delegation, startup, status changes, significant decisions, acceptance, merges, and closure, update `task.yaml` and `updated_at`, and append progress to `progress.md`. When scope changes, revise the goal, constraints, and acceptance criteria.
 
 | Task status | Meaning                                             |
 | ----------- | --------------------------------------------------- |
@@ -71,41 +59,32 @@ For work that does not modify a repository, omit `--worktree`. Record the reason
 | `completed` | Acceptance passed and all required merges completed |
 | `cancelled` | User cancelled or terminated the task; record why   |
 
-Normal flow: `planned` → `running` → `reviewing` → `completed`.
+Any nonterminal state may become `blocked` or `cancelled`. After unblocking, return to the actual stage; after failed acceptance, return to `running`. To reopen a terminal task, record the reason and new acceptance criteria, then return to `running`.
 
-- Any nonterminal state may become `blocked` or `cancelled`.
-- After unblocking, return to the actual stage. After failed acceptance, return to `running`.
-- To reopen a terminal task, record the reason and new acceptance criteria, then return to `running`.
+Track session status separately: `reported_done` is an agent report, and `unknown` requires verification before reassignment.
 
-Track session status separately. `reported_done` is an agent report; `unknown` requires verification before reassignment.
+Give acceptance criteria stable IDs and descriptions. Update their status and evidence against the checked commit or artifact version; reverify affected criteria when that version changes. Acceptance requires all criteria to pass across the task's workspaces. Record deliverable locations in `result.deliverables` and validation evidence in `result.validation_evidence`.
 
-Acceptance passes only when all criteria pass across the task-level workspaces. Reverify affected criteria when the checked commit or artifact version changes.
-
-Update each workspace’s merge and cleanup state as sessions report changes. Merge status:
+Track merge status per workspace:
 
 - `pending`: merge outstanding.
-- `merged`: record evidence that the delivered changes reached the target.
+- `merged`: evidence confirms the delivered changes reached the target.
 - `not_required`: record the user's instruction or a concrete reason, such as no changes or branch-only delivery.
 
-Follow each project's commit, PR, and merge process. If another repository fails, preserve successful merge evidence; do not claim overall completion or automatically roll back partial merges.
+Follow each project's commit, PR, and merge process. If another repository fails, preserve successful merge evidence; do not claim overall completion or automatically roll back partial merges. Verify merges and cleanup already performed by project automation rather than repeating them.
 
-## 4. Close and Clean Up
+## 4. Close and Release Resources
 
 On completion or cancellation:
 
-1. Save `result`, deliverables, validation, limitations, session IDs, and workspace recovery information.
-2. Query sessions by `--task` and reconcile local records. Run `ahub-cli session exit <id>` for every execution session created for this task. Verify exit, set session status to `stopped`, and record `exited_at`. Record failures and the retry needed.
-3. Clean up remaining worktrees and temporary branches only after the entire task succeeds with all changes merged or no changes made. Process each task-level workspace once, after all sessions referencing it have exited, and update its cleanup state. Otherwise retain them and record the reason and next step.
+1. Finalize `result` with deliverables, validation, and limitations. Preserve session IDs and workspace information needed for recovery.
+2. Reconcile Hub sessions with the record, then run `ahub-cli session exit <id>` for every execution session created for this task. Verify exit before setting `stopped` and `exited_at`; record failures and the next retry. Keep the user conversation and other tasks' sessions intact. Exit sessions before deleting them.
+3. Clean up each remaining task-owned worktree and temporary branch once, only when all conditions below hold. Otherwise retain resources and record the reason and next step.
 
-Exit only execution sessions created for this task, keeping the user conversation and other tasks' sessions intact. Exit sessions before deleting them.
+Cleanup requires:
 
-Before cleanup, verify:
+- The entire task succeeded, and all changes were merged or no changes were made. Record evidence of either outcome.
+- All sessions referencing the workspace have exited.
+- Resources belong to this task and contain no unpreserved uncommitted, untracked, or ignored work.
 
-- Sessions have exited.
-- Merge evidence is recorded.
-- Resources belong to this task.
-- No unpreserved uncommitted, untracked, or ignored work remains.
-
-If verification fails, retain resources; do not force deletion. Never remove original repositories or target branches.
-
-Respect project automation: verify completed merges and cleanup without repeating them. Record delivery and cleanup outcomes separately, preserving accepted delivery status if cleanup fails.
+Never force deletion or remove original repositories or target branches. Update workspace cleanup state separately from delivery status; cleanup failure does not invalidate accepted delivery.
