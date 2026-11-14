@@ -239,8 +239,6 @@ export const messages: Record<keyof typeof english, string> = {
   backToSession: "← 返回会话",
   parentSessionLabel: "← 父会话",
 
-  characters: "{{count, number}} 个字符",
-
   filesChanged_other: "{{count, number}} 个文件变更",
   projectSessions: "{{project}}，{{count, number}} 个主会话",
   newProjectSession: "在 {{project}} 中新建会话",
