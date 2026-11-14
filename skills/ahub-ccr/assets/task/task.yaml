@@ -11,8 +11,6 @@ acceptance_criteria: []
 status: planned
 created_at: "" # UTC ISO 8601
 updated_at: ""
-user_session_id: null # User conversation ID; keep null if unavailable
-owner_session_id: null # Orchestration session allowed to write these records
 hub_url: null # Resolved Hub origin; reuse during recovery
 blocker: null # Reason for blocking; clear when resolved, retaining history in progress.md
 next_action: ""
