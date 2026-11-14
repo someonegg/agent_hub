@@ -1,36 +1,45 @@
-schema_version: 1
+schema_version: 2
 id: "" # Directory name and Hub --task value: UTC timestamp + random suffix
 title: ""
 goal: ""
 constraints: []
 acceptance_criteria: []
+# - id: acceptance-1
+#   description: "Observable acceptance requirement"
+#   status: pending # pending / passed / failed
+#   evidence: [] # Verification findings and evidence locations, including the checked commit or artifact version
 status: planned
 created_at: "" # UTC ISO 8601
 updated_at: ""
 user_session_id: null # User conversation ID; keep null if unavailable
 owner_session_id: null # Orchestration session allowed to write these records
+hub_url: null # Resolved Hub origin; reuse during recovery
 blocker: null # Reason for blocking; clear when resolved, retaining history in progress.md
 next_action: ""
 projects: []
 # - id: project-1
 #   repository_path: /absolute/path/to/repository
+workspaces: [] # Workspaces used by this task; record each workspace once
+# - id: workspace-1
+#   project_id: project-1
+#   working_directory: /absolute/path/to/workspace
+#   kind: worktree # worktree / original / external
+#   branch: null # Actual branch per project conventions; null for detached HEAD
+#   head_commit: null # Actual HEAD commit
+#   target_branch: null # Actual target branch when a merge is required
+#   merge_status: pending # pending / merged / not_required
+#   merge_evidence: null # Merge evidence verified per project process, or reason no merge is needed
+#   cleanup_status: retained # retained / cleaned / failed; clean up only after success with all changes merged or no changes
+#   cleanup_note: null # Cleanup evidence, automatic project cleanup, or reason for retention/failure
 execution_sessions: []
 # - key: execution-1 # Local identifier assigned before delegation
 #   session_id: null # Fill in the actual identifier immediately after startup
 #   status: pending # pending / running / blocked / reported_done / stopped / unknown
 #   exited_at: null # UTC timestamp after verifying successful exit
 #   assignment: "Complete goal and delivery requirements"
-#   workspaces:
-#     - project_id: project-1
-#       worktree_path: /absolute/path/to/isolated/worktree
-#       branch: null # Actual branch per project conventions; null for detached HEAD
-#       head_commit: null # Actual HEAD commit
-#       target_branch: null # Actual target branch when a merge is required
-#       merge_status: pending # pending / merged / not_required
-#       merge_evidence: null # Merge evidence verified per project process, or reason no merge is needed
-#       cleanup_status: retained # retained / cleaned / failed; clean up only after success with all changes merged or no changes
-#       cleanup_note: null # Cleanup evidence, automatic project cleanup, or reason for retention/failure
+#   workspace_ids: [workspace-1] # References to task-level workspaces
 result:
   summary: null
+  deliverables: [] # Delivered artifact locations and their commit or version where applicable
   validation_evidence: []
   limitations: []
