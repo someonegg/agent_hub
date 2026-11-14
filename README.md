@@ -49,7 +49,7 @@ For running from source, see [Development](docs/development.md).
 
 ## Features
 
-- Navigate projects, main sessions, and child conversations.
+- Navigate projects and sessions.
 - Read conversation messages, plans, and user input with Markdown, code, tables, and math.
 - Follow conversation updates while browsing their history.
 - Create sessions with optional worktrees, send input, and preview their terminals.

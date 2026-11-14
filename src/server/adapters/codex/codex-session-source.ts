@@ -1,3 +1,4 @@
+import { open } from "node:fs/promises";
 import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -17,6 +18,8 @@ import type {
 import { mergeBindingMetadata } from "../shared/binding-protocol.js";
 import {
   CheckpointedJsonlDecoder,
+  type DecodedRecord,
+  isObject,
   type JsonlCheckpoint,
   type JsonlDecoder,
 } from "../shared/jsonl-decoder.js";
@@ -46,7 +49,6 @@ interface CodexCacheEntry {
   readonly fingerprint: FileFingerprint;
   readonly normalized: NormalizedSession;
   readonly threadId: string | null;
-  readonly parentThreadId: string | null;
   readonly origin: DomainSessionOrigin;
   readonly checkpoint: JsonlCheckpoint;
   readonly identityState: IdentityAccumulatorState;
@@ -54,10 +56,12 @@ interface CodexCacheEntry {
   readonly bindProjectDirectory: string | null;
 }
 
+type ExcludedRollout = { reason: "non-primary" } | { reason: "duplicate"; threadId: string };
+
 export class CodexSessionSource implements SessionSource {
   readonly descriptor: SessionSourceDescriptor;
   #cache = new Map<string, CodexCacheEntry>();
-  #duplicates = new Map<string, { fingerprint: FileFingerprint; threadId: string }>();
+  #excluded = new Map<string, ExcludedRollout>();
   #snapshot: SessionSourceSnapshot | null = null;
   #lastRefreshTelemetry: RefreshTelemetry = mutableTelemetry();
 
@@ -100,7 +104,7 @@ export class CodexSessionSource implements SessionSource {
       entries: discovery.entries.map(({ descriptor }) => fingerprintOf(descriptor)),
     });
     const nextCache = new Map<string, CodexCacheEntry>();
-    const nextDuplicates = new Map<string, { fingerprint: FileFingerprint; threadId: string }>();
+    const nextExcluded = new Map<string, ExcludedRollout>();
     const binds = new Map<string, Omit<SourceBindingEvent, "localId">[]>();
     const telemetry = mutableTelemetry();
     const unavailableRollouts: string[] = [];
@@ -117,22 +121,22 @@ export class CodexSessionSource implements SessionSource {
     );
     for (const { descriptor } of candidates) {
       const fingerprint = fingerprintOf(descriptor);
-      const duplicate = this.#duplicates.get(descriptor.sourceRelativePath);
-      if (
-        duplicate &&
-        sameFingerprint(duplicate.fingerprint, fingerprint) &&
-        acceptedThreads.has(duplicate.threadId)
-      ) {
-        nextDuplicates.set(descriptor.sourceRelativePath, duplicate);
-        duplicateThreads.add(duplicate.threadId);
+      const excluded = this.#excluded.get(descriptor.sourceRelativePath);
+      if (excluded) {
+        nextExcluded.set(descriptor.sourceRelativePath, excluded);
+        if (excluded.reason === "duplicate") duplicateThreads.add(excluded.threadId);
         continue;
       }
       const cached = this.#cache.get(descriptor.sourceRelativePath);
-      let loaded: CodexCacheEntry | null;
+      let loaded: CodexCacheEntry | "non-primary" | null;
       if (cached !== undefined && sameFingerprint(cached.fingerprint, fingerprint)) {
         loaded = cached;
       } else {
         loaded = await this.#load(descriptor, fingerprint, cached, telemetry, binds);
+      }
+      if (loaded === "non-primary") {
+        nextExcluded.set(descriptor.sourceRelativePath, { reason: "non-primary" });
+        continue;
       }
       if (loaded === null) {
         unavailableRollouts.push(descriptor.sourceRelativePath);
@@ -141,8 +145,8 @@ export class CodexSessionSource implements SessionSource {
       }
       if (loaded.threadId !== null) {
         if (acceptedThreads.has(loaded.threadId)) {
-          nextDuplicates.set(descriptor.sourceRelativePath, {
-            fingerprint,
+          nextExcluded.set(descriptor.sourceRelativePath, {
+            reason: "duplicate",
             threadId: loaded.threadId,
           });
           duplicateThreads.add(loaded.threadId);
@@ -184,7 +188,7 @@ export class CodexSessionSource implements SessionSource {
     });
     const snapshot = { signature, sessions, diagnostics, bindings };
     this.#cache = nextCache;
-    this.#duplicates = nextDuplicates;
+    this.#excluded = nextExcluded;
     this.#lastRefreshTelemetry = telemetry;
     if (this.#snapshot?.signature === signature) return this.#snapshot;
     this.#snapshot = snapshot;
@@ -206,8 +210,19 @@ export class CodexSessionSource implements SessionSource {
     cached: CodexCacheEntry | undefined,
     telemetry: RefreshTelemetry,
     binds: Map<string, Omit<SourceBindingEvent, "localId">[]>,
-  ): Promise<CodexCacheEntry | null> {
+  ): Promise<CodexCacheEntry | "non-primary" | null> {
     try {
+      if (cached === undefined) {
+        const head = await probeIdentity(descriptor, telemetry);
+        const state = this.identity.append(this.identity.create(descriptor), head.records);
+        // A filename match cannot be superseded by later metadata. At EOF the
+        // first metadata is also definitive; otherwise use the complete decoder.
+        if (
+          (state.firstMatchingMetadata !== null || head.eof) &&
+          this.identity.metadata(state).excluded
+        )
+          return "non-primary";
+      }
       const decodeStartedAt = performance.now();
       const decoded = await this.decoder.decode(descriptor, cached?.checkpoint);
       telemetry.decodeMs += performance.now() - decodeStartedAt;
@@ -220,11 +235,14 @@ export class CodexSessionSource implements SessionSource {
         decoded.mode === "append" && cached !== undefined
           ? cached.identityState
           : this.identity.create(descriptor);
+      const identityState = this.identity.append(identityBase, decoded.records);
+      const metadata = this.identity.metadata(identityState);
+      if (metadata.excluded) return "non-primary";
       const normalizerBase =
         decoded.mode === "append" && cached !== undefined
           ? cached.normalizerState
           : this.normalizer.create(descriptor);
-      const identityState = this.identity.append(identityBase, decoded.records);
+
       const normalizerState = this.normalizer.append(
         normalizerBase,
         decoded.records,
@@ -241,7 +259,6 @@ export class CodexSessionSource implements SessionSource {
         }));
       });
       binds.set(descriptor.id, bindingEvents);
-      const metadata = this.identity.metadata(identityState);
       const origin = this.#origin(metadata.runtimeVersion);
       const baseNormalized =
         decoded.mode === "append" &&
@@ -281,7 +298,6 @@ export class CodexSessionSource implements SessionSource {
         fingerprint,
         normalized,
         threadId: metadata.threadId,
-        parentThreadId: metadata.parentThreadId,
         origin,
         checkpoint: decoded.checkpoint,
         identityState,
@@ -327,7 +343,6 @@ function sourceEntries(cache: ReadonlyMap<string, CodexCacheEntry>): SourceSessi
     sessions.push({
       localId: sourceLocalId(threadId, entry.fingerprint.sourceRelativePath),
       nativeSessionId: threadId,
-      parentNativeSessionId: entry.parentThreadId,
       origin: entry.origin,
       normalized: entry.normalized,
     });
@@ -356,4 +371,39 @@ function sameOrigin(left: DomainSessionOrigin, right: DomainSessionOrigin): bool
     left.runtimeName === right.runtimeName &&
     left.runtimeVersion === right.runtimeVersion
   );
+}
+
+const IDENTITY_HEAD_BYTES = 64 * 1024;
+
+async function probeIdentity(
+  descriptor: RolloutDescriptor,
+  telemetry: RefreshTelemetry,
+): Promise<{ records: DecodedRecord[]; eof: boolean }> {
+  const handle = await open(descriptor.path, "r");
+  try {
+    const info = await handle.stat();
+    const buffer = Buffer.alloc(Math.min(info.size, IDENTITY_HEAD_BYTES));
+    let length = 0;
+    while (length < buffer.length) {
+      const read = await handle.read(buffer, length, buffer.length - length, length);
+      telemetry.probeBytes += read.bytesRead;
+      if (read.bytesRead === 0) break;
+      length += read.bytesRead;
+    }
+    const text = buffer.subarray(0, length).toString("utf8");
+    const lines = text.split("\n");
+    lines.pop(); // Only newline-terminated JSONL records are eligible for probing.
+    const records: DecodedRecord[] = [];
+    for (const [index, line] of lines.entries()) {
+      try {
+        const value: unknown = JSON.parse(line);
+        if (isObject(value)) records.push({ ordinal: index + 1, value });
+      } catch {
+        /* The full decoder owns malformed-record diagnostics. */
+      }
+    }
+    return { records, eof: length === info.size && text.endsWith("\n") };
+  } finally {
+    await handle.close();
+  }
 }

@@ -13,7 +13,7 @@ vi.mock("../../src/server/interaction/tmux-preview-listener.js", () => ({
   createTmuxPreviewListener: () => createTestPreviewListener(),
 }));
 
-it("isolates native identities, names and relationships while merging projects and retaining empty agents", async () => {
+it("isolates native identities, names while merging projects and retaining empty agents", async () => {
   const root = await createTempDirectory("multi-agent-");
   const agents = ["personal", "work", "empty"].map((nickname) => ({
     nickname,
@@ -46,10 +46,6 @@ it("isolates native identities, names and relationships while merging projects a
       const detail = (await hub.sessions.getSession(parent.id))!.session;
       expect(detail.title).toBe(parent.title);
       expect(detail).not.toHaveProperty("nickname");
-      expect(detail.childIds).toHaveLength(1);
-      const child = (await hub.sessions.getSession(detail.childIds[0]!))!.session;
-      expect(child.parentId).toBe(parent.id);
-      expect(child.origin.agent).toBe(parent.agent);
     }
     const reordered = await createAhub({
       agents: [...agents]

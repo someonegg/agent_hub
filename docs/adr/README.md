@@ -41,3 +41,4 @@ The status column records the lifecycle; scope notes identify later refinements.
 | [0023: Separate runtime status from resume permission](0023-separate-runtime-status-from-resume-permission.md) | accepted | reader observations refined by [ADR-0024](0024-share-request-scoped-runtime-observations.md) |
 | [0024: Share runtime observations within each reader response](0024-share-request-scoped-runtime-observations.md) | accepted | reader response paths refined by [ADR-0025](0025-unify-session-reading-on-ordinal-messages.md) |
 | [0025: Unify session reading on ordinal messages](0025-unify-session-reading-on-ordinal-messages.md) | accepted | — |
+| [0026: Filter non-primary rollouts in adapters](0026-filter-non-primary-rollouts-in-adapters.md) | accepted | — |

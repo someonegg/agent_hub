@@ -33,8 +33,6 @@ export const messages: Record<keyof typeof english, string> = {
   capturingTerminalPane: "正在捕获终端窗格…",
   changedFiles: "变更文件",
   checkTheCurrentStateBeforeTryingAgain: "重试前请检查当前状态。",
-  childSessions: "子会话",
-  childSessionsLabel: "子会话 ·",
   chooseFiles: "选择文件",
   chooseImages: "选择图片",
   closeImagePreview: "关闭图片预览",
@@ -122,7 +120,7 @@ export const messages: Record<keyof typeof english, string> = {
     "尚未检测到智能体会话。请连接 tmux 查看启动进度。",
   noAnswerRecorded: "尚无回答记录。",
 
-  noMainSessionsYet: "暂无主会话",
+  noSessionsYet: "暂无会话",
   noPublishedWebPages: "暂无已发布网页。",
   noUploadsYet: "暂无上传记录。",
 
@@ -134,7 +132,6 @@ export const messages: Record<keyof typeof english, string> = {
 
   pagePosition: "页面位置",
   pages: "网页",
-  parentSession: "父会话",
   pendingAttachments: "待发送附件",
   BTab: "BTab",
   planContentUnavailable: "计划内容不可用。",
@@ -148,7 +145,7 @@ export const messages: Record<keyof typeof english, string> = {
   projectDirectoryLabel: "项目目录",
   projectHub: "项目中心",
   projects: "项目",
-  projectsAndMainSessions: "项目与主会话",
+  projectsAndSessions: "项目与会话",
   publishedPages: "已发布网页",
   publishedSnapshots: "已发布快照",
 
@@ -237,10 +234,9 @@ export const messages: Record<keyof typeof english, string> = {
   tmuxAccessLabel: "连接 tmux",
   backToList: "← 返回列表",
   backToSession: "← 返回会话",
-  parentSessionLabel: "← 父会话",
 
   filesChanged_other: "{{count, number}} 个文件变更",
-  projectSessions: "{{project}}，{{count, number}} 个主会话",
+  projectSessions: "{{project}}，{{count, number}} 个会话",
   newProjectSession: "在 {{project}} 中新建会话",
   previewFile: "预览 {{filename}}",
   removeFile: "移除 {{filename}}",

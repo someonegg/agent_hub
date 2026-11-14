@@ -12,12 +12,6 @@ export interface DomainDiagnostic {
   readonly ordinal: number | null;
 }
 
-export interface SubagentIdentity {
-  readonly taskName: string | null;
-  readonly nickname: string | null;
-  readonly role: string | null;
-}
-
 export interface DomainSessionOrigin {
   readonly sourceType: string;
   readonly agent: string;
@@ -100,10 +94,6 @@ export interface DomainSession {
   readonly createdAt: string | null;
   readonly updatedAt: string | null;
   readonly archived: boolean;
-  readonly isChild?: boolean;
-  readonly parentId: DomainSessionId | null;
-  readonly childIds: readonly DomainSessionId[];
-  readonly subagent: SubagentIdentity | null;
   readonly warningCount: number;
   readonly diagnostics: readonly DomainDiagnostic[];
 }

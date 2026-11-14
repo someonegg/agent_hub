@@ -248,9 +248,6 @@ function materializeClaudeSession(
       createdAt: state.createdAt,
       updatedAt: state.updatedAt,
       archived: false,
-      parentId: null,
-      childIds: [],
-      subagent: null,
       warningCount: state.diagnostics.length,
       diagnostics: state.diagnostics,
     },
@@ -260,7 +257,6 @@ function materializeClaudeSession(
   return {
     localId,
     nativeSessionId: nativeId,
-    parentNativeSessionId: null,
     origin,
     normalized,
   };

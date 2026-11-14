@@ -410,7 +410,6 @@ async function capture(
               ...session,
               agent: "default",
               projectDirectory: session.projectDirectory,
-              isChild: false,
             },
             ...[
               ["docs-demo-session-keyboard", "Add keyboard navigation", session.projectDirectory],
@@ -423,7 +422,6 @@ async function capture(
               title,
               projectDirectory,
               agent: "default",
-              isChild: false,
               status: "normal",
             })),
           ],
@@ -624,6 +622,10 @@ async function capture(
   }
 
   async function verifyUnavailableUploadPreviews() {
+    // Finish the current history thumbnail before measuring reload requests.
+    await demo
+      .getByRole("img", { name: historyAttachment.filename, exact: true })
+      .evaluate((image) => image.decode());
     const original = { ...historyAttachment };
     try {
       for (const { type, filename, missing, requests } of [
@@ -812,7 +814,7 @@ async function capture(
     await prepareDesktopPreview();
     const selectedProject = demo.getByRole("button", {
       name: new RegExp(
-        label("{{project}}, {{count, number}} main sessions", {
+        label("{{project}}, {{count, number}} sessions", {
           project: "atlas-dashboard",
           count: ".*",
         }),
@@ -886,7 +888,7 @@ async function capture(
     for (const project of ["atlas-dashboard", "harbor-api", "field-notes"]) {
       const toggle = demo.getByRole("button", {
         name: new RegExp(
-          label("{{project}}, {{count, number}} main sessions", { project, count: ".*" }),
+          label("{{project}}, {{count, number}} sessions", { project, count: ".*" }),
         ),
       });
       if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();

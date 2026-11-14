@@ -165,8 +165,6 @@ it("uses explicit URL over the environment and filters by associated project", a
           agent: "work",
           updatedAt: null,
         },
-        { id: "child", projectDirectory: "/project", isChild: true, parentId: "yes" },
-        { id: "orphan", projectDirectory: "/project", isChild: true, parentId: null },
         { id: "no", projectDirectory: "/other-project" },
       ],
     });
@@ -449,8 +447,6 @@ it.each([
       reply(res, {
         session: {
           id: "child",
-          parentId: "parent",
-          childIds: [],
           title: "Child",
           status: "live",
           origin: { sourceType: "codex", runtimeName: "Codex", agent: "work" },
@@ -721,7 +717,6 @@ it.each([false, true])("filters archived sessions with all=%s", async (include) 
         { id: "normal", status: "normal", projectDirectory: "/project" },
         { id: "live", status: "live", projectDirectory: "/project" },
         { id: "archived", status: "archived", projectDirectory: "/project" },
-        { id: "child", status: "archived", isChild: true, projectDirectory: "/project" },
         { id: "other", status: "archived", projectDirectory: "/other" },
       ].map((session) => ({ title: session.id, agent: "default", updatedAt: null, ...session })),
     });

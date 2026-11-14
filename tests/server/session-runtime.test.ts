@@ -39,9 +39,6 @@ function setup() {
     projectDirectory: "/project",
     createdAt: null,
     updatedAt: null,
-    parentId: null,
-    childIds: [],
-    subagent: null,
     warningCount: 0,
     diagnostics: [],
   };

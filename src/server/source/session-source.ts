@@ -16,7 +16,6 @@ export interface SessionSourceDescriptor {
 export interface SourceSessionEntry {
   readonly localId: string;
   readonly nativeSessionId: string | null;
-  readonly parentNativeSessionId: string | null;
   readonly origin: DomainSessionOrigin;
   /**
    * Published normalized values are immutable snapshots. An adapter must never

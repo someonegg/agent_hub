@@ -1,12 +1,6 @@
 export type SessionId = string;
 export type ItemId = string;
 
-export interface SubagentIdentity {
-  taskName: string | null;
-  nickname: string | null;
-  role: string | null;
-}
-
 export interface SessionOrigin {
   sourceType: string;
   agent: string;
@@ -27,8 +21,6 @@ export interface SessionSummary {
   projectDirectory: string | null;
   taskName?: string | null;
   status: SessionStatus;
-  parentId: SessionId | null;
-  isChild: boolean;
   updatedAt: string | null;
 }
 
@@ -43,9 +35,6 @@ export interface SessionDetail {
   createdAt: string | null;
   updatedAt: string | null;
   status: SessionStatus;
-  parentId: SessionId | null;
-  childIds: SessionId[];
-  subagent: SubagentIdentity | null;
   sourceId: string | null;
 }
 

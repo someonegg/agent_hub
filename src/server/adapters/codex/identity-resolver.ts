@@ -1,10 +1,8 @@
 import { basename } from "node:path";
 
-import type { SubagentIdentity } from "../../domain/session-domain.js";
 import type { DecodedRecord } from "../shared/jsonl-decoder.js";
 import { isObject } from "../shared/jsonl-decoder.js";
 import type { RolloutDescriptor } from "./rollout-descriptor.js";
-import { nonEmptySubagentIdentity, taskNameFromSubagentPath } from "./subagent-identity.js";
 import { nonEmptyString } from "./value-readers.js";
 
 export interface SessionMetadata {
@@ -15,9 +13,8 @@ export interface SessionMetadata {
   projectDirectory: string | null;
   createdAt: string | null;
   updatedAt: string | null;
-  parentThreadId: string | null;
   archived: boolean;
-  subagent?: SubagentIdentity | null;
+  excluded: boolean;
 }
 
 interface RawMetadata {
@@ -26,8 +23,7 @@ interface RawMetadata {
   title: string | null;
   cwd: string | null;
   timestamp: string | null;
-  parentThreadId: string | null;
-  subagent: SubagentIdentity | null;
+  excluded: boolean;
 }
 
 export interface IdentityAccumulatorState {
@@ -103,52 +99,33 @@ export class IdentityResolver {
       projectDirectory: raw?.cwd ?? null,
       createdAt: raw?.timestamp ?? state.firstRecordTimestamp,
       updatedAt: state.lastTimestamp,
-      parentThreadId: raw?.parentThreadId ?? null,
       archived: state.archived,
-      subagent: raw?.subagent ?? null,
+      excluded: raw?.excluded ?? false,
     };
   }
 }
 
 function rawMetadata(value: unknown): RawMetadata | null {
   if (!isObject(value)) return null;
-  const spawn = threadSpawn(value);
   return {
     id: nonEmptyString(value.id),
     runtimeVersion: nonEmptyString(value.cli_version ?? value.agent_version),
     title: nonEmptyString(value.title),
     cwd: nonEmptyString(value.cwd),
     timestamp: nonEmptyString(value.timestamp),
-    parentThreadId:
-      nonEmptyString(value.parent_thread_id) ??
-      nonEmptyString(value.parent_id) ??
-      nonEmptyString(spawn?.parent_thread_id),
-    subagent: rawSubagent(value, spawn),
+    excluded: isNonPrimaryMetadata(value),
   };
 }
 
-function threadSpawn(value: Record<string, unknown>): Record<string, unknown> | null {
+function isNonPrimaryMetadata(value: Record<string, unknown>): boolean {
   const source = isObject(value.source) ? value.source : null;
-  const subagent = source?.subagent;
-  return isObject(subagent) && isObject(subagent.thread_spawn) ? subagent.thread_spawn : null;
-}
-
-function rawSubagent(
-  value: Record<string, unknown>,
-  spawn: Record<string, unknown> | null,
-): SubagentIdentity | null {
-  const source = isObject(value.source) ? value.source : null;
-  const subagent = source?.subagent;
-  return nonEmptySubagentIdentity({
-    taskName: taskNameFromSubagentPath(
-      nonEmptyString(value.agent_path) ?? nonEmptyString(spawn?.agent_path),
-    ),
-    nickname: nonEmptyString(value.agent_nickname) ?? nonEmptyString(spawn?.agent_nickname),
-    role:
-      nonEmptyString(value.agent_role) ??
-      nonEmptyString(spawn?.agent_role) ??
-      (typeof subagent === "string" ? subagent : null),
-  });
+  const marker = source?.subagent;
+  return (
+    nonEmptyString(value.parent_thread_id) !== null ||
+    nonEmptyString(value.parent_id) !== null ||
+    isObject(marker) ||
+    nonEmptyString(marker) !== null
+  );
 }
 
 function timestampOf(record: Record<string, unknown> | undefined): string | null {

@@ -33,8 +33,6 @@ export const messages: Record<keyof typeof english, string> = {
   capturingTerminalPane: "正在擷取終端窗格…",
   changedFiles: "變更檔案",
   checkTheCurrentStateBeforeTryingAgain: "重試前請檢查目前狀態。",
-  childSessions: "子工作階段",
-  childSessionsLabel: "子工作階段 ·",
   chooseFiles: "選擇檔案",
   chooseImages: "選擇圖片",
   closeImagePreview: "關閉圖片預覽",
@@ -122,7 +120,7 @@ export const messages: Record<keyof typeof english, string> = {
     "尚未檢測到智慧體工作階段。請連線 tmux 檢視啟動進度。",
   noAnswerRecorded: "尚無回答記錄。",
 
-  noMainSessionsYet: "暫無主工作階段",
+  noSessionsYet: "暫無工作階段",
   noPublishedWebPages: "暫無已發布網頁。",
   noUploadsYet: "暫無上傳記錄。",
 
@@ -134,7 +132,6 @@ export const messages: Record<keyof typeof english, string> = {
 
   pagePosition: "頁面位置",
   pages: "網頁",
-  parentSession: "父工作階段",
   pendingAttachments: "待傳送附件",
   BTab: "BTab",
   planContentUnavailable: "計畫內容不可用。",
@@ -148,7 +145,7 @@ export const messages: Record<keyof typeof english, string> = {
   projectDirectoryLabel: "專案目錄",
   projectHub: "專案中心",
   projects: "專案",
-  projectsAndMainSessions: "專案與主工作階段",
+  projectsAndSessions: "專案與工作階段",
   publishedPages: "已發布網頁",
   publishedSnapshots: "已發布快照",
 
@@ -237,10 +234,9 @@ export const messages: Record<keyof typeof english, string> = {
   tmuxAccessLabel: "連線 tmux",
   backToList: "← 返回列表",
   backToSession: "← 返回工作階段",
-  parentSessionLabel: "← 父工作階段",
 
   filesChanged_other: "{{count, number}} 個檔案變更",
-  projectSessions: "{{project}}，{{count, number}} 個主工作階段",
+  projectSessions: "{{project}}，{{count, number}} 個工作階段",
   newProjectSession: "在 {{project}} 中新增工作階段",
   previewFile: "預覽 {{filename}}",
   removeFile: "移除 {{filename}}",

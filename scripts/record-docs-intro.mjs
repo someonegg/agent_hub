@@ -140,7 +140,6 @@ async function record(
                 ...session(),
                 agent: "default",
                 projectDirectory: "/projects/atlas-dashboard",
-                isChild: false,
               },
             ]
           : [],

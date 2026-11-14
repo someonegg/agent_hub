@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MAX_SESSION_TITLE_CHARS } from "../../src/server/domain/session-text.js";
 import { normalizeDecoded, resolveIdentity } from "./session-normalizer.fixtures.js";
-import {
-  decodedRollout,
-  normalizeFixture,
-  normalizeRecords,
-} from "./session-normalizer.fixtures.js";
+import { decodedRollout, normalizeRecords } from "./session-normalizer.fixtures.js";
 
 describe("session identity and recovery", () => {
   it("bounds JSONL titles to the first non-empty line", () => {
@@ -66,43 +62,15 @@ describe("session identity and recovery", () => {
     );
   });
 
-  it("chooses filename-matching metadata when duplicate metadata records exist", async () => {
-    const normalized = await normalizeFixture("rollout-2026-07-28T11-00-00-child-session.jsonl");
-    expect(normalized.session.workingDirectory).toBe("/synthetic/child");
-    expect(normalized.session.parentId).toBe("basic-session");
-    expect(normalized.session.subagent).toEqual({
-      taskName: "widget_review",
-      nickname: "Sagan",
-      role: "reviewer",
-    });
-  });
-
-  it("extracts a parent thread ID from current nested thread-spawn metadata", () => {
-    const decoded = decodedRollout("nested-child", [
+  it("chooses filename-matching metadata when duplicate metadata records exist", () => {
+    const decoded = decodedRollout("selected", [
+      { ordinal: 1, value: { type: "session_meta", payload: { id: "other", cwd: "/other" } } },
       {
-        ordinal: 1,
-        value: {
-          type: "session_meta",
-          payload: {
-            id: "nested-child",
-            parent_thread_id: "",
-            parent_id: 42,
-            source: {
-              subagent: {
-                thread_spawn: {
-                  parent_thread_id: "parent-session",
-                  agent_path: "/root/nested-child",
-                },
-              },
-            },
-          },
-        },
+        ordinal: 2,
+        value: { type: "session_meta", payload: { id: "selected", cwd: "/selected" } },
       },
     ]);
-
-    expect(resolveIdentity(decoded)).toMatchObject({
-      parentThreadId: "parent-session",
-      subagent: { taskName: "nested-child" },
-    });
+    const normalized = normalizeDecoded(decoded, resolveIdentity(decoded));
+    expect(normalized.session.workingDirectory).toBe("/selected");
   });
 });

@@ -46,7 +46,7 @@ function SessionHub() {
   );
   const visibleCatalog = { ...catalog, list: visibleList };
   const hub = useHubNavigation(catalog.list);
-  const { sessionId, navigation, navigate, selectedProject } = hub;
+  const { sessionId, navigate, selectedProject } = hub;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => browserStorage.getItem("ahub.sidebar-collapsed") === "true",
   );
@@ -113,9 +113,7 @@ function SessionHub() {
               <SessionPage
                 key={sessionId}
                 sessionId={sessionId}
-                sessions={catalog.list?.sessions ?? []}
                 agents={agents}
-                includeArchived={navigation.includeArchived}
                 onNavigate={navigate}
                 onCatalogChanged={catalog.refresh}
                 onUpdatedAt={catalog.reportUpdatedAt}

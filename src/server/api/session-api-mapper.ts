@@ -20,8 +20,7 @@ export class SessionApiMapper {
     const summaries = sessions
       .map((session) => {
         const projectDirectory = session.projectDirectory;
-        const isChild = session.isChild ?? session.parentId !== null;
-        if (!isChild && projectDirectory !== null) projectDirectories.add(projectDirectory);
+        if (projectDirectory !== null) projectDirectories.add(projectDirectory);
         return {
           id: session.id,
           agent: session.origin.agent,
@@ -31,8 +30,6 @@ export class SessionApiMapper {
           status:
             effectiveStates?.get(session.id) ??
             (session.archived ? ("archived" as const) : ("normal" as const)),
-          parentId: session.parentId,
-          isChild,
           updatedAt: session.updatedAt,
         };
       })
@@ -62,9 +59,6 @@ export class SessionApiMapper {
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,
       status: session.archived ? ("archived" as const) : ("normal" as const),
-      parentId: session.parentId,
-      childIds: [...session.childIds],
-      subagent: session.subagent === null ? null : { ...session.subagent },
       sourceId: session.sourceId,
     };
   }

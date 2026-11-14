@@ -30,9 +30,6 @@ const session: DomainSession = {
   workingDirectory: null,
   createdAt: null,
   updatedAt: null,
-  parentId: null,
-  childIds: [],
-  subagent: null,
   warningCount: 0,
   diagnostics: [],
 };

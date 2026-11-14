@@ -1,7 +1,7 @@
 import type { SessionMessagesResponse, UpdateRevision } from "../../src/shared/api-contract";
 import type { SessionDetail } from "../../src/shared/domain";
 export const SESSION_ID = "abcdefghijklmnopqrstuvwx";
-export const CHILD_ID = "zyxwvutsrqponmlkjihgfedc";
+export const OTHER_SESSION_ID = "zyxwvutsrqponmlkjihgfedc";
 export const UPDATE_REVISION = "a".repeat(43) as UpdateRevision;
 export const baseSession: SessionDetail = {
   sourceId: "original-session-id",
@@ -19,9 +19,6 @@ export const baseSession: SessionDetail = {
   updatedAt: "2026-07-28T11:00:00Z",
   status: "normal" as const,
   resume: { allowed: false, reason: "No pane binding has been recorded" },
-  parentId: null,
-  childIds: [],
-  subagent: null,
 };
 
 export const listBody = {
@@ -34,8 +31,6 @@ export const listBody = {
       title: baseSession.title,
       projectDirectory: "/project/reader",
       status: "normal" as const,
-      parentId: null,
-      isChild: false,
       updatedAt: baseSession.updatedAt,
     },
   ],

@@ -26,7 +26,7 @@ latest messages. Preserve original ordinal gaps and incremental file checkpoints
 Publish only `message` and `user_input`, including progress, responses, Plans,
 questions, and answers. Remove directive/tool/token/internal models, preferences,
 details, signed cursors, prefix indexes, and the separate updates endpoint without
-compatibility support. Adapter parsing for bindings, identity, relationships, and
+compatibility support. Adapter parsing for bindings, identity, and
 runtime status stays internal. Terminal preview snapshots/deltas are unchanged.
 
 Backlog returns immediately; at the tail, messages or public state changes wake a

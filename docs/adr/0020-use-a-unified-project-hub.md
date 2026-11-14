@@ -21,7 +21,7 @@ project/main-session sidebar beside the conversation.
 
 - Preserve direct URLs, refresh, and browser back/forward without a routing dependency.
 - Restore project expansion, archive filtering, and scroll position.
-- Show unarchived main sessions by default; reach children from the conversation.
+- Show unarchived sessions by default.
 
 ## Considered Options
 
@@ -37,8 +37,8 @@ column transition below 768px.
 
 The tab navigation state contains only `includeArchived`, `collapsed`, and `scroll`;
 remove the old navigation filter format without migration. Archived sessions support direct access
-and stay open after archive. The sidebar shows main sessions matching the archive
-filter, also used by direct child links. Unknown projects without a directory
+and stay open after archive. The sidebar shows sessions matching the archive
+filter. Unknown projects without a directory
 have no creation entry point.
 
 ### Positive Consequences
