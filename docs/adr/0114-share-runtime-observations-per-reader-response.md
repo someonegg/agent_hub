@@ -41,6 +41,6 @@ a completed reader observation.
 Reconstructed on the date above from legacy [0024](legacy-index.md#adr-0024),
 as refined by [0025](legacy-index.md#adr-0025). Old item/update paths are replaced
 by messages; their names are not retained as current contracts.
-See [reader assembly](../technical-reference.md#reader-and-automatic-updates),
+See [reader assembly](../technical-reference.md#conversation-reads),
 [binding ownership](0109-retain-binding-ownership-until-explicit-transfer.md), and
 [runtime policy](0113-separate-runtime-status-from-resume-permission.md).

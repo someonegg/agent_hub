@@ -1,52 +1,54 @@
 # Technical reference
 
-See [Usage](usage.md), [JSONL processing](session-jsonl-filtering.md),
-[ADRs](adr/README.md), and [response types](../src/shared/api-contract.ts).
-Treat IDs and revisions as opaque strings. Message positions are nonnegative
-ordinal numbers; pass each returned `nextAfter` as the next request’s `after`.
+Contracts, limits, and runtime guarantees. For workflows, see [Usage](usage.md);
+for contributor setup, see [Development](development.md). Detailed parsing rules
+live in [JSONL processing](session-jsonl-filtering.md), decision rationale in
+[ADRs](adr/README.md), and exact response types in
+[api-contract.ts](../src/shared/api-contract.ts).
 
-- [Sources and identity](#sources-and-identity), including [runtime CLI compatibility](#runtime-cli-compatibility)
-- [Conversation model](#conversation-model)
-- [Catalog](#catalog)
-- [Reader and automatic updates](#reader-and-automatic-updates)
-- [Session CLI and observation](#session-cli-and-observation)
-- [File uploads](#file-uploads)
+IDs and revisions are opaque strings. Message positions are nonnegative ordinals;
+use each returned `nextAfter` as the next request's `after`.
+
+- [Sources and identity](#sources-and-identity)
+- [Conversation model](#conversation-model), [catalog](#catalog), and [reads](#conversation-reads)
+- [Runtime binding and ownership](#runtime-binding-and-ownership)
 - [Tmux interaction](#tmux-interaction) and [Terminal Preview](#terminal-preview)
-- [Asynchronous management](#asynchronous-management)
-- [Optional hosting](#optional-hosting): [pages](#web-pages) and [diffs](#temporary-diffs)
-- [Browser state](#browser-state) and [localization](#interface-localization)
+- [Asynchronous management](#asynchronous-management), including [runtime CLI compatibility](#runtime-cli-compatibility)
+- [Session CLI](#session-cli)
+- [File uploads](#file-uploads)
+- [Optional hosting](#optional-hosting)
+- [Browser state](#browser-state)
 
 ## Sources and identity
 
 ### Discovery and caching
 
-Codex scans `rollout-*.jsonl` under `sessions/` and `archived_sessions/`;
-`session_index.jsonl` supplies advisory titles. Claude scans
-`projects/<project>/<UUID>.jsonl`. Codex follows trusted-directory symlinks through
-depth 8 (root = 0), without cycle detection or real-path deduplication.
-Logical paths determine discovery order and cache keys.
+| Runtime | Sources                                                                                                  |
+| ------- | -------------------------------------------------------------------------------------------------------- |
+| Codex   | `rollout-*.jsonl` under `sessions/` and `archived_sessions/`; advisory titles from `session_index.jsonl` |
+| Claude  | `projects/<project>/<UUID>.jsonl`; main sessions only, excluding native shell commands/output            |
 
-For ordinary sessions, both adapters cache by source-relative path, size, and
-`mtimeMs`. Changes that
-preserve these fields, including permission-only changes, do not trigger reads.
-Growing files reuse decoded prefixes when SHA-256 probes match the first 4 KiB
-and up to 4 KiB before the previous EOF. A single open handle reads to observed
-EOF, resuming after the last committed newline. Restart, truncation, detected
-same-size changes, or probe mismatch require full decoding.
+Codex follows trusted-directory symlinks through depth 8 (root = 0), without
+cycle detection or real-path deduplication. Logical paths determine order/cache keys.
+Reading does not modify native history. Parsing rules live in
+[JSONL processing](session-jsonl-filtering.md).
 
-Checkpoints are process-local. A middle rewrite preserving both probes followed
-by an append can escape detection; see [ADR-102](adr/0102-use-immutable-incremental-session-snapshots.md).
-Loaded archives remain cached until restart or restoration, even after in-place
-edits. Discovery, removal, advisory metadata refresh, and failed-load retries continue.
+Ordinary sessions cache by relative path, size, and `mtimeMs`; unchanged keys
+(including permission-only changes) skip reads. Growth reuses decoded prefixes
+when SHA-256 probes match the first 4 KiB and up to 4 KiB before the previous EOF.
+One handle reads to observed EOF from the last committed newline. Restart,
+truncation, detected same-size changes, or probe mismatch force full decoding.
+Checkpoints are process-local; middle rewrites preserving probes can escape detection
+([ADR-102](adr/0102-use-immutable-incremental-session-snapshots.md)). Loaded archives
+remain cached until restart/restoration; discovery, removal, metadata refresh,
+and failed-load retries continue.
 
-Codex filters auxiliary rollouts inside the adapter before normalization and
-binding extraction. The shared decoder checks up to 64 KiB of complete records,
-then continues as needed on the same handle with the same parser state to the
-initially observed EOF. Confirmed exclusions and duplicate files
-stay excluded by source-relative path until discovery observes their absence or
-the source is rebuilt. File changes and loss of an accepted original do not clear
-exclusions. Ordinary sessions retain incremental checkpoints. See
-[ADR-115](adr/0115-retain-codex-path-exclusions.md).
+Codex excludes auxiliary rollouts before normalization/binding extraction. The
+shared decoder checks up to 64 KiB of complete records, continuing on the same
+handle/parser to observed EOF as needed. Auxiliary/duplicate exclusions persist
+by relative path until observed removal or source rebuild; edits or loss of the
+accepted original do not clear them
+([ADR-115](adr/0115-retain-codex-path-exclusions.md)).
 
 ### Session identity
 
@@ -63,122 +65,57 @@ its caches.
 
 ### Adapter publication and diagnostics
 
-Adapters publish deeply immutable snapshots with unique local IDs within each
-source. Aggregation asserts local ID uniqueness only when `NODE_ENV` is
-`development` or `test`; production trusts the adapter contract.
-Reused references indicate unchanged content; an unchanged source signature
-returns the same snapshot object.
-Binding events come from the current decoded batch; project/task metadata
-accumulates. Public origins expose `runtimeVersion`, omitting `formatVersion`.
+Adapters publish deeply immutable snapshots with source-local unique IDs;
+aggregation asserts uniqueness only in `development`/`test`. Unchanged source
+signatures return the same snapshot; reused references mean unchanged content.
+Binding events describe the decoded batch; project/task metadata accumulates.
 Registration requires independently unique, nonempty `instanceKey` and `agent`.
-See [adapter domain types](../src/server/domain/session-domain.ts).
+See [adapter types](../src/server/domain/session-domain.ts).
 
-Diagnostics affect logs only, never responses, policy, or revisions. Default
-logging deduplicates and limits reports; logging failures do not interrupt work.
-Cache hits skip diagnostics traversal. Refresh telemetry is internal, with no HTTP API.
+Diagnostics are log-only: deduplicated, bounded, skipped on cache hits, and unable
+to interrupt work. Refresh telemetry has no HTTP API. `ENOENT`, `EACCES`, `EPERM`,
+`ESTALE`, `EISDIR`, `ENOTDIR`, and `ELOOP` skip/diagnose unreadable portions;
+missing scan roots are normal, other errors propagate. Successful snapshots do
+not guarantee complete filesystem coverage.
 
-`ENOENT`, `EACCES`, `EPERM`, `ESTALE`, `EISDIR`, `ENOTDIR`, and `ELOOP` skip and
-diagnose unreadable portions. Missing scan roots are normal; unexpected errors
-propagate. A successful snapshot does not guarantee complete filesystem coverage.
-
-Session API path IDs use the opaque Hub ID syntax (`[A-Za-z0-9_-]{20,100}`),
-not native session IDs. Message reads also validate ordinal bounds. See
-[path validation](../src/server/http/session-path.ts).
+HTTP session IDs use `[A-Za-z0-9_-]{20,100}`, distinct from native IDs;
+[path validation](../src/server/http/session-path.ts) also checks ordinal bounds.
 
 ### Agent identity and routing
 
-An Agent owns configuration, Skills, memory, and model settings. Codex and Claude
-Code are Runtimes. Agent catalog entries
-expose `nickname`, `runtimeName`, and management capabilities. Session origins expose
-`agent`, `runtimeName`, and nullable `runtimeVersion`.
+An Agent owns configuration, Skills, memory, and model settings; Codex and Claude
+Code are Runtimes. Catalog agents expose `nickname`, `runtimeName`, and management
+capabilities; session origins expose `agent`, `runtimeName`, nullable
+`runtimeVersion`, and no `formatVersion`.
 
-Agent nicknames route publicly; configured absolute paths namespace internally. Renaming/reordering agents preserves session IDs; moving an agent changes them.
+Public nicknames route requests; configured absolute paths namespace identities.
+Renaming/reordering preserves session IDs; moving agent directories changes them.
 Projects merge by directory across agents; agent paths remain private.
 
-Without explicit agent options, both `codex=~/.codex` and `claude=~/.claude`
-remain configured. Codex comes first unless `~/.codex` is absent, when Claude
-comes first. Explicit agents replace both defaults and retain argument order;
-`default` has no special meaning as a nickname.
-
-Creation defaults `agent` to the first configured nickname. Unknown nicknames return `400`; reusing a request ID across agents returns
-`409`. Operations use the selected/owning adapter's local CLI and agent environment
-(`CODEX_HOME` for Codex, `CLAUDE_CONFIG_DIR` for Claude). See [Multiple agents](usage.md#multiple-agents).
-
-### Runtime CLI compatibility
-
-Before launching sessions, configure and authenticate each agent's runtime CLI
-on `PATH`. The adapters use these commands and flags:
-
-| Runtime     | Create and resume                                                                      | Launch options                                                                       | History management                                                                            |
-| ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                               | `codex archive <UUID>` and `codex delete <UUID> --force`                                      |
-| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions` | The adapter deletes local session files directly; no native archive/delete command is invoked |
-
-See the [Codex adapter](../src/server/adapters/codex/session-manager.ts),
-[Claude Code adapter](../src/server/adapters/claude/session-manager.ts), and
-[execution and confirmation](#execution-and-confirmation) for behavior.
-
-### Claude Code adapter
-
-Claude supports main-session reading, tmux interaction, create/resume, exit, and
-delete, with worktree/permission mode launch options. Archive is
-unavailable; native shell commands/output are excluded from conversations. Reading
-does not modify native history or depend on Codex internals. Filtering and limits
-are defined in [JSONL processing](session-jsonl-filtering.md#claude-code).
-
-Launch uses the agent's `CLAUDE_CONFIG_DIR` and the
-[CLI contract above](#runtime-cli-compatibility).
-The adapter waits up to 15 seconds for a confirmed native prompt before sending
-the binding command once. A single matching empty prompt with the cursor in its
-allowed rectangle is sufficient; unsuccessful checks wait one second before
-capturing again.
-
-Optional global `--claude-ready-script <path>` replaces the built-in predicate
-for all Claude agents. The executable runs directly (no shell) once per captured
-snapshot. stdin is JSON `{ "current": { "content": "...", "cursorX": 2,
-"cursorY": 1 }, "context": "" }`; coordinates are zero-based. Missing snapshots
-skip script execution, preserve context, and retry after one second. stdout must
-contain JSON `{ "ready": false, "context": "opaque text" }`.
-Context starts empty for each create/resume attempt and is passed back unchanged
-on the next check. Use stderr for diagnostics.
-The script must have executable permission and a valid shebang. Relative paths
-resolve against the Hub startup directory. Nonzero exit, invalid output, or
-exceeding the remaining 15-second launch deadline sends no input and reports an
-unknown result with the target/attach command, as does unconfirmed readiness.
-Output is limited to 1 MiB. Binding uses shell
-expansion without tmux queries to accommodate worktree isolation checks.
-
-A CLI prompt starting with `!` is ordinary model input; this behavior was verified
-against Claude Code 2.1.318 and needs rechecking after upgrades. Claude records the
-binding. Create/resume interrupts once after binding confirmation; handoff does not.
-A running process alone cannot confirm launch: management verifies the operation
-marker, ownership, project, and original identity on resume. Capture, delivery, or
-interrupt failures retain the target/attach command with an unknown result.
-
-Interrupt sends Ctrl-U, waits 100 ms, then Escape. Exit uses the [shared exit sequence](#execution-and-confirmation).
-See [adapter implementation](../src/server/adapters/claude/session-manager.ts).
+Defaults configure both `codex=~/.codex` and `claude=~/.claude`, Codex first unless
+`~/.codex` is absent. Explicit agents replace defaults in argument order; nickname
+`default` has no special meaning. Creation uses the first nickname when omitted;
+unknown nicknames return `400`, request-ID reuse across agents `409`.
+Operations use the owning CLI/environment: `CODEX_HOME` or `CLAUDE_CONFIG_DIR`.
+See [Multiple agents](usage.md#multiple-agents).
 
 ## Conversation model
 
-An adapter publishes an immutable `NormalizedSession`: session metadata, an ordered
-`timeline`, and optional interaction configuration. Session metadata includes source
-identity, directories, task association, archive state,
-and log diagnostics. The API maps metadata into `SessionSummary` and `SessionDetail`,
-combining archive facts with observed runtime status and resume availability.
+Adapters publish immutable `NormalizedSession` metadata, ordered `timeline`, and
+optional interaction configuration. HTTP `SessionSummary`/`SessionDetail` combine
+source facts with observed runtime status and resume availability.
 
-Adapter publications and HTTP reads share `TimelineItem`. Every item has `id`,
-`ordinal`, and `timestamp`, plus fields determined by `kind`:
+`TimelineItem` is shared by adapters and HTTP reads. Every item has `id`, `ordinal`,
+and `timestamp`:
 
 - `message`: `role` (`user | assistant`), `phase` (`update | response | null`),
-  `itemType` (`plan | null`), and `markdown`.
-- `user_input`: `callId` and `stage`.
-  Requests contain questions with IDs, headers, text, and options. Responses contain
-  an `outcome`: `answered` with question-scoped answers, `aborted`, or `unavailable`
-  with a summary.
+  `itemType` (`plan | null`), and `markdown`. Plans are assistant responses.
+- `user_input`: `callId`, `stage`, and either request questions (IDs, headers,
+  text, options) or response `outcome`: `answered` (question-scoped answers),
+  `aborted`, or `unavailable` (summary). The browser pairs cards by `callId`.
 
-Plans are assistant response messages with `itemType: plan`. The browser combines
-loaded input requests and responses by `callId` into cards. See
-[domain types](../src/shared/domain.ts) and [JSONL processing](session-jsonl-filtering.md).
+See [domain types](../src/shared/domain.ts) and
+[JSONL processing](session-jsonl-filtering.md).
 
 ## Catalog
 
@@ -191,8 +128,8 @@ loaded input requests and responses by `callId` into cards. See
 | `projects` | `directory`                                                                            |
 | `sessions` | `id`, `agent`, `title`, `projectDirectory`, optional `taskName`, `status`, `updatedAt` |
 
-Reads/updates resolve titles from valid owning-agent `thread_name`, then original title. Missing directories yield
-`projectDirectory: null`.
+Catalog reads resolve titles from the owning agent’s valid `thread_name`, falling
+back to the original title. Missing directories yield `projectDirectory: null`.
 
 Only `after` (43-character base64url revision) is accepted; invalid/extra queries return `400`.
 
@@ -203,18 +140,15 @@ Only `after` (43-character base64url revision) is accepted; invalid/extra querie
 | Unchanged after 25 seconds                  | Bodyless `204`           |
 | Over 100 waiters                            | `429`, `Retry-After: 2`  |
 
-Waiters share a 1.5-second probe, stopped when idle; disconnect/shutdown releases
-them. Revisions cover agents, titles, projects, task associations, effective runtime status. Timestamps, conversation content, and diagnostics are excluded.
-
-Browser sorting uses best-effort `updatedAt`, retaining newer snapshot/reader
-timestamps in memory. Projects follow their latest visible session; IDs
-break ties, invalid times sort last, and hidden pages pause requests.
+Waiters share a 1.5-second probe that stops when idle; disconnect or shutdown
+releases waiters. Revisions cover agents, titles, projects, task associations, and
+effective runtime status. Timestamps, conversation content, and diagnostics are excluded.
 
 Status is `normal | live | archived`: archive wins; Live requires an observed
 living, owned tmux session. Normal does not authorize Resume. Runtime checks coalesce
 concurrent observations and bound socket concurrency; errors revoke Live and resume.
 
-## Reader and automatic updates
+## Conversation reads
 
 `GET /api/v1/sessions/:id/messages` is the single conversation read endpoint.
 Queries: `after` (nonnegative ordinal), `limit` (1–300, default 10), `wait`
@@ -236,152 +170,56 @@ bodyless `204`. Probes run every 1.5 seconds with capacity 100/process and
 10/session; overflow returns `429` and `Retry-After: 2`. Disconnect, timeout, and
 shutdown release capacity. Concurrent same-session probes share immutable source
 and runtime observations; pagination remains request-specific. Each response
-uses the same runtime observation for status and interaction; effects revalidate.
+uses the same runtime observation for status and interaction.
 
-Public response assembly belongs to `SessionReadService`. Interaction operations
-read internal facts through `InteractionSessionReader` over the same catalog,
-without calling the public response assembler. The interaction describer is
-injected at construction.
+`SessionReadService` assembles public responses using an injected interaction
+describer. Interaction effects read internal facts through `InteractionSessionReader`
+over the same catalog and revalidate observations before acting.
 
-`stateRevision` covers `session` except `updatedAt`, and the complete
-`interaction` value. `session.updatedAt` remains in responses but does not wake
-waiting requests. The revision does not validate message history. An ordinal
-beyond the current range returns `400 after_out_of_range`; clients retry once from `after=0`.
-Other history rewrites may go undetected; reload the browser page to reread history.
-Terminal Preview uses its own snapshot/delta protocol.
+`stateRevision` covers `session` except `updatedAt`, plus all of `interaction`;
+it does not validate history. Out-of-range ordinals return `400 after_out_of_range`
+(browser retries once from `after=0`); other rewrites may require page reload.
+Terminal Preview has an independent revision protocol.
 
-The browser reads from `after=0` in pages of up to 300 items as the user scrolls.
-Historical pages and tail waiting share one request slot. Tail waiting starts
-at the end for unarchived sessions. Requests are canceled on session changes,
-hiding, or unmount; appends preserve reading position. Resume availability is
-`session.resume: { allowed, reason }`.
+Resume availability is `session.resume: { allowed, reason }`.
 
-## Session CLI and observation
+## Runtime binding and ownership
 
-### CLI output contract
+### Binding format and ownership
 
-Business commands default to human-readable stdout; diagnostics use stderr.
-`--json` emits one compact result or `{ "error": { "code", "message" } }` plus
-newline; help stays text. Argument/validation/dispatch errors use `invalid_arguments`;
-other resource failures use `command_failed`. Session connection errors use
-`query_failed`; local validation fails before requests.
+Both adapters bind using `printf` and shell environment expansion without tmux
+queries, allowing binding under Claude's worktree isolation checks.
 
-### Client behavior and results
+Codex and Claude emit and recognize six-line `AHUB_TMUX_BIND_V3` records:
+marker, absolute socket path, `ahub-<UUID>` session name, optional operation UUID,
+optional project directory, and JSON task name or `null` (empty fields retain lines).
+Codex accepts user-message `<user_shell_command>` output; Claude accepts native
+main-user `<bash-stdout>` output. Unknown markers produce no binding events.
+Invalid required V3 fields produce an invalid binding event.
+An invalid latest binding attempt never falls back.
 
-`ahub-cli session` is a stateless HTTP client: no rollout reads, direct tmux
-control, server discovery/startup, or persisted recovery state. `agent-hub` starts
-the server; `ahub-cli page`/`diff` access local hosting storage via `--home-dir`.
+A process-wide manager tracks each session’s latest binding attempt and valid claims
+to socket/session pairs across agents. Attempts, including appends, are ordered by
+timestamp (invalid = zero), global session ID, ordinal, then position. New claims
+retain claims on other sessions. Takeover makes former owners `superseded`, revoking effects and
+attach. `supersededBySessionId` names a readable replacement (including archived),
+otherwise null. Claims survive archive, deletion, rereads, and Hub close for the
+process lifetime; later explicit binds can reclaim them. See [binding manager](../src/server/interaction/pane-binding-manager.ts).
 
-URL precedence: `--url`, `AGENT_HUB_URL`, `http://127.0.0.1:4173`. HTTP and HTTPS
-origins are accepted. HTTPS uses Node.js certificate verification. For a private CA, set
-`NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem` before starting the CLI.
+### Project directory
 
-Except in [continuous inspection](#cli-continuous-inspection), one `--timeout`
-deadline covers stdin, requests, operation polling, and readiness. The default is
-15 seconds; create, resume, exit, archive, and delete use 45 seconds.
+Latest valid bind overrides Working Directory: absolute project path without
+NUL/CR/LF; no filesystem/Git checks. Invalid/empty fields preserve earlier project
+paths and do not invalidate pane bindings.
 
-Lifecycle commands await [management](#asynchronous-management); create/resume
-also inspect until live, connected, and idle. Input success does not prove task
-completion or answer correctness.
+### Task association
 
-| Exit code | Meaning                                                       |
-| --------- | ------------------------------------------------------------- |
-| `0`       | Success                                                       |
-| `1`       | Definite failure, including queries                           |
-| `2`       | Submitted write may have taken effect but remains unconfirmed |
+Create accepts optional `taskName`; resume retains it and rejects overrides.
+Names are trimmed, case-sensitive, and shared across agents/projects;
+`<`, `>`, NUL, CR and LF are rejected. Unassigned responses omit the field.
 
-Interruptions, disconnects, deadlines, polling failures, and unknown results never
-resubmit/cancel mutations. Query list/inspect/terminal to recover.
-Lifecycle commands run without a CLI confirmation prompt; [execution rules](#execution-and-confirmation) apply.
-
-### Public session CLI results
-
-CLI output uses explicit whitelists independent of HTTP response types. It omits
-operation/request IDs and attach commands. Exact fields and text formatting live
-in [session-output.ts](../src/server/cli/session-output.ts).
-
-| Command       | Result                                                                              |
-| ------------- | ----------------------------------------------------------------------------------- |
-| `list`        | `{ sessions }`: identity, title, status, agent, project, update time, optional task |
-| `inspect`     | `{ session, interaction, items, nextAfter, hasMore }`                               |
-| `terminal`    | `{ content, truncated, capturedAt }`                                                |
-| Input/handoff | `{ sessionId, status: "sent" }`                                                     |
-| Lifecycle     | `{ sessionId, status: "succeeded" }`; create/resume also include `tmux`             |
-
-`--project` filters project association, not launch/worktree location. Explicit IDs
-go directly to endpoints without catalog lookup. Nullable metadata remains
-null; absent task names remain omitted. Inspect includes the owning agent's nickname
-and current interaction, with `tmux: { socketPath, sessionName } | null`.
-
-Items retain message Markdown and user-input content. Plans and input requests
-include `inputHint`; answered responses flatten selections into `answers: string[]`
-in question/answer order. Text output preserves full content, flattening whitespace
-only in summaries/tables. See [ahub-control](../skills/ahub-control/SKILL.md#choose-actions-by-session-state)
-for the input workflow.
-
-### CLI continuous inspection
-
-`inspect --follow` reads immediately, drains pagination sequentially, then long-polls.
-`--count` requires `--follow` and counts rounds, including empty/`204` rounds; the
-final round drains all pages. Without a count, observation continues until canceled,
-including while idle or disconnected. Stopping observation does not stop the session.
-Follow has no overall deadline; `--timeout` applies per request (default 30 seconds).
-
-The first result always prints. Later output requires new visible items or changed
-session/interaction state other than `updatedAt`; position-only advances stay silent.
-JSON is NDJSON with the single-inspection shape and that page's incremental items.
-Ordinals do not guarantee history consistency. Nonadvancing pagination, API/network
-errors, and request timeouts end observation with exit code 1, without retry;
-Ctrl+C cancels reads/timers and exits normally. The caller judges task completion.
-
-Inspection exposes the current owned tmux target. Attach with
-`tmux -S <socketPath> attach-session -t =<sessionName>:`, shell-quoting each argument.
-Launch errors retain known `sessionId` and `tmux` inside `error` (unknown values are
-null), including when readiness times out.
-
-## File uploads
-
-| Endpoint                                                          | Contract                                         |
-| ----------------------------------------------------------------- | ------------------------------------------------ |
-| `POST /api/v1/uploads?sessionId=<Hub ID>&filename=<encoded name>` | Raw binary, ≤20 MiB; existing session required   |
-| `GET /api/v1/sessions/:id/uploads`                                | `{ items }`, newest first, unpaginated           |
-| `GET /api/v1/sessions/:id/uploads/:attachmentId/content`          | Raster preview; `?download=1` downloads          |
-| `GET /api/v1/sessions/:id/uploads/:attachmentId/thumbnail`        | Cached WebP thumbnail; unavailable returns `404` |
-| `DELETE /api/v1/sessions/:id/uploads/:attachmentId`               | Delete content/registration; idempotent          |
-
-Upload returns `201`: `path`, `id`, `sessionId`, `filename`, `size`, `type`,
-`uploadedAt`. Unique paths prevent overwrites.
-Oversize returns `413`, storage failures `500`; mutations reject cross-origin
-access. Content/deletion are session-scoped. Non-preview types (including HTML/SVG)
-download; original content uses `nosniff`, sandbox CSP, and `no-store`.
-
-PNG, JPEG, GIF, WebP, and AVIF uploads schedule background thumbnail generation
-without delaying or failing the upload. Sharp produces a static, auto-oriented
-WebP within 360 × 280 pixels (no enlargement, 40-million-pixel input limit).
-Generation is serialized; concurrent requests for the same thumbnail share work.
-Existing uploads are generated on first request; decoding failures return `404`.
-
-History loads thumbnails lazily and originals only on expansion. BMP skips
-thumbnails; unsupported or failed thumbnails never automatically load originals.
-Thumbnails use `private, max-age=86400` and atomic files beside originals.
-Deletion removes both; startup clears interrupted writes and orphan thumbnails.
-
-Storage: `<home-dir>/uploads/<Hub session ID>/`, with atomic metadata rename and
-absolute content paths. HTTP/storage validate session IDs and UUID-v4 attachment
-IDs, matching metadata identity and direct content filenames/extensions. Reads,
-deletion, and recovery reject corrupt metadata/symlink escapes using real locations.
-Invalid IDs return `400`; missing attachments preserve not-found/idempotent-delete semantics.
-
-Deletion tombstones metadata before removing content. Failed cleanup retries on
-delete/startup; startup also cleans interrupted uploads without blocking service
-or other uploads. Confirmed session deletion triggers background cleanup;
-archive/exit and unconfirmed deletion retain files.
-
-Attachment sends prepend absolute server paths as a Markdown unordered list
-(`- ` per attachment), separated from optional text by a blank line. Message limits
-include these paths. Failed sends retain drafts; successful sends clear unchanged
-drafts. Removing a draft attachment retains its stored file.
-See [usage](usage.md#file-uploads).
+Latest valid bind overrides the task. Empty, invalid, null, or missing fields
+preserve it without invalidating bindings; there is no clear operation.
 
 ## Tmux interaction
 
@@ -411,60 +249,15 @@ ownership before effects; uncertain writes are never retried. Socket/session reu
 has no process-identity check. See [runtime](../src/server/interaction/session-runtime.ts)
 and [tmux service](../src/server/interaction/tmux-service.ts).
 
-CLI `send` rejects messages whose first character is `/`, unless `--force` is
-used. It checks only the start of the entire message, without trimming whitespace,
-for both `--message` and `--stdin`; subsequent lines are not checked. This guard is
-CLI-only and does not change API validation.
-
 HTTP message sends observe terminal text before pasting and wait up to two seconds
 for a change before sending Enter. If no change is observed, the request fails with
 `message_not_submitted` without sending Enter or retrying; this confirms terminal
-echo, not agent acceptance. The browser retains the draft and expands the terminal
-preview on this error. Direct service callers opt into this confirmation explicitly.
+echo, not agent acceptance. Direct service callers opt into this confirmation explicitly.
 
-CLI messages/ordinary keys default to `requireIdle: true`: non-idle input fails at
-transaction entry without waiting/retry. `--force` sends `requireIdle: false`, allowing
-input while working; browser calls omit the idle restriction. Connection, ownership, and management occupancy checks apply throughout. Ordinary keys use
-the non-interrupt whitelist. Interrupt and handoff also skip the idle requirement while
-retaining other checks. Handoff sends the adapter binding command; success means sent,
-not confirmed binding.
-
-### Binding format and ownership
-
-Both adapters bind using `printf` and shell environment expansion without tmux
-queries, allowing binding under Claude's worktree isolation checks.
-
-Codex and Claude emit and recognize six-line `AHUB_TMUX_BIND_V3` records:
-marker, absolute socket path, `ahub-<UUID>` session name, optional operation UUID,
-optional project directory, and JSON task name or `null` (empty fields retain lines).
-Codex accepts user-message `<user_shell_command>` output; Claude accepts native
-main-user `<bash-stdout>` output. Unknown markers produce no binding events.
-Invalid required V3 fields produce an invalid binding event.
-An invalid latest binding attempt never falls back.
-
-A process-wide manager tracks latest attempts/session and valid claims/socket/session
-across agents, ordered by timestamp (invalid = zero), global session ID, ordinal,
-position, including appends. New claims retain claims
-on other sessions. Takeover makes former owners `superseded`, revoking effects and
-attach. `supersededBySessionId` names a readable replacement (including archived),
-otherwise null. Claims survive archive, deletion, rereads, and Hub close for the
-process lifetime; later explicit binds can reclaim them. See [binding manager](../src/server/interaction/pane-binding-manager.ts).
-
-### Project directory
-
-Latest valid bind overrides Working Directory: absolute project path without
-NUL/CR/LF; no filesystem/Git checks. Invalid/empty fields preserve earlier project
-paths and do not invalidate pane bindings.
-
-### Task association
-
-Create accepts optional `taskName`; resume retains it and rejects overrides.
-Names are trimmed, case-sensitive, and shared across agents/projects;
-`<`, `>`, NUL, CR and LF are rejected. Unassigned responses omit the field.
-
-Latest valid bind overrides the task; empty or invalid task fields preserve the
-earlier value and do not invalidate pane bindings. Null and missing task fields
-also preserve the existing task; there is no clear operation.
+`requireIdle: true` rejects non-idle input at transaction entry without waiting
+or retry; browser calls omit this restriction. Interrupt cannot require idle.
+Connection, ownership, and management occupancy checks still apply.
+Handoff sends the adapter binding command; success confirms delivery, not binding.
 
 ### Activity observation
 
@@ -523,16 +316,6 @@ Idempotency includes both directories, normalized task name, and launch options;
 omitted working directory equals an explicit project directory. `worktree` is
 an independent agent launch option.
 
-### Service responsibilities
-
-The [coordinator](../src/server/management/operation-service.ts) owns idempotency,
-occupancy, deadlines, retention, and cleanup. [Launch](../src/server/management/session-launch-executor.ts)
-and [lifecycle](../src/server/management/session-lifecycle-executor.ts) executors
-validate, invoke adapters, and confirm results. Continuations check operation
-activity after awaits; shutdown reuses the exit service. Shared services delegate
-native identity validation, directory resolution, history changes, and exit steps
-to the owning adapter.
-
 ### Operation model
 
 Operations include `operationId`, `type`, `status`, `createdAt`, `updatedAt`,
@@ -557,42 +340,95 @@ method presence; Codex supports archive and Claude does not. Unsupported archive
 HTTP requests return `409 operation_not_supported`; lifecycle execution repeats
 the check before resolving targets, exiting, or invoking native effects.
 
-Create/resume share launch; worktree and permission mode are options. Resume occupies the session,
-refreshes source once, records a binding baseline, and evaluates runtime once,
-reusing its directory. Prelaunch checks binding/operation validity without another
-external-change scan or filesystem/tmux atomicity. Native commands use the
-[owning adapter's agent environment](#agent-identity-and-routing). Shared services
-delegate native history changes to the owning adapter.
+#### Create and resume
 
-| Operation | Validation and confirmation                                                                                                                                                                                                                                                                                                                                           |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Create    | Project and effective working directories independently resolve to existing real paths; equal inputs share resolution. Confirm operation marker, target, project, valid bind within 60 seconds after launch.                                                                                                                                                          |
-| Resume    | Require unarchived unique valid native identity, plus no binding, confirmed session exit, or explicit transfer. Invalid/uncertain bindings deny resume. Confirm original identity, marker, project, live owned target.                                                                                                                                                |
-| Exit      | Validate latest bind; interrupt/EOF then force-close the tmux session if needed. Confirm session absence within 30 seconds; query errors/ownership changes mean `unknown`. Unbound succeeds, missing fails; archived uses same checks.                                                                                                                                |
-| Archive   | Refresh source; already archived succeeds. Validate unique native identity, exit, run native archive once (25-second command limit), confirm within 30 seconds.                                                                                                                                                                                                       |
-| Delete    | Run Exit validation and sequence first, then permanently remove history through the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove session JSONL and associated per-session directory). Exit, deletion, and same-source absence confirmation have separate 30-, 25-, and 30-second budgets. Initially absent in a successful snapshot succeeds. |
+Create and resume use the same launch flow; equal directory inputs share resolution.
+Confirmation requires the operation marker, expected target and project, and a
+live owned binding within 60 seconds after launch.
+Resume additionally requires the original unarchived, valid native identity.
 
-Codex launches `ahub-<operationId>` using the [runtime CLI flags](#runtime-cli-compatibility)
-(`--worktree` is off by default) and an initial native `! printf ...` shell binding command.
-Its recorded output provides the operation marker and project/task association. Resume uses
-`codex resume <UUID>`, trying Working then Project Directory: skip invalid paths,
-fall back only on missing/non-directory paths. Launch from chosen real path,
-retain original project association; reject agent/projectDirectory/workingDirectory/worktree overrides.
-Users must ensure unbound sessions' original processes have exited.
+Resume permits no binding, confirmed exit, or explicit transfer; invalid or
+uncertain bindings deny it. It occupies the session, refreshes the source once,
+records a binding baseline, and evaluates runtime once. Prelaunch rechecks
+binding/operation validity without another external scan or filesystem/tmux atomicity.
+Working Directory is tried before Project Directory: invalid paths are skipped;
+fallback is allowed only for missing/non-directory paths. Launch retains the
+original project association and rejects agent/projectDirectory/workingDirectory/worktree
+overrides. Unbound sessions require the original process to have exited.
 
-Attach appears after 30 seconds and survives timeout, using known target or
-configured socket/deterministic session name. Confirmed no-launch tmux errors
-mean `failed`; launch timeout, malformed success, and post-launch errors mean
-`unknown`, without retry/teardown.
+Codex launches `ahub-<operationId>` with the runtime flags below and an initial
+native `! printf ...` binding command; its recorded output supplies the marker and
+project/task association. Claude's handshake is specified below.
+Attach becomes available after 30 seconds using the known target or configured
+socket/deterministic session name, and survives timeout. Confirmed no-launch tmux
+errors produce `failed`; launch timeout, malformed success, and post-launch errors
+produce `unknown`, without retry or teardown.
 
-Exit controls the whole tmux session, including manual binds, retaining session data;
-see [ADR-112](adr/0112-separate-exit-from-history-management.md). Codex and Claude send Ctrl-C at
-0, 200, 2600, and 2800 ms, Ctrl-D at 6 seconds, and one targeted `kill-session`
-at 15 seconds if still running. Each step checks cancellation and
-target ownership/state; natural exit stops further sends, and forced close still
-requires exit confirmation. Occupancy blocks
-ordinary input/handoff with `409 session_busy`; archive and delete hold it through confirmation.
-Successful snapshots can skip unreadable data and confirm absence; thrown reads cannot.
+#### Exit
+
+Exit validates the latest binding and controls the whole tmux session, including
+manual binds, while retaining history. Unbound succeeds; missing fails; archived
+sessions use the same checks. Query errors or ownership changes produce `unknown`.
+
+Both adapters send Ctrl-C at 0, 200, 2600, and 2800 ms, Ctrl-D at 6 seconds, then
+one targeted `kill-session` at 15 seconds if still running. Each step checks
+cancellation and ownership/state; natural exit stops further input. Forced close
+still requires absence confirmation within the 30-second exit budget.
+See [ADR-112](adr/0112-separate-exit-from-history-management.md).
+
+#### Archive and delete
+
+Archive refreshes the source; already archived succeeds. Otherwise it validates
+native identity, exits, invokes native archive once (25-second command limit),
+and confirms archive state within 30 seconds.
+
+Delete runs Exit validation and sequence, then permanently removes history through
+the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove session
+JSONL and associated per-session directory). Exit, deletion, and same-source
+absence confirmation have separate 30-, 25-, and 30-second budgets. Initially
+absent in a successful snapshot succeeds. Successful snapshots may skip unreadable
+data and confirm absence; thrown reads cannot.
+
+Occupancy blocks ordinary input/handoff with `409 session_busy`; archive/delete
+hold it through confirmation. Native identity validation, directory resolution,
+history effects, and exit steps belong to the owning adapter. The
+[coordinator](../src/server/management/operation-service.ts) owns idempotency,
+occupancy, deadlines, retention, and cleanup; executors validate, invoke adapters,
+and confirm results. Shutdown reuses the exit service.
+
+### Runtime CLI compatibility
+
+Adapters require authenticated runtime CLIs on `PATH`:
+
+| Runtime     | Create and resume                                                                      | Launch options                                                                       | History management                                                                            |
+| ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                               | `codex archive <UUID>` and `codex delete <UUID> --force`                                      |
+| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions` | The adapter deletes local session files directly; no native archive/delete command is invoked |
+
+Implementations: [Codex](../src/server/adapters/codex/session-manager.ts),
+[Claude](../src/server/adapters/claude/session-manager.ts).
+
+### Claude launch readiness
+
+Claude captures the native prompt for up to 15 seconds, retrying unsuccessful
+checks every second. One matching empty prompt with the cursor in the allowed
+rectangle permits one binding-command send. Create/resume interrupts once after
+confirmed binding; handoff does not. Interrupt is Ctrl-U, 100 ms, Escape.
+Capture, delivery, interrupt, or readiness failures produce `unknown` with target/attach.
+
+Global `--claude-ready-script <path>` replaces the predicate for every Claude agent:
+
+| Contract         | Value                                                                                                           |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- |
+| Execution        | Direct executable with shebang; relative paths resolve from Hub startup directory                               |
+| stdin            | `{ "current": { "content": "...", "cursorX": 2, "cursorY": 1 }, "context": "" }`; zero-based coordinates        |
+| stdout           | `{ "ready": false, "context": "opaque text" }`; output limit 1 MiB                                              |
+| Context          | Empty per launch; returned context is passed unchanged to the next check                                        |
+| Missing snapshot | Skip execution, preserve context, retry after one second                                                        |
+| Failure          | Nonzero exit, invalid output, or remaining 15-second deadline exceeded: send no binding input, return `unknown` |
+
+Diagnostics use stderr. Claude treats `!`-prefixed input as ordinary model input
+(verified with 2.1.318; recheck on upgrade) and records the binding. See [implementation](../src/server/adapters/claude/session-manager.ts).
 
 ### Tracking and recovery
 
@@ -603,72 +439,185 @@ continuations check activity. Restart loses tracking, leaving tmux running.
 Unknown launches retain target/attach; same request ID retrieves retained results.
 A new ID can launch after normal checks even if the earlier launch still runs.
 
-Browser polls one second after query completion; hidden pages pause, stored IDs
-support reload recovery. Terminal/`404` results clear
-markers; nonretryable query errors require manual retry. Launch network retries
-reuse request IDs until terminal results. Submitted writes continue while hidden.
+## Session CLI
+
+### CLI output contract
+
+Business commands default to human-readable stdout; diagnostics use stderr.
+`--json` emits one compact result or `{ "error": { "code", "message" } }` plus
+newline; help stays text. Argument/validation/dispatch errors use `invalid_arguments`;
+other resource failures use `command_failed`. Session connection errors use
+`query_failed`; local validation fails before requests.
+
+### Client behavior and results
+
+`ahub-cli session` is a stateless HTTP client, without native-history access,
+direct tmux control, server discovery/startup, or persisted recovery state.
+URL precedence: `--url`, `AGENT_HUB_URL`, `http://127.0.0.1:4173`.
+HTTP/HTTPS are supported; HTTPS uses Node.js verification and `NODE_EXTRA_CA_CERTS`.
+
+One `--timeout` deadline covers stdin, HTTP, operation polling, and readiness:
+15 seconds by default, 45 for create/resume/exit/archive/delete. Follow uses
+[per-request deadlines](#cli-continuous-inspection). Lifecycle commands have no
+CLI confirmation prompt and await management; create/resume additionally wait
+for live, connected, idle state. Input success confirms neither task completion
+nor answer correctness.
+
+| Exit code | Meaning                                                       |
+| --------- | ------------------------------------------------------------- |
+| `0`       | Success                                                       |
+| `1`       | Definite failure, including queries                           |
+| `2`       | Submitted write may have taken effect but remains unconfirmed |
+
+Interruptions, disconnects, deadlines, polling failures, and unknown results
+never resubmit or cancel mutations.
+
+### Public session CLI results
+
+CLI output uses explicit whitelists independent of HTTP response types. It omits
+operation/request IDs and attach commands. Inspect exposes the owned tmux target.
+Launch errors retain `sessionId` and `tmux` inside `error` (unknown values are null),
+including readiness timeouts. Exact fields and text formatting live in
+[session-output.ts](../src/server/cli/session-output.ts).
+
+| Command       | Result                                                                              |
+| ------------- | ----------------------------------------------------------------------------------- |
+| `list`        | `{ sessions }`: identity, title, status, agent, project, update time, optional task |
+| `inspect`     | `{ session, interaction, items, nextAfter, hasMore }`                               |
+| `terminal`    | `{ content, truncated, capturedAt }`                                                |
+| Input/handoff | `{ sessionId, status: "sent" }`                                                     |
+| Lifecycle     | `{ sessionId, status: "succeeded" }`; create/resume also include `tmux`             |
+
+`--project` filters project association, not launch/worktree location. Explicit IDs
+go directly to endpoints without catalog lookup. Nullable metadata remains
+null; absent task names remain omitted. Inspect includes the owning agent's nickname
+and current interaction, with `tmux: { socketPath, sessionName } | null`.
+
+Items retain message Markdown and user-input content. Plans and input requests
+include `inputHint`; answered responses flatten selections into `answers: string[]`
+in question/answer order. Text output preserves full content, flattening whitespace
+only in summaries/tables. See [ahub-control](../skills/ahub-control/SKILL.md#choose-actions-by-session-state)
+for the input workflow.
+
+### CLI continuous inspection
+
+`inspect --follow` reads immediately, drains pages sequentially, then long-polls.
+`--count` requires follow and counts rounds, including empty/`204` rounds; the last
+round drains all pages. Otherwise it runs until canceled, including idle or
+disconnected periods. `--timeout` is per request (default 30 seconds), with no
+overall deadline; stopping observation does not stop the session.
+
+The first result prints unconditionally; later results require new visible items
+or changed session/interaction state excluding `updatedAt`. Position-only advances
+are silent. JSON is NDJSON using the inspect shape with each page's incremental
+items. Nonadvancing pagination, API/network errors, or request timeouts exit `1`
+without retry; Ctrl+C cancels reads/timers and exits normally.
+
+### Input policy
+
+`send` rejects a leading `/` unless `--force`: both `--message` and `--stdin`
+check only the first character, without trimming or checking subsequent lines.
+This guard does not apply to HTTP.
+
+Messages and ordinary keys default to `requireIdle: true`; `--force` disables it.
+Interrupt and handoff skip the idle requirement. Ordinary keys use the
+non-interrupt whitelist; all operations retain connection, ownership, and
+management occupancy checks.
+
+## File uploads
+
+| Endpoint                                                          | Contract                                         |
+| ----------------------------------------------------------------- | ------------------------------------------------ |
+| `POST /api/v1/uploads?sessionId=<Hub ID>&filename=<encoded name>` | Raw binary, ≤20 MiB; existing session required   |
+| `GET /api/v1/sessions/:id/uploads`                                | `{ items }`, newest first, unpaginated           |
+| `GET /api/v1/sessions/:id/uploads/:attachmentId/content`          | Raster preview; `?download=1` downloads          |
+| `GET /api/v1/sessions/:id/uploads/:attachmentId/thumbnail`        | Cached WebP thumbnail; unavailable returns `404` |
+| `DELETE /api/v1/sessions/:id/uploads/:attachmentId`               | Delete content/registration; idempotent          |
+
+Upload returns `201` with `path`, `id`, `sessionId`, `filename`, `size`, `type`,
+and `uploadedAt`; unique paths prevent overwrites. Oversize is `413`, storage
+failure `500`. Mutations reject cross-origin requests. Content/deletion are
+session-scoped; non-preview types (including HTML/SVG) download. Originals use
+`nosniff`, sandbox CSP, and `no-store`.
+
+PNG/JPEG/GIF/WebP/AVIF thumbnails are static, auto-oriented WebP, at most
+360 × 280 without enlargement (40-million-pixel input limit). Generation runs
+serially in the background, coalesces same-thumbnail work, and never delays/fails
+upload. Older uploads generate on demand; decode failures return `404`. BMP skips
+thumbnails. History loads thumbnails lazily, originals only on expansion; failed
+thumbnails never trigger automatic original loads. Thumbnail files are atomic,
+beside originals, with `private, max-age=86400` caching.
+
+Storage is `<home-dir>/uploads/<Hub session ID>/` with absolute content paths and
+atomic metadata replacement. HTTP/storage validate Hub IDs, UUID-v4 attachment IDs,
+metadata identity, and direct filenames/extensions. Reads/deletion/recovery reject
+corrupt metadata and symlink escapes using real locations. Invalid IDs return `400`;
+missing files retain not-found/idempotent-delete semantics.
+
+Deletion tombstones metadata before content removal, retrying failed cleanup on
+delete/startup. Startup clears interrupted uploads and orphan thumbnails without
+blocking service. Confirmed session deletion schedules cleanup; exit, archive,
+and unconfirmed deletion retain uploads.
+
+Attachment messages prepend absolute paths as Markdown list items, separated from
+optional text by a blank line; paths count toward message limits. Failed sends
+retain drafts; success clears unchanged drafts. Removing draft attachments retains
+stored files. See [Usage](usage.md#file-uploads).
 
 ## Optional hosting
 
-Adapter-independent hosting requires `--hosting`.
-`GET /api/v1/capabilities` returns `{ hosting: boolean }`; disabled hosting creates
-no storage and returns `404`. Offline commands use `--home-dir`
-and `--json`. Hosted resources use the configured HTTPS/mTLS/proxy authentication.
+`--hosting` enables adapter-independent storage/endpoints;
+`GET /api/v1/capabilities` reports `{ hosting: boolean }`. Disabled hosting creates
+no storage and resource routes return `404`. Offline CLI uses `--home-dir`/`--json`;
+HTTP resources inherit configured HTTPS/mTLS/proxy authentication.
 
-Malformed URLs/encodings return `400`, missing resources `404`, unexpected storage,
-metadata, or deletion errors `500 internal_error` with `requestId`. Logs correlate
-method/path/error without bodies; post-header errors terminate responses. Damaged entries remain skipped.
-
-Publish/delete share an atomic-rename filesystem lock. Reclaim requires OS-confirmed
-PID absence; tombstones protect new locks, live PID reuse blocks recovery.
-Avoid manual storage changes while publishing.
+Malformed URLs/encodings return `400`, missing resources `404`, unexpected
+storage/metadata/deletion errors `500 internal_error` with `requestId`. Logs
+correlate method/path/error without bodies; post-header failures terminate responses.
+Publish/delete share an atomic-rename lock; recovery requires OS-confirmed PID
+absence. Tombstones protect new locks; live PID reuse prevents reclamation.
 
 ### Web pages
 
-`GET /api/v1/artifacts` rescans projects (`directory`, `artifacts`);
-`DELETE /api/v1/artifacts/:id` removes all snapshots. Invalid metadata is diagnosed
-and skipped; resources do not depend on agents/sessions.
+| Endpoint                       | Contract                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/artifacts`        | Rescan projects: `{ projects: [{ directory, artifacts }] }`; skip/diagnose invalid metadata       |
+| `DELETE /api/v1/artifacts/:id` | Remove all snapshots                                                                              |
+| `/web/:id/`                    | `302` to `/web/:id/:snapshotId/`                                                                  |
+| `/web/:id/:snapshotId/…`       | GET/HEAD files or directory `index.html`; no listing, traversal, metadata access, or SPA fallback |
 
-Without `--name`, the page name is the source directory basename after resolving
-symlinks. Updates retain the title unless `--title` is supplied.
+Canonical project `realpath` plus name determines identity, independent of
+agents/sessions. Default name is the resolved source basename; updates retain
+titles unless `--title` is supplied. Republishing retains history; moving projects
+changes association. Random 32-character lowercase hex IDs identify artifacts and
+snapshots. Storage is `<hosting>/artifacts/<id>/artifact.json` plus
+`snapshots/<snapshot-id>/`; metadata records identity, title, project/source,
+current snapshot, timestamps, and relative URL, without session/server identity.
 
-Canonical project `realpath` plus name determines identity. Republishing retains
-history; moving projects changes association. Random
-32-character lowercase hex IDs identify artifacts/snapshots. Storage:
-`<hosting>/artifacts/<id>/artifact.json` and `snapshots/<snapshot-id>/`. Metadata
-contains identity, title, project/source, current snapshot, timestamps, relative
-URL, without session/server identity.
+Publication accepts regular files/directories; rejects nested symlinks, special
+files, and hosting overlap. Snapshot rename precedes atomic metadata replacement,
+preserving prior metadata on failure. All snapshots persist until artifact deletion,
+including interrupted/unreferenced ones; no expiry/history management exists.
 
-Publication accepts regular files/directories, canonicalizes source root, rejects
-nested symlinks, special files, and hosting overlap. Snapshot rename precedes atomic
-metadata replacement, preserving prior metadata on failure. Snapshots persist until
-artifact deletion, including inert interrupted/unreferenced snapshots; no expiry/history management.
-
-`/web/:id/` redirects (`302`) to `/web/:id/:snapshotId/`. GET/HEAD serve files and
-directory `index.html`: no listing, traversal, metadata access, or SPA fallback.
-Disk metadata makes offline changes visible. Responses use `private, no-store`;
-entry/directory redirects preserve queries. Use relative assets; root-relative
-paths are not rewritten. External resources require connectivity/provider permission.
-
-Pages execute trusted same-origin code with Hub authority, omitting Hub UI's
-restrictive CSP to support scripts/styles/modules/fonts/JSON/external HTTPS.
-Session Markdown accepts canonical `/web/<id>/` links;
-copied links use browser origin.
+Serving reads disk metadata, so offline changes are visible. Responses use
+`private, no-store`; redirects preserve queries and root-relative assets are not
+rewritten. Pages execute trusted same-origin code with Hub authority, without the
+Hub UI's restrictive CSP; external resources require connectivity/provider permission.
+Session Markdown accepts canonical `/web/<id>/` links; copied URLs use browser origin.
 
 ### Temporary diffs
 
-Each `diff publish <file>` creates UUID-v4 `<hosting>/diffs/<uuid>/` with original
-`raw.diff` and `metadata.json` (identity, title, creation time, URL). Directory
-publication uses atomic rename under the shared write lock. CLI list reads metadata;
-delete is idempotent. Explicit cleanup preserves source; no project/session association.
-Damaged metadata is diagnosed and treated as missing without blocking other entries;
-filesystem errors other than missing files still propagate.
+Each `diff publish <file>` atomically creates `<hosting>/diffs/<UUID-v4>/` under
+the shared lock, containing `raw.diff` and `metadata.json` (identity, title,
+creation time, URL). CLI list reads metadata; delete is idempotent and preserves
+the source. Diffs have no project/session association or HTTP list endpoint.
+Damaged metadata is diagnosed/treated as missing; other filesystem errors propagate.
 
-`/diffs/<uuid>` serves the viewer; `GET /api/v1/diffs/:uuid` returns metadata/`raw`;
-`DELETE` returns `204`. Missing/disabled returns `404`; no HTTP list exists.
-Responses: `private, no-store`, Hub CSP, text rendering; Markdown links open new tabs. Viewer supports Git unified diffs,
-renames, mode changes, binary markers, C-quoted paths; unsupported/incomplete input
-warns and retains original text access.
+`/diffs/<uuid>` serves the viewer; `GET /api/v1/diffs/:uuid` returns metadata/`raw`,
+DELETE returns `204`, missing/disabled returns `404`. Responses use
+`private, no-store`, Hub CSP, and text rendering; Markdown links open new tabs.
+The viewer supports Git unified diffs, renames, modes, binary markers, and C-quoted
+paths; unsupported/incomplete input warns and retains raw-text access.
 
 ## Browser state
 
@@ -676,20 +625,33 @@ warns and retains original text access.
 `ahub.browser-state.v1` sessionStorage holds tab-local browsing. Recovery/drafts
 have independent lifecycles; storage failures preserve in-memory behavior.
 
-## Interface localization
+### Requests and recovery
 
-`ahub.preferences.v1.language` selects `en` (default), `zh-CN`, `zh-TW` (Taiwan).
-Missing/malformed/unsupported values use English. Changes apply without reload
-and synchronize across tabs. Locale affects presentation, preserving API values, identities, conversation/terminal
-text, paths, commands. Dates use device time zone; documentation captures use UTC.
+Sorting uses best-effort `updatedAt`, retaining newer catalog/reader timestamps
+in memory. Projects follow their latest visible session; IDs break ties and
+invalid times sort last.
+
+The reader starts at `after=0`, loading up to 300 items per page on scroll.
+History and tail waiting share one request slot; unarchived sessions tail at EOF.
+Session changes, hiding, or unmount cancel reads; appends preserve reading position.
+
+Management polls one second after query completion. Hidden pages pause reads,
+while submitted writes continue. Stored operation IDs survive reload; terminal
+results/`404` clear recovery markers. Nonretryable query errors need manual retry;
+launch network retries reuse request IDs until terminal results.
+
+### Interface localization
+
+`ahub.preferences.v1.language` selects `en` (default), `zh-CN`, or `zh-TW` (Taiwan).
+Invalid/missing values use English. Changes apply immediately across tabs without
+resetting operations, drafts, or conversations. Dates use device time zone;
+documentation captures use UTC. Locale affects presentation only; API values,
+identities, native diagnostics, conversation/terminal text, paths, and commands
+remain unchanged.
 
 [Client i18n](../src/client/i18n/) owns catalogs, interpolation, and formatters.
-English defines translation keys/parameters; Chinese catalogs must match.
-Missing/empty translations fall back to English. Adding a language requires
-catalog registration and validation tests; there is no runtime catalog fetch or
-browser-language detection.
-
-Notifications retain keys until rendering; native diagnostics remain verbatim
-beside localized explanations. Structured API errors use codes, never English
-message matching. Translation preserves HTTP/WebSocket contracts. Preference
-changes preserve running operations, drafts, and loaded conversations.
+English defines keys/parameters; Chinese catalogs must match. Missing/empty
+translations fall back to English. New languages require catalog registration and
+validation tests; no runtime fetch or browser-language detection exists.
+Notifications retain keys until rendering; structured API errors use codes,
+never English-message matching.

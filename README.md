@@ -28,13 +28,7 @@ Runtime requirements:
 Hub reads `~/.codex` and `~/.claude` by default. You can use either runtime or both;
 see [Agent configuration](docs/usage.md#multiple-agents) for custom directories.
 
-Try it without a global installation:
-
-```sh
-npx @someonegg/agent-hub@latest
-```
-
-Or install it for regular use:
+Install globally and start Hub:
 
 ```sh
 npm install -g @someonegg/agent-hub
@@ -83,8 +77,7 @@ See [session CLI usage](docs/usage.md#session-commands) for commands and example
 
 For agent-assisted session workflows, use the bundled
 [`ahub-control` skill](skills/ahub-control). Run
-`ahub-cli skill path ahub-control` to locate it. With `npx`, copy the skill
-directory from the temporary cache for lasting use.
+`ahub-cli skill path ahub-control` to locate it.
 
 ## Security
 

@@ -4,7 +4,7 @@ The [Codex](../src/server/adapters/codex/) and
 [Claude Code](../src/server/adapters/claude/) adapters decode complete JSONL lines
 and publish only conversation messages and user input. Metadata,
 pane bindings, and runtime facts are extracted independently of conversation
-publication. See the [technical reference](technical-reference.md#reader-and-automatic-updates)
+publication. See the [technical reference](technical-reference.md#conversation-reads)
 for pagination and long polling, and [loading guarantees](technical-reference.md#discovery-and-caching)
 for checkpoints, probe validation, and archive caching.
 

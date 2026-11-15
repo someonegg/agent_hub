@@ -53,7 +53,7 @@ the test suite. See the [lint toolchain](../tools/client-lint/README.md) for rul
 
 Reader changes should cover ordinal pagination, state/message wakeups, timeout, cancellation,
 and one-time out-of-range recovery in existing tests. Protocol details live in the
-[technical reference](technical-reference.md#reader-and-automatic-updates).
+[technical reference](technical-reference.md#conversation-reads).
 
 Run additional checks for the affected area:
 
@@ -164,8 +164,3 @@ the new package's trusted publisher for `someonegg/agent_hub` and `publish.yml`,
 allowing `npm publish`. If an authenticated first publish is needed to create the
 package, publish the validated release first, then configure trusted publishing
 and verify the tag workflow. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
-
-When renaming the GitHub repository, update package metadata and Git remotes
-before publishing. After the new package passes installation checks, deprecate
-`@someonegg/codex-hub` with a pointer to `@someonegg/agent-hub`. Release notes must
-include the new `agent-hub` command and the [existing-data instructions](usage.md#configure-the-server).
