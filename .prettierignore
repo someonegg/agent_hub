@@ -12,5 +12,4 @@ tests/fixtures/
 **/*.ico
 **/*.svg
 package-lock.json
-docs/adr/
 docs/benchmarks/

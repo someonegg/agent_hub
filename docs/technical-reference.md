@@ -35,7 +35,7 @@ EOF, resuming after the last committed newline. Restart, truncation, detected
 same-size changes, or probe mismatch require full decoding.
 
 Checkpoints are process-local. A middle rewrite preserving both probes followed
-by an append can escape detection; see [ADR-0012](adr/0012-use-checkpointed-incremental-rollout-loading.md).
+by an append can escape detection; see [ADR-102](adr/0102-use-immutable-incremental-session-snapshots.md).
 Loaded archives remain cached until restart or restoration, even after in-place
 edits. Discovery, removal, advisory metadata refresh, and failed-load retries continue.
 
@@ -46,7 +46,7 @@ initially observed EOF. Confirmed exclusions and duplicate files
 stay excluded by source-relative path until discovery observes their absence or
 the source is rebuilt. File changes and loss of an accepted original do not clear
 exclusions. Ordinary sessions retain incremental checkpoints. See
-[ADR-0026](adr/0026-filter-non-primary-rollouts-in-adapters.md).
+[ADR-115](adr/0115-retain-codex-path-exclusions.md).
 
 ### Session identity
 
@@ -586,7 +586,7 @@ mean `failed`; launch timeout, malformed success, and post-launch errors mean
 `unknown`, without retry/teardown.
 
 Exit controls the whole tmux session, including manual binds, retaining session data;
-see [ADR-0022](adr/0022-separate-session-exit-from-archive.md). Codex and Claude send Ctrl-C at
+see [ADR-112](adr/0112-separate-exit-from-history-management.md). Codex and Claude send Ctrl-C at
 0, 200, 2600, and 2800 ms, Ctrl-D at 6 seconds, and one targeted `kill-session`
 at 15 seconds if still running. Each step checks cancellation and
 target ownership/state; natural exit stops further sends, and forced close still
