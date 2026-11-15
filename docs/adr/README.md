@@ -1,44 +1,70 @@
 # Architecture decisions
 
-ADRs explain why a choice was made, including alternatives and accepted costs.
-Use the [technical reference](../technical-reference.md) for current contracts.
+ADRs explain the choices and accepted costs behind the current architecture.
+Use the [technical reference](../technical-reference.md) for schemas, protocols,
+limits, and exact runtime behavior.
 
-- Preserve record numbers, decision dates, and historical context when editing.
-- Keep each record focused on one decision; link to implementation details instead
-  of duplicating the technical reference.
-- Mark full replacements as superseded and link their successors. For partial
-  refinements, retain the status and add a scope note linking the later decision
-  or current reference. A later refinement does not change the decision date.
+## Reading paths
+
+| Question                                                               | Start here                                                            |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Who owns native formats, identities, and auxiliary-session filtering?  | [ADR-101](0101-use-source-owned-session-adapters.md)                  |
+| Why use bounded probes rather than reread or authenticate all history? | [ADR-102](0102-use-immutable-incremental-session-snapshots.md)        |
+| How do Agent names differ from Runtime and session identity?           | [ADR-103](0103-separate-agent-identity-from-runtime.md)               |
+| Why send a complete catalog but allow stale ordering times?            | [ADR-104](0104-long-poll-complete-catalog-structure.md)               |
+| Why do advisory title edits wake clients?                              | [ADR-105](0105-resolve-display-titles-on-the-server.md)               |
+| Why can some historical message rewrites remain undetected?            | [ADR-106](0106-read-conversations-by-ordinal.md)                      |
+| Why use automatic HTTP long polling?                                   | [ADR-107](0107-use-bounded-polling-for-automatic-updates.md)          |
+| Why keep navigation and reading in one application?                    | [ADR-108](0108-use-a-unified-project-hub.md)                          |
+| Why cannot old bindings regain control after deletion or rereads?      | [ADR-109](0109-retain-binding-ownership-until-explicit-transfer.md)   |
+| Why can a submitted operation finish unknown?                          | [ADR-110](0110-observe-management-operations-on-the-server.md)        |
+| Why can launch location differ from project association?               | [ADR-111](0111-separate-launch-directory-from-project-association.md) |
+| Why can Exit close an entire tmux session?                             | [ADR-112](0112-separate-exit-from-history-management.md)              |
+| Why does Normal or disconnected not authorize Resume?                  | [ADR-113](0113-separate-runtime-status-from-resume-permission.md)     |
+| Why share runtime evidence within a reader response?                   | [ADR-114](0114-share-runtime-observations-per-reader-response.md)     |
+| Why can a replaced excluded Codex file remain hidden?                  | [ADR-115](0115-retain-codex-path-exclusions.md)                       |
 
 ## Decision index
 
-The status column records the lifecycle; scope notes identify later refinements.
+| Decision                                                                                                                          | Status   |
+| --------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| [ADR-101: Use source-owned session adapters](0101-use-source-owned-session-adapters.md)                                           | accepted |
+| [ADR-102: Use immutable incremental session snapshots](0102-use-immutable-incremental-session-snapshots.md)                       | accepted |
+| [ADR-103: Separate Agent identity from Runtime](0103-separate-agent-identity-from-runtime.md)                                     | accepted |
+| [ADR-104: Long-poll complete catalog structure with advisory timestamps](0104-long-poll-complete-catalog-structure.md)            | accepted |
+| [ADR-105: Resolve display titles on the server](0105-resolve-display-titles-on-the-server.md)                                     | accepted |
+| [ADR-106: Read conversations by ordinal](0106-read-conversations-by-ordinal.md)                                                   | accepted |
+| [ADR-107: Use bounded polling for automatic updates](0107-use-bounded-polling-for-automatic-updates.md)                           | accepted |
+| [ADR-108: Use a unified project hub](0108-use-a-unified-project-hub.md)                                                           | accepted |
+| [ADR-109: Retain binding ownership until explicit transfer](0109-retain-binding-ownership-until-explicit-transfer.md)             | accepted |
+| [ADR-110: Observe management operations on the server](0110-observe-management-operations-on-the-server.md)                       | accepted |
+| [ADR-111: Separate launch working directory from project association](0111-separate-launch-directory-from-project-association.md) | accepted |
+| [ADR-112: Separate exit from history management](0112-separate-exit-from-history-management.md)                                   | accepted |
+| [ADR-113: Separate runtime status from resume permission](0113-separate-runtime-status-from-resume-permission.md)                 | accepted |
+| [ADR-114: Share runtime observations within each reader response](0114-share-runtime-observations-per-reader-response.md)         | accepted |
+| [ADR-115: Retain Codex path exclusions until disappearance](0115-retain-codex-path-exclusions.md)                                 | accepted |
 
-| Decision | Status | Scope / successor |
-| --- | --- | --- |
-| [0001: Use generation-based whole-file session snapshots](0001-use-generation-based-session-snapshots.md) | superseded | [ADR-0012](0012-use-checkpointed-incremental-rollout-loading.md) |
-| [0002: Use JSONL-only session discovery](0002-use-jsonl-only-session-discovery.md) | accepted | unreadable placeholders replaced by skip-and-retry behavior |
-| [0003: Use session source adapters](0003-use-session-source-adapters.md) | accepted | — |
-| [0004: Use session-scoped revisions for reader consistency](0004-use-session-scoped-reader-revisions.md) | superseded | [ADR-0009](0009-use-opaque-single-writer-timeline-cursors.md) |
-| [0005: Use query-scoped revisions for session-list pagination](0005-use-query-scoped-revisions-for-session-list-pagination.md) | superseded | [ADR-0010](0010-use-opaque-session-list-cursors.md) |
-| [0006: Use conditional read cursors for session resources](0006-use-timeline-prefix-continuity.md) | superseded | [ADR-0009](0009-use-opaque-single-writer-timeline-cursors.md) |
-| [0007: Discover tmux interaction targets through adapters](0007-use-adapter-discovered-tmux-interaction.md) | superseded | [ADR-0016](0016-enable-hub-management-by-default.md) and [ADR-0018](0018-cache-validation-per-binding-record.md) |
-| [0008: Split the session catalog and reader into a multi-page application](0008-split-session-catalog-and-reader-into-an-mpa.md) | superseded | [ADR-0020](0020-use-a-unified-project-hub.md) |
-| [0009: Use opaque single-writer timeline cursors](0009-use-opaque-single-writer-timeline-cursors.md) | superseded | [ADR-0025](0025-unify-session-reading-on-ordinal-messages.md) |
-| [0010: Use opaque cursors for session-list pagination](0010-use-opaque-session-list-cursors.md) | superseded | [ADR-0021](0021-split-catalog-structure-and-activity.md) |
-| [0011: Use repository-probed bounded long polling for automatic updates](0011-use-repository-probed-bounded-long-polling.md) | accepted | cache policy replaced by [ADR-0018](0018-cache-validation-per-binding-record.md); toggle removed by [ADR-0019](0019-enable-automatic-updates-for-unarchived-sessions.md); message protocol refined by [ADR-0025](0025-unify-session-reading-on-ordinal-messages.md) |
-| [0012: Use checkpointed incremental rollout loading with probe validation](0012-use-checkpointed-incremental-rollout-loading.md) | accepted | probe validation applies to unarchived rollouts; loaded archives reuse cached content |
-| [0013: Filter session archive state in the browser](0013-filter-session-archive-state-in-the-browser.md) | superseded | [ADR-0020](0020-use-a-unified-project-hub.md) |
-| [0014: Remember automatic updates per browser tab](0014-remember-automatic-updates-per-browser-tab.md) | superseded | [ADR-0019](0019-enable-automatic-updates-for-unarchived-sessions.md) |
-| [0015: Expose session index names as presentation metadata](0015-expose-session-index-names-as-presentation-metadata.md) | accepted | current title contract: [technical reference](../technical-reference.md#catalog); catalog polling: [ADR-0021](0021-split-catalog-structure-and-activity.md) |
-| [0016: Enable hub management and interaction by default](0016-enable-hub-management-by-default.md) | accepted | — |
-| [0017: Observe asynchronous management operations on the server](0017-observe-asynchronous-management-operations.md) | accepted | exit replaced by [ADR-0022](0022-separate-session-exit-from-archive.md); resume added by [ADR-0023](0023-separate-runtime-status-from-resume-permission.md) |
-| [0018: Use ahub V1 bindings and current pane validation](0018-cache-validation-per-binding-record.md) | accepted | [current binding format](../technical-reference.md#binding-format-and-ownership); exit replaced by [ADR-0022](0022-separate-session-exit-from-archive.md); runtime extended by [ADR-0023](0023-separate-runtime-status-from-resume-permission.md) and [ADR-0024](0024-share-request-scoped-runtime-observations.md) |
-| [0019: Enable automatic updates by default for unarchived sessions](0019-enable-automatic-updates-for-unarchived-sessions.md) | accepted | catalog refresh replaced by [ADR-0021](0021-split-catalog-structure-and-activity.md) |
-| [0020: Use a unified project hub](0020-use-a-unified-project-hub.md) | accepted | navigation now stores expanded project IDs instead of collapsed IDs |
-| [0021: Long-poll session structure with best-effort timestamps](0021-split-catalog-structure-and-activity.md) | accepted | runtime status added by [ADR-0023](0023-separate-runtime-status-from-resume-permission.md) |
-| [0022: Separate session exit from archive](0022-separate-session-exit-from-archive.md) | accepted | — |
-| [0023: Separate runtime status from resume permission](0023-separate-runtime-status-from-resume-permission.md) | accepted | reader observations refined by [ADR-0024](0024-share-request-scoped-runtime-observations.md) |
-| [0024: Share runtime observations within each reader response](0024-share-request-scoped-runtime-observations.md) | accepted | reader response paths refined by [ADR-0025](0025-unify-session-reading-on-ordinal-messages.md) |
-| [0025: Unify session reading on ordinal messages](0025-unify-session-reading-on-ordinal-messages.md) | accepted | — |
-| [0026: Filter non-primary rollouts in adapters](0026-filter-non-primary-rollouts-in-adapters.md) | accepted | — |
+## Provenance and maintenance
+
+ADR-101 through ADR-115 reconstruct existing, implemented decisions as of
+2026-11-15. Their `date` is the reconstruction date, not the original decision or
+acceptance date. This consolidation introduces no runtime behavior changes.
+Each record links its evidence and identifies material gaps; alternatives are
+listed only where supported by surviving records. Current implementation verifies
+behavior, but does not by itself prove which alternatives were historically considered.
+
+The [legacy index](legacy-index.md) preserves all 26 old numbers, original titles,
+commit-pinned source links, and their mapping to the current set. The old records
+are available in Git rather than duplicated in this directory. References to
+ADR-0001 through ADR-0026 always mean those frozen records, never the new set.
+
+- Use `ADR-116` next, with filename `0116-<slug>.md`; never reuse numbers.
+- Record one independently changeable choice, including its boundary and accepted
+  costs. Keep implementation detail in the technical reference.
+- Use `proposed` until acceptance is established. For a full replacement, mark the
+  prior record `superseded by ADR-NNN` and link both records. For partial changes,
+  keep its status and identify the changed scope and successor explicitly.
+- Preserve decision context and dates. Later evolution belongs in a dated scope
+  note or a successor, not an unmarked rewrite of the original rationale.
+- Keep the index aligned with titles and statuses, and check file links, section
+  anchors, unique numbers, and replacement targets when changing records.
