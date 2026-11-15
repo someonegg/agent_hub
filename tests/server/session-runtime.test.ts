@@ -105,9 +105,9 @@ describe("session runtime evidence", () => {
 
   it("rejects invalid identities and unavailable directories", async () => {
     const f = setup();
-    expect((await f.evaluate({ ...f.session, sourceId: "" })).resume.allowed).toBe(false);
-    expect((await f.evaluate({ ...f.session, sourceId: null })).resume.allowed).toBe(false);
-    expect((await f.evaluate({ ...f.session, sourceId: "   " })).resume.allowed).toBe(false);
+    f.isValidNativeId.mockReturnValue(false);
+    expect((await f.evaluate()).resume.allowed).toBe(false);
+    f.isValidNativeId.mockReturnValue(true);
     f.resolveDirectory.mockRejectedValue(new Error("ENOENT"));
     expect((await f.evaluate()).resume.allowed).toBe(false);
   });

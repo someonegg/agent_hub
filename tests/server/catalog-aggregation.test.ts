@@ -19,11 +19,11 @@ describe("catalog source aggregation", () => {
       ordinal: null,
     }));
     const source = {
-      ...testSource("catalog-diagnostics", []),
+      ...testSource("catalog-diagnostics", [sourceEntry("one", "Healthy")]),
       async refresh() {
         return {
           signature: "catalog-diagnostics",
-          sessions: [],
+          sessions: [sourceEntry("one", "Healthy")],
           diagnostics,
         };
       },
@@ -32,45 +32,39 @@ describe("catalog source aggregation", () => {
     const snapshot = await new CatalogSnapshotStore([source]).current();
 
     expect(snapshot.diagnostics).toEqual(diagnostics.slice(0, MAX_CATALOG_DIAGNOSTICS));
+    expect(snapshot.sessions.size).toBe(1);
   });
 
-  it("retains readable sessions despite truncated diagnostics and duplicate local identities", async () => {
-    const first = testSource("first", []);
-    const healthy = testSource("healthy", [sourceEntry("one", "Healthy")]);
-    const duplicate = sourceEntry("same", "Duplicate");
-    const broken = testSource("broken", [duplicate, duplicate]);
-    const noisy: SessionSource = {
-      ...first,
-      async refresh() {
-        return {
-          signature: "noisy",
-          sessions: [],
-          diagnostics: Array.from({ length: MAX_CATALOG_DIAGNOSTICS + 1 }, () => ({
-            code: "unavailable",
-            severity: "error" as const,
-            message: "Unavailable",
-            ordinal: null,
-          })),
-        };
-      },
-    };
-    const log = vi.fn();
-    const snapshot = await new CatalogSnapshotStore(
-      [noisy, healthy, broken],
-      undefined,
-      undefined,
-      { diagnosticLogger: { log } },
-    ).current();
-    expect(log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        agent: broken.descriptor.agent,
-        scope: "aggregate",
-        code: "duplicate_source_session_id",
-      }),
-    );
-    expect(snapshot.diagnostics).toHaveLength(MAX_CATALOG_DIAGNOSTICS);
+  it("rejects duplicate local identities within a source", async () => {
+    const entry = sourceEntry("same", "Duplicate");
+    await expect(
+      new CatalogSnapshotStore([testSource("broken", [entry, entry])]).current(),
+    ).rejects.toThrow("Session source contract violation");
+  });
+
+  it("allows the same local identity in different sources", async () => {
+    const entry = sourceEntry("same", "Session");
+    const snapshot = await new CatalogSnapshotStore([
+      testSource("first", [entry]),
+      testSource("second", [entry]),
+    ]).current();
     expect(snapshot.sessions.size).toBe(2);
   });
+
+  it.each(["production", undefined])(
+    "trusts source identities with NODE_ENV=%s",
+    async (environment) => {
+      vi.stubEnv("NODE_ENV", environment);
+      try {
+        const entry = sourceEntry("same", "Session");
+        await expect(
+          new CatalogSnapshotStore([testSource("source", [entry, entry])]).current(),
+        ).resolves.toBeDefined();
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
 
   it("rejects duplicate source instances and propagates source invariant failures", async () => {
     const source = {

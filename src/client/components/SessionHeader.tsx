@@ -59,7 +59,7 @@ export function SessionHeader({ agentNickname, management, session }: SessionHea
               </p>
               <p className="session-origin">{sessionOriginLabel(session.origin)}</p>
               <p className="session-source-id">
-                {t("originalSessionID")} <code>{session.sourceId ?? t("unavailable")}</code>
+                {t("originalSessionID")} <code>{session.sourceId}</code>
               </p>
             </div>
           </details>

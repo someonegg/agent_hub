@@ -85,7 +85,7 @@ export type DomainAgentInteraction = {
 
 export interface DomainSession {
   readonly id: DomainSessionId;
-  readonly sourceId: string | null;
+  readonly sourceId: string;
   readonly origin: DomainSessionOrigin;
   readonly title: string;
   readonly workingDirectory: string | null;

@@ -78,7 +78,7 @@ export class SessionLaunchExecutor {
       const capability = await this.runtime.evaluate(session);
       if (!capability.resume.allowed) throw new Error(capability.resume.reason!);
       entry.agent = session.origin.agent;
-      entry.resumeNativeId = session.sourceId ?? undefined;
+      entry.resumeNativeId = session.sourceId;
       const manager = this.managers.get(entry.agent);
       const directory = capability.directory!;
       if (
@@ -93,7 +93,7 @@ export class SessionLaunchExecutor {
         workingDirectory: directory,
         worktree: false,
         permissionMode: input.permissionMode ?? "default",
-        resumeNativeId: session.sourceId!,
+        resumeNativeId: session.sourceId,
         projectDirectory: session.projectDirectory,
         ...(session.taskName ? { taskName: session.taskName } : {}),
       });
@@ -135,8 +135,7 @@ export class SessionLaunchExecutor {
       entry.metadata.mode === "resume" &&
       (match.id !== entry.metadata.sessionId ||
         match.archived ||
-        match.sourceId !== entry.resumeNativeId ||
-        !match.sourceId)
+        match.sourceId !== entry.resumeNativeId)
     )
       throw new AssociationError("Resume did not bind the original session");
     const attempt = this.bindings.latest(match.id);

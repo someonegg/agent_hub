@@ -105,7 +105,7 @@ it("does not inspect diagnostic content on cached reads or unchanged diagnostic 
   expect(reads).toBe(0);
 });
 
-it("logs each source independently, including aggregate diagnostics, and forgets removed sources", () => {
+it("logs each source independently, forgets removed sources", () => {
   const log = vi.fn();
   const logger = new RefreshDiagnosticLogger({ log });
   const one = entry();
@@ -127,33 +127,13 @@ it("logs each source independently, including aggregate diagnostics, and forgets
       },
     },
   ];
-  const aggregates = new Map([
-    [
-      "other",
-      [
-        {
-          sessionId: "global-id",
-          diagnostic: {
-            ...warning,
-            code: "duplicate_source_session_id",
-            severity: "error" as const,
-          },
-        },
-      ],
-    ],
-  ]);
-  logger.update(sources, aggregates);
-  expect(log).toHaveBeenCalledTimes(52);
-  expect(log.mock.calls.at(-1)?.[0]).toMatchObject({
-    agent: "other",
-    scope: "aggregate",
-    code: "duplicate_source_session_id",
-  });
-  logger.update(sources, aggregates);
-  expect(log).toHaveBeenCalledTimes(52);
+  logger.update(sources);
+  expect(log).toHaveBeenCalledTimes(51);
+  logger.update(sources);
+  expect(log).toHaveBeenCalledTimes(51);
   logger.update([]);
-  logger.update(sources, aggregates);
-  expect(log).toHaveBeenCalledTimes(104);
+  logger.update(sources);
+  expect(log).toHaveBeenCalledTimes(102);
 });
 
 it("isolates logger failures from reading and management snapshots", async () => {

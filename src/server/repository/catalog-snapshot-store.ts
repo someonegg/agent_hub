@@ -12,11 +12,7 @@ import type {
   SourceBindingEvent,
   SourceSessionEntry,
 } from "../source/session-source.js";
-import {
-  type AggregateDiagnostic,
-  type DiagnosticLogger,
-  RefreshDiagnosticLogger,
-} from "./diagnostic-logger.js";
+import { type DiagnosticLogger, RefreshDiagnosticLogger } from "./diagnostic-logger.js";
 import { RefreshCoordinator } from "./refresh-coordinator.js";
 
 export const DEFAULT_CATALOG_FRESHNESS_MS = 1_500;
@@ -43,7 +39,6 @@ export class CatalogSnapshotStore {
   readonly #pendingBindings = new Map<SessionSource, Set<SourceBindingEvent>>();
   readonly #publishBindings: NonNullable<CatalogSnapshotStoreDependencies["publishBindings"]>;
   #aggregate: AggregateState | null = null;
-  #aggregateDiagnostics: ReadonlyMap<string, readonly AggregateDiagnostic[]> = new Map();
   #lastDiscoveryAt = Number.NEGATIVE_INFINITY;
 
   constructor(
@@ -105,7 +100,7 @@ export class CatalogSnapshotStore {
     const signature = aggregateSignature(loadedSources);
     const previous = this.#snapshot;
     if (previous?.signature === signature) {
-      this.#diagnosticLogger.update(loadedSources, this.#aggregateDiagnostics);
+      this.#diagnosticLogger.update(loadedSources);
       return previous;
     }
 
@@ -117,23 +112,15 @@ export class CatalogSnapshotStore {
         sourceDiagnostics.push({ ...item });
       }
     }
-    const aggregate = aggregateSessions(
-      loadedSources,
-      this.#aggregate,
-      MAX_CATALOG_DIAGNOSTICS - sourceDiagnostics.length,
-    );
+    const aggregate = aggregateSessions(loadedSources, this.#aggregate);
     const snapshot: CatalogSnapshot = {
       signature,
-      diagnostics: [...sourceDiagnostics, ...aggregate.diagnostics],
+      diagnostics: sourceDiagnostics,
       sessions: aggregate.sessions,
     };
-    this.#aggregate = {
-      inputs: aggregate.inputs,
-      sessions: aggregate.sessions,
-    };
+    this.#aggregate = aggregate;
     this.#snapshot = snapshot;
-    this.#aggregateDiagnostics = aggregate.aggregateDiagnostics;
-    this.#diagnosticLogger.update(loadedSources, aggregate.aggregateDiagnostics);
+    this.#diagnosticLogger.update(loadedSources);
     return snapshot;
   }
 }
@@ -145,7 +132,7 @@ interface LoadedSource {
 
 interface PendingSession {
   readonly descriptor: SessionSourceDescriptor;
-  readonly nativeSessionId: string | null;
+  readonly nativeSessionId: string;
   readonly origin: SourceSessionEntry["origin"];
   readonly normalized: NormalizedSession;
 }
@@ -153,11 +140,6 @@ interface PendingSession {
 interface AggregateState {
   readonly inputs: ReadonlyMap<DomainSessionId, PendingSession>;
   readonly sessions: ReadonlyMap<DomainSessionId, NormalizedSession>;
-}
-
-interface AggregatedSessions extends AggregateState {
-  readonly aggregateDiagnostics: ReadonlyMap<string, readonly AggregateDiagnostic[]>;
-  readonly diagnostics: readonly DomainDiagnostic[];
 }
 
 function assertUniqueSources(sources: readonly SessionSource[]): void {
@@ -191,34 +173,20 @@ function aggregateSignature(sources: readonly LoadedSource[]): string {
 function aggregateSessions(
   sources: readonly LoadedSource[],
   previous: AggregateState | null,
-  diagnosticLimit: number,
-): AggregatedSessions {
-  const diagnostics: DomainDiagnostic[] = [];
-  const aggregateDiagnostics = new Map<string, AggregateDiagnostic[]>();
+): AggregateState {
   const inputs = new Map<DomainSessionId, PendingSession>();
   for (const { descriptor, snapshot } of sources) {
-    const localIds = new Set<string>();
+    const localIds =
+      process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test"
+        ? new Set<string>()
+        : null;
     for (const entry of snapshot.sessions) {
-      if (localIds.has(entry.localId)) {
-        const diagnostic: DomainDiagnostic = {
-          code: "duplicate_source_session_id",
-          severity: "error",
-          message: "A source returned duplicate stable session identities.",
-          ordinal: null,
-        };
-        if (diagnostics.length < diagnosticLimit) diagnostics.push(diagnostic);
-        const group = aggregateDiagnostics.get(descriptor.agent) ?? [];
-        const sessionId = opaqueIdForParts(descriptor.instanceKey, entry.localId);
-        if (
-          group.length < MAX_CATALOG_DIAGNOSTICS &&
-          !group.some((item) => item.sessionId === sessionId)
-        ) {
-          group.push({ sessionId, diagnostic });
-          aggregateDiagnostics.set(descriptor.agent, group);
-        }
-        continue;
+      if (localIds?.has(entry.localId)) {
+        throw new Error(
+          `Session source contract violation: duplicate localId ${entry.localId} from ${descriptor.agent}`,
+        );
       }
-      localIds.add(entry.localId);
+      localIds?.add(entry.localId);
       const id = opaqueIdForParts(descriptor.instanceKey, entry.localId);
       const input: PendingSession = {
         descriptor,
@@ -257,8 +225,6 @@ function aggregateSessions(
   }
   return {
     sessions,
-    diagnostics,
-    aggregateDiagnostics,
     inputs,
   };
 }

@@ -223,7 +223,7 @@ describe("catalog discovery", () => {
     const path = join(agent, "sessions/rollout-atomic.jsonl");
     await writeFile(
       path,
-      '{"type":"event_msg","payload":{"type":"agent_message","message":"one"}}\n',
+      '{"type":"session_meta","payload":{"id":"atomic"}}\n{"type":"event_msg","payload":{"type":"agent_message","message":"one"}}\n',
     );
     const delegate = new DefaultSessionNormalizer();
     let failNextAppend = false;
@@ -272,8 +272,8 @@ describe("catalog discovery", () => {
     );
 
     const snapshot = await new CodexSessionSource(agent, "codex-identities").refresh();
-    expect(snapshot.sessions).toHaveLength(2);
-    expect(new Set(snapshot.sessions.map((entry) => entry.localId)).size).toBe(2);
+    expect(snapshot.sessions).toHaveLength(1);
+    expect(new Set(snapshot.sessions.map((entry) => entry.localId)).size).toBe(1);
     expect(snapshot.diagnostics).toContainEqual(
       expect.objectContaining({
         code: "duplicate_native_session_id",
@@ -282,9 +282,6 @@ describe("catalog discovery", () => {
     expect(
       snapshot.sessions.find((entry) => entry.nativeSessionId === "duplicate")?.origin,
     ).toMatchObject({ runtimeName: "Codex", runtimeVersion: "2.4.0" });
-    expect(snapshot.sessions.find((entry) => entry.nativeSessionId === null)?.localId).toBe(
-      "resource:sessions/rollout-no-id.jsonl",
-    );
     expect(
       snapshot.sessions
         .filter((entry) => entry.nativeSessionId === "duplicate")
@@ -323,12 +320,24 @@ it("returns an empty management snapshot after a known root disappears", async (
   await rename(join(agent, "sessions"), join(agent, "sessions-moved"));
   expect((await reader.managementSnapshot()).sessions).toEqual([]);
 });
-it("retains a rollout without a valid native identity for management validation", async () => {
+it("skips missing and blank identities and recovers after complete metadata", async () => {
   const agent = await createTempDirectory("codex-management-identity-");
   await mkdir(join(agent, "sessions"));
-  await writeFile(join(agent, "sessions", "rollout-invalid.jsonl"), "invalid JSON\n");
+  const file = join(agent, "sessions", "rollout-invalid.jsonl");
   const source = await createCodexSessionSource(agent);
-  expect(
-    (await new SessionReadService([source]).managementSnapshot()).sessions[0]?.sourceId,
-  ).toBeNull();
+  for (const id of [undefined, "", "   "]) {
+    await writeFile(file, JSON.stringify({ type: "session_meta", payload: { id } }) + "\n");
+    const skipped = await source.refresh();
+    expect(skipped.sessions).toEqual([]);
+    expect(skipped.bindings).toEqual([]);
+    expect(skipped.diagnostics).toContainEqual(
+      expect.objectContaining({ code: "missing_native_session_id" }),
+    );
+  }
+  await writeFile(file, '{"type":"session_meta","payload":{"id":"recovered"}}');
+  expect((await source.refresh()).sessions).toEqual([]);
+  await appendFile(file, "\n");
+  const recovered = await source.refresh();
+  expect(recovered.sessions[0]?.nativeSessionId).toBe("recovered");
+  expect(recovered.diagnostics).toEqual([]);
 });

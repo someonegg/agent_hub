@@ -31,7 +31,7 @@ export interface SessionNormalizer {
   ): SessionNormalizerState;
   materialize(
     state: SessionNormalizerState,
-    metadata: SessionMetadata,
+    metadata: SessionMetadata & { readonly threadId: string },
     origin?: DomainSessionOrigin,
   ): NormalizedSession;
 }
@@ -104,7 +104,7 @@ export class DefaultSessionNormalizer implements SessionNormalizer {
 
   materialize(
     state: SessionNormalizerState,
-    metadata: SessionMetadata,
+    metadata: SessionMetadata & { readonly threadId: string },
     origin: DomainSessionOrigin = DEFAULT_SESSION_ORIGIN,
   ): NormalizedSession {
     const diagnostics = combinedDiagnostics(state);

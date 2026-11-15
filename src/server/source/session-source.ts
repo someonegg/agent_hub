@@ -14,8 +14,10 @@ export interface SessionSourceDescriptor {
 }
 
 export interface SourceSessionEntry {
+  /** Stable and unique within this source snapshot. */
   readonly localId: string;
-  readonly nativeSessionId: string | null;
+  /** Nonempty native identity; operation format validation belongs to the adapter. */
+  readonly nativeSessionId: string;
   readonly origin: DomainSessionOrigin;
   /**
    * Published normalized values are immutable snapshots. An adapter must never

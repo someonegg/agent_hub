@@ -31,7 +31,10 @@ export function normalizeRecords(
   records: DecodedRecord[],
   metadata: Partial<SessionMetadata> = {},
 ) {
-  return normalizeDecoded(decodedRollout(id, records), sessionMetadata(metadata));
+  return normalizeDecoded(
+    decodedRollout(id, records),
+    sessionMetadata({ ...metadata, threadId: metadata.threadId ?? id }),
+  );
 }
 
 export function decodedRollout(id: string, records: DecodedRecord[]): DecodedRollout {
@@ -49,9 +52,11 @@ export function decodedRollout(id: string, records: DecodedRecord[]): DecodedRol
   };
 }
 
-export function sessionMetadata(overrides: Partial<SessionMetadata> = {}): SessionMetadata {
+export function sessionMetadata(
+  overrides: Partial<SessionMetadata & { threadId: string }> = {},
+): SessionMetadata & { threadId: string } {
   return {
-    threadId: null,
+    threadId: "test-native-id",
     runtimeVersion: null,
     title: null,
     workingDirectory: null,
@@ -77,6 +82,6 @@ export function normalizeDecoded(decoded: DecodedRollout, metadata: SessionMetad
   const normalizer = new DefaultSessionNormalizer();
   return normalizer.materialize(
     normalizer.append(normalizer.create(decoded.descriptor), decoded.records, decoded.diagnostics),
-    metadata,
+    { ...metadata, threadId: metadata.threadId ?? "test-native-id" },
   );
 }
