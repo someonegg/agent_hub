@@ -36,8 +36,11 @@ export class DiffStore {
         throw new Error("Invalid diff metadata");
       return metadata;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-      throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") return null;
+      if (code) throw error;
+      console.warn(`Skipping damaged diff entry ${this.directory(id)}: ${String(error)}`);
+      return null;
     }
   }
   async exists(id: string): Promise<boolean> {

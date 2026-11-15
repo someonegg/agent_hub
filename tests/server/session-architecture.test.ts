@@ -10,16 +10,19 @@ const apiDirectory = resolve(serverDirectory, "api");
 const apiContract = resolve("src/shared/api-contract.js");
 
 describe("architecture dependency scanner", () => {
-  it.each([
-    'import "../adapters/codex/session-manager.js";',
-    'const adapter = import( /* adapter */ "../adapters/codex/session-manager.js");',
-    'type Manager = import("../adapters/codex/session-manager.js").CodexSessionManager;',
-  ])("detects Codex dependency syntax: %s", (source) => {
-    expect(
-      forbiddenDependencies(resolve(serverDirectory, "application/example.ts"), source, [
-        codexDirectory,
-      ]),
-    ).toEqual([resolve(codexDirectory, "session-manager.js")]);
+  it("detects static, dynamic and type-only Codex dependencies", () => {
+    for (const source of [
+      'import "../adapters/codex/session-manager.js";',
+      'const adapter = import( /* adapter */ "../adapters/codex/session-manager.js");',
+      'type Manager = import("../adapters/codex/session-manager.js").CodexSessionManager;',
+    ]) {
+      expect(
+        forbiddenDependencies(resolve(serverDirectory, "application/example.ts"), source, [
+          codexDirectory,
+        ]),
+        JSON.stringify(source),
+      ).toEqual([resolve(codexDirectory, "session-manager.js")]);
+    }
   });
 
   it("resolves relative API paths without matching comments, strings or sibling directories", () => {

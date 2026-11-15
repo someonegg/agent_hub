@@ -102,8 +102,10 @@ ahub-cli session inspect <id>
 ahub-cli session inspect <id> --follow
 ```
 
-使用 `list` 或 `create` 返回的 Hub ID。`list` 默认不含归档会话，传入 `--all` 可包含；
-将返回的 `Next after` 值传给 `--after <value>` 读取下一页。
+使用 `list` 或 `create` 返回的 Hub ID。
+`list` 返回完整列表而不分页，默认不含归档会话；传入 `--all` 可包含归档会话。
+对于 `inspect`，将返回的 `Next after` 值传给
+`ahub-cli session inspect <id> --after <value>` 读取下一页消息。
 `--follow` 持续观察直到按 `Ctrl+C` 停止，不会因任务完成自动结束。
 
 创建默认使用项目目录和第一个已配置智能体。用 `--cwd` 修改工作目录而保留项目归属，

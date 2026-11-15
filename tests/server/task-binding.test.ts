@@ -34,11 +34,10 @@ it("round trips quoted task names without shell evaluation", () => {
   ]);
 });
 
-it.each(["not-json", JSON.stringify("a>b")])(
-  "ignores an invalid task field without invalidating the binding: %s",
-  (task) => {
+it("ignores malformed and disallowed task fields without invalidating bindings", () => {
+  for (const task of ["not-json", JSON.stringify("a>b")]) {
     const output = `AHUB_TMUX_BIND_V3\n/tmp/socket\nahub-00000000-0000-0000-0000-000000000007\n\n/project\n${task}\n`;
-    expect(bindingAttempts(output, 9)).toEqual([
+    expect(bindingAttempts(output, 9), JSON.stringify(task)).toEqual([
       {
         ordinal: 9,
         valid: true,
@@ -47,8 +46,8 @@ it.each(["not-json", JSON.stringify("a>b")])(
         projectDirectory: "/project",
       },
     ]);
-  },
-);
+  }
+});
 
 function bindingAttempts(output: string, ordinal = 1) {
   return codexBindingAttemptsFrom({
@@ -75,18 +74,16 @@ it("rejects shell output delimiters before generating commands", () => {
   ).toThrow("Task name");
 });
 
-it.each(['""', "not-json", "42", JSON.stringify("a>b")])(
-  "preserves Claude task/project metadata for invalid or empty updates: %s",
-  (task) => {
-    const initial = createClaudeState("session");
-    const first = appendClaudeRecords(initial, [
-      claudeBindingRecord(1, "/first", JSON.stringify("first")),
-    ]);
+it("preserves Claude task and project metadata across invalid updates", () => {
+  const first = appendClaudeRecords(createClaudeState("session"), [
+    claudeBindingRecord(1, "/first", JSON.stringify("first")),
+  ]);
+  for (const task of ['""', "not-json", "42", JSON.stringify("a>b")]) {
     const second = appendClaudeRecords(first, [claudeBindingRecord(2, "relative", task)]);
-    expect(second).toMatchObject({ project: "/first", taskName: "first" });
-    expect(first).toMatchObject({ project: "/first", taskName: "first" });
-  },
-);
+    expect(second, JSON.stringify(task)).toMatchObject({ project: "/first", taskName: "first" });
+    expect(first, JSON.stringify(task)).toMatchObject({ project: "/first", taskName: "first" });
+  }
+});
 
 function claudeBindingRecord(ordinal: number, project: string, task: string) {
   return {

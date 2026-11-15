@@ -8,6 +8,7 @@ import { PassThrough } from "node:stream";
 
 import { expect, it, vi } from "vitest";
 
+import { DiffStore } from "../../src/server/hosting/diff-store.js";
 import { hostingRoutes } from "../../src/server/hosting/routes.js";
 import { HostingStore } from "../../src/server/hosting/store.js";
 import { reportRequestError } from "../../src/server/http/request-errors.js";
@@ -36,6 +37,25 @@ it("propagates artifact storage permission failures", async () => {
   const denied = Object.assign(new Error("storage denied"), { code: "EACCES" });
   vi.mocked(readFile).mockRejectedValueOnce(denied);
   await expect(store.get(artifact.id)).rejects.toBe(denied);
+});
+
+it("propagates permission and I/O failures from diff metadata reads", async () => {
+  const root = await createTempDirectory("diff-errors-");
+  const source = join(root, "test.diff");
+  await writeFile(source, "diff content");
+  const store = new DiffStore(join(root, "hosting"));
+  const entry = await store.publish(source);
+  for (const code of ["EACCES", "EIO"]) {
+    const failure = Object.assign(new Error("storage failure"), { code });
+    for (const read of [
+      () => store.list(),
+      () => store.get(entry.id),
+      () => store.exists(entry.id),
+    ]) {
+      vi.mocked(readFile).mockRejectedValueOnce(failure);
+      await expect(read(), code).rejects.toBe(failure);
+    }
+  }
 });
 
 it("logs stream errors and destroys the response without writing JSON", async () => {

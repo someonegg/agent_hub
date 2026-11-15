@@ -113,17 +113,23 @@ it("handles catalog help, empty lists and errors", async () => {
 });
 
 it.each([
-  ["create"],
-  ["list", "extra"],
-  ["list", "--unknown"],
-  ["list", "--timeout", "0"],
-  ["list", "--timeout", "2147484"],
-  ["list", "--url", "http://example.com/path"],
-])("rejects invalid catalog arguments: %j", (...args) => {
-  expect(() => parseCatalogArguments(args)).toThrow(CommandError);
-  expect(() => parseCatalogArguments(args)).toThrow(
-    expect.objectContaining({ code: "invalid_arguments" }),
-  );
+  { category: "positionals", cases: [["create"], ["list", "extra"]] },
+  { category: "unknown options", cases: [["list", "--unknown"]] },
+  {
+    category: "timeout bounds",
+    cases: [
+      ["list", "--timeout", "0"],
+      ["list", "--timeout", "2147484"],
+    ],
+  },
+  { category: "non-origin URLs", cases: [["list", "--url", "http://example.com/path"]] },
+])("rejects invalid catalog $category", ({ cases }) => {
+  for (const args of cases) {
+    expect(() => parseCatalogArguments(args), JSON.stringify(args)).toThrow(CommandError);
+    expect(() => parseCatalogArguments(args), JSON.stringify(args)).toThrow(
+      expect.objectContaining({ code: "invalid_arguments" }),
+    );
+  }
 });
 
 it("uses the same URL precedence and default timeout as session list", () => {

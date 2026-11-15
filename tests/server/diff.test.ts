@@ -23,7 +23,8 @@ async function fixture() {
   return { root, source, store: new DiffStore(join(root, "hosting")) };
 }
 it("publishes independent snapshots offline and serializes concurrent writes and idempotent deletion", async () => {
-  const { source, store } = await fixture();
+  const { root, source, store } = await fixture();
+  await expect(store.publish(root)).rejects.toThrow("Diff source must be a regular file");
   const entries = await Promise.all(
     Array.from({ length: 3 }, () => store.publish(source, "Review")),
   );
@@ -37,6 +38,30 @@ it("publishes independent snapshots offline and serializes concurrent writes and
   expect(await store.get("../../test")).toBeNull();
   await expect(store.delete("../test")).rejects.toThrow(/UUID/);
 });
+it("lists valid metadata without opening bodies and skips damaged entries", async () => {
+  const { root, source, store } = await fixture();
+  const valid = await store.publish(source, "Valid");
+  const damaged = await store.publish(source, "Damaged");
+  const damagedDirectory = join(root, "hosting", "diffs", damaged.id);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  expect(await store.get(valid.id)).toMatchObject(valid);
+
+  const rawPath = join(root, "hosting", "diffs", valid.id, "raw.diff");
+  // A directory makes body reads fail while leaving metadata readable.
+  await rm(rawPath);
+  await mkdir(rawPath);
+  for (const metadata of ["{broken", "null", "{}"]) {
+    await writeFile(join(damagedDirectory, "metadata.json"), metadata);
+    warn.mockClear();
+    expect(await store.list(), metadata).toEqual([valid]);
+    expect(await store.get(damaged.id), metadata).toBeNull();
+    expect(await store.exists(damaged.id), metadata).toBe(false);
+    expect(warn, metadata).toHaveBeenCalledWith(
+      expect.stringContaining(`Skipping damaged diff entry ${damagedDirectory}`),
+    );
+  }
+});
+
 it("parses hunks, counts, C-quoted UTF-8 paths, spaces, and no-newline markers", () => {
   const parsed = parseDiff(
     'diff --git "a/\\344\\270\\255 file" "b/\\344\\270\\255 file"\n--- "a/\\344\\270\\255 file"\n+++ "b/\\344\\270\\255 file"\n@@ -2,2 +2,3 @@\n keep\n-old\n+new\n+extra\n\\ No newline at end of file\n@@ -8 +9 @@\n-x\n+y\n',
@@ -113,16 +138,6 @@ it("removes Git's separator tab without trimming spaces in a filename", () => {
   );
   expect(parsed.files[0].path).toBe("a b ");
   expect(parsed.warning).toBe(false);
-});
-
-it("lists metadata without opening diff bodies", async () => {
-  const { root, source, store } = await fixture();
-  const entry = await store.publish(source, "Metadata only");
-  const rawPath = join(root, "hosting", "diffs", entry.id, "raw.diff");
-  // A directory makes any attempt to read the body fail without allocating a large fixture.
-  await rm(rawPath);
-  await mkdir(rawPath);
-  expect(await store.list()).toEqual([entry]);
 });
 
 it("decodes mixed Git C escapes in file headers and patch paths", () => {
@@ -223,9 +238,4 @@ it("serves pages and deletes resources without loading diff bodies", async () =>
   await mkdir(raw);
   expect(await store.exists(entry.id)).toBe(false);
   expect(await store.exists("../invalid")).toBe(false);
-});
-
-it("rejects a directory as the diff source", async () => {
-  const { root, store } = await fixture();
-  await expect(store.publish(root)).rejects.toThrow("Diff source must be a regular file");
 });

@@ -26,16 +26,18 @@ const answer = (question: string) =>
   ]);
 
 describe("Claude incremental allocation", () => {
-  it.each([
-    { type: "progress", cwd: "/ignored" },
-    message("user", "<system-reminder>hidden</system-reminder>"),
-    message("assistant", [{ type: "tool_use", name: "Read", id: "read", input: {} }]),
-    message("user", [{ type: "tool_result", tool_use_id: "missing", content: "result" }]),
-  ])("reuses collections for records without display items: %j", (row) => {
+  it("reuses timeline and question collections for records without display items", () => {
     const before = append(createClaudeState(id), message("user", "Hello"), ask("Continue?"));
-    const after = append(before, row);
-    expect(after.timeline).toBe(before.timeline);
-    expect(after.questions).toBe(before.questions);
+    for (const row of [
+      { type: "progress", cwd: "/ignored" },
+      message("user", "<system-reminder>hidden</system-reminder>"),
+      message("assistant", [{ type: "tool_use", name: "Read", id: "read", input: {} }]),
+      message("user", [{ type: "tool_result", tool_use_id: "missing", content: "result" }]),
+    ]) {
+      const after = append(before, row);
+      expect(after.timeline, JSON.stringify(row)).toBe(before.timeline);
+      expect(after.questions, JSON.stringify(row)).toBe(before.questions);
+    }
   });
 
   it("updates metadata and identity diagnostics while reusing collections", () => {

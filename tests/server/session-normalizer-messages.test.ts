@@ -52,33 +52,39 @@ describe("message and directive normalization", () => {
     expect(JSON.stringify(normalized)).not.toContain("WRONG_CASE_MUST_NOT_RENDER");
   });
 
-  it.each([
-    ["commentary", "update"],
-    ["final", "response"],
-    ["final_answer", "response"],
-    [undefined, null],
-  ] as const)("normalizes completed AgentMessage phase %s", (phase, expectedPhase) => {
-    const normalized = normalizeRecords(`completed-agent-${phase ?? "missing"}`, [
-      completedItem(1, {
-        type: "AgentMessage",
-        ...(phase === undefined ? {} : { phase }),
-        content: [
-          { type: "Text", text: "First assistant paragraph" },
-          { type: "text", text: "WRONG_CASE_MUST_NOT_RENDER" },
-          { type: "Text", text: "Second assistant paragraph" },
-        ],
-      }),
-    ]);
+  it("normalizes completed assistant message text and phase aliases", () => {
+    const phases = [
+      ["commentary", "update"],
+      ["final", "response"],
+      ["final_answer", "response"],
+      [undefined, null],
+    ] as const;
+    const normalized = normalizeRecords(
+      "completed-agent-phases",
+      phases.map(([phase], index) =>
+        completedItem(index + 1, {
+          type: "AgentMessage",
+          ...(phase === undefined ? {} : { phase }),
+          content: [
+            { type: "Text", text: "First assistant paragraph" },
+            { type: "text", text: "WRONG_CASE_MUST_NOT_RENDER" },
+            { type: "Text", text: "Second assistant paragraph" },
+          ],
+        }),
+      ),
+    );
 
-    expect(normalized.timeline).toEqual([
-      expect.objectContaining({
-        kind: "message",
-        role: "assistant",
-        phase: expectedPhase,
-        itemType: null,
-        markdown: "First assistant paragraph\n\nSecond assistant paragraph",
-      }),
-    ]);
+    expect(normalized.timeline).toEqual(
+      phases.map(([, phase]) =>
+        expect.objectContaining({
+          kind: "message",
+          role: "assistant",
+          phase,
+          itemType: null,
+          markdown: "First assistant paragraph\n\nSecond assistant paragraph",
+        }),
+      ),
+    );
     expect(JSON.stringify(normalized)).not.toContain("WRONG_CASE_MUST_NOT_RENDER");
   });
 

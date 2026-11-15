@@ -136,37 +136,52 @@ describe("normalizeQuestionResponse", () => {
     expect(response).toMatchObject({ outcome: "answered" });
   });
 
-  it.each([
-    ["denied flag", { denied: true }],
-    ["rejected flag", { rejected: true }],
-  ])("reports aborted for the %s", (_label, toolUseResult) => {
-    expect(normalizeQuestionResponse("ask", questions, {}, toolUseResult, "T")).toMatchObject({
-      ...base,
-      outcome: "aborted",
-    });
+  it("reports aborted for either native rejection flag", () => {
+    for (const [label, toolUseResult] of [
+      ["denied flag", { denied: true }],
+      ["rejected flag", { rejected: true }],
+    ]) {
+      expect(
+        normalizeQuestionResponse("ask", questions, {}, toolUseResult, "T"),
+        JSON.stringify([label, toolUseResult]),
+      ).toMatchObject({
+        ...base,
+        outcome: "aborted",
+      });
+    }
   });
 
-  it.each([
-    "The user doesn't want to proceed. Ask what to do instead.",
-    "User declined to answer",
-    "Request interrupted by user",
-  ])("reports aborted for the rejection text %s", (text) => {
-    expect(normalizeQuestionResponse("ask", questions, text, null, "T")).toMatchObject({
-      ...base,
-      outcome: "aborted",
-    });
+  it("recognizes native rejection text variants", () => {
+    for (const text of [
+      "The user doesn't want to proceed. Ask what to do instead.",
+      "User declined to answer",
+      "Request interrupted by user",
+    ]) {
+      expect(
+        normalizeQuestionResponse("ask", questions, text, null, "T"),
+        JSON.stringify(text),
+      ).toMatchObject({
+        ...base,
+        outcome: "aborted",
+      });
+    }
   });
 
-  it.each([
-    ["non-array answers", { answers: "Red" }],
-    ["mixed-type answer arrays", { answers: { "Color?": ["Red", 3], "Size?": "Two" } }],
-    ["answers keyed by unknown questions", { answers: { Shape: "Round" } }],
-    ["unparseable text content", "not JSON"],
-  ])("reports unavailable for %s", (_label, content) => {
-    expect(normalizeQuestionResponse("ask", questions, content, null, "T")).toMatchObject({
-      ...base,
-      outcome: "unavailable",
-    });
+  it("reports unavailable for malformed or unmatched answers", () => {
+    for (const [label, content] of [
+      ["non-array answers", { answers: "Red" }],
+      ["mixed-type answer arrays", { answers: { "Color?": ["Red", 3], "Size?": "Two" } }],
+      ["answers keyed by unknown questions", { answers: { Shape: "Round" } }],
+      ["unparseable text content", "not JSON"],
+    ]) {
+      expect(
+        normalizeQuestionResponse("ask", questions, content, null, "T"),
+        JSON.stringify([label, content]),
+      ).toMatchObject({
+        ...base,
+        outcome: "unavailable",
+      });
+    }
   });
 
   it("reports unavailable when any question lacks an answer", () => {

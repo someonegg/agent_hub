@@ -265,7 +265,10 @@ it("classifies malformed paths, missing files and storage failures with correlat
   const id = "00000000-0000-4000-8000-000000000001";
   await mkdir(join(store.root, "diffs", id), { recursive: true });
   await writeFile(join(store.root, "diffs", id, "metadata.json"), "broken json");
-  expect((await fetch(base + `/api/v1/diffs/${id}`)).status).toBe(500);
+  const diagnostics = vi.spyOn(console, "warn").mockImplementation(() => {});
+  expect((await fetch(base + `/api/v1/diffs/${id}`)).status).toBe(404);
+  expect(diagnostics).toHaveBeenCalledWith(expect.stringContaining("Skipping damaged diff entry"));
+  expect(logger.error).toHaveBeenCalledTimes(1);
   const deletion = vi.spyOn(HostingStore.prototype, "delete").mockRejectedValueOnce(failure);
   try {
     expect(
