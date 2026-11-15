@@ -16,7 +16,7 @@ export const docsSession = {
   status: "live",
   resume: { allowed: false, reason: "Session is already live" },
   messageCount: 0,
-  sourceId: null,
+  sourceId: "00000000-0000-4000-8000-000000000001",
 };
 
 export const connectedInteraction = {

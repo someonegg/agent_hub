@@ -53,11 +53,10 @@ it.each([
   },
 );
 
-it.each([
-  meta({ id: "test", parent_id: "", parent_thread_id: 42, source: { subagent: null } }),
-  line({ type: "event_msg", payload: { message: "parent_thread_id subagent parent_id" } }),
-])("keeps ordinary and metadata-free rollouts: %s", async (content) => {
-  const { source, decode } = await setup(content);
+it("keeps ordinary rollouts with non-subagent metadata fields", async () => {
+  const { source, decode } = await setup(
+    meta({ id: "test", parent_id: "", parent_thread_id: 42, source: { subagent: null } }),
+  );
   expect((await source.refresh()).sessions).toHaveLength(1);
   expect(decode).toHaveBeenCalledTimes(1);
 });
@@ -125,7 +124,7 @@ it("retries read failures rather than excluding their paths", async () => {
 
 it("defers an incomplete metadata line until it is newline terminated", async () => {
   const { source, file, decode } = await setup(meta({ id: "test", parent_id: "parent" }).trimEnd());
-  expect((await source.refresh()).sessions).toHaveLength(1);
+  expect((await source.refresh()).sessions).toHaveLength(0);
   expect(decode).toHaveBeenCalledTimes(1);
   await appendFile(file, "\n");
   expect((await source.refresh()).sessions).toEqual([]);

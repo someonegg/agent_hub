@@ -24,7 +24,7 @@ Codex scans `rollout-*.jsonl` under `sessions/` and `archived_sessions/`;
 `session_index.jsonl` supplies advisory titles. Claude scans
 `projects/<project>/<UUID>.jsonl`. Codex follows trusted-directory symlinks through
 depth 8 (root = 0), without cycle detection or real-path deduplication.
-Logical paths determine discovery order, fallback identity, and cache keys.
+Logical paths determine discovery order and cache keys.
 
 For ordinary sessions, both adapters cache by source-relative path, size, and
 `mtimeMs`. Changes that
@@ -49,9 +49,10 @@ exclusions. Ordinary sessions retain incremental checkpoints. See
 
 ### Session identity
 
-Native IDs are agent-scoped. Shared services check native
-ID presence; format validation belongs to the owning adapter (both current adapters
-require UUIDs). Missing native IDs use path identity.
+Native IDs are agent-scoped. Adapters publish nonempty native IDs; management
+format validation belongs to the owning adapter (both current adapters require
+UUIDs). Codex rollouts with missing or blank IDs are skipped with a bounded source
+warning and retried on every refresh.
 
 Duplicates retain the accepted readable rollout, otherwise the first fully
 readable candidate in logical path order. Codex caches confirmed duplicate
@@ -61,8 +62,11 @@ its caches.
 
 ### Adapter publication and diagnostics
 
-Adapters publish deeply immutable snapshots. Reused references indicate unchanged
-content; an unchanged source signature returns the same snapshot object.
+Adapters publish deeply immutable snapshots with unique local IDs within each
+source. Aggregation asserts local ID uniqueness only when `NODE_ENV` is
+`development` or `test`; production trusts the adapter contract.
+Reused references indicate unchanged content; an unchanged source signature
+returns the same snapshot object.
 Binding events come from the current decoded batch; project/task metadata
 accumulates. Public origins expose `runtimeVersion`, omitting `formatVersion`.
 Registration requires independently unique, nonempty `instanceKey` and `agent`.

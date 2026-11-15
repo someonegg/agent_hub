@@ -48,7 +48,7 @@ interface CodexCacheEntry {
   readonly descriptor: RolloutDescriptor;
   readonly fingerprint: FileFingerprint;
   readonly normalized: NormalizedSession;
-  readonly threadId: string | null;
+  readonly threadId: string;
   readonly origin: DomainSessionOrigin;
   readonly checkpoint: JsonlCheckpoint;
   readonly identityState: IdentityAccumulatorState;
@@ -122,13 +122,15 @@ export class CodexSessionSource implements SessionSource {
     for (const { descriptor } of candidates) {
       const fingerprint = fingerprintOf(descriptor);
       const excluded = this.#excluded.get(descriptor.sourceRelativePath);
+      // Exclusions are sticky by design: no fingerprint re-check, so a deleted
+      // session cannot resurrect from its duplicate rollout.
       if (excluded) {
         nextExcluded.set(descriptor.sourceRelativePath, excluded);
         if (excluded.reason === "duplicate") duplicateThreads.add(excluded.threadId);
         continue;
       }
       const cached = this.#cache.get(descriptor.sourceRelativePath);
-      let loaded: CodexCacheEntry | "non-primary" | null;
+      let loaded: CodexCacheEntry | "non-primary" | "missing-identity" | null;
       if (cached !== undefined && sameFingerprint(cached.fingerprint, fingerprint)) {
         loaded = cached;
       } else {
@@ -138,23 +140,31 @@ export class CodexSessionSource implements SessionSource {
         nextExcluded.set(descriptor.sourceRelativePath, { reason: "non-primary" });
         continue;
       }
+      if (loaded === "missing-identity") {
+        unavailableRollouts.push(descriptor.sourceRelativePath);
+        loadDiagnostics.push({
+          code: "missing_native_session_id",
+          severity: "warning",
+          message: "A Codex rollout has no non-empty native session ID and was ignored.",
+          ordinal: null,
+        });
+        continue;
+      }
       if (loaded === null) {
         unavailableRollouts.push(descriptor.sourceRelativePath);
         loadDiagnostics.push(rolloutUnavailableDiagnostic());
         continue;
       }
-      if (loaded.threadId !== null) {
-        if (acceptedThreads.has(loaded.threadId)) {
-          nextExcluded.set(descriptor.sourceRelativePath, {
-            reason: "duplicate",
-            threadId: loaded.threadId,
-          });
-          duplicateThreads.add(loaded.threadId);
-          binds.delete(descriptor.id);
-          continue;
-        }
-        acceptedThreads.add(loaded.threadId);
+      if (acceptedThreads.has(loaded.threadId)) {
+        nextExcluded.set(descriptor.sourceRelativePath, {
+          reason: "duplicate",
+          threadId: loaded.threadId,
+        });
+        duplicateThreads.add(loaded.threadId);
+        binds.delete(descriptor.id);
+        continue;
       }
+      acceptedThreads.add(loaded.threadId);
       nextCache.set(descriptor.sourceRelativePath, loaded);
     }
     const sessions = sourceEntries(nextCache);
@@ -200,7 +210,7 @@ export class CodexSessionSource implements SessionSource {
   }
 
   displayTitleFor(session: DomainSession): string | null {
-    if (session.origin.agent !== this.descriptor.agent || session.sourceId === null) return null;
+    if (session.origin.agent !== this.descriptor.agent) return null;
     return this.sessionIndex.threadName(session.sourceId);
   }
 
@@ -210,7 +220,7 @@ export class CodexSessionSource implements SessionSource {
     cached: CodexCacheEntry | undefined,
     telemetry: RefreshTelemetry,
     binds: Map<string, Omit<SourceBindingEvent, "localId">[]>,
-  ): Promise<CodexCacheEntry | "non-primary" | null> {
+  ): Promise<CodexCacheEntry | "non-primary" | "missing-identity" | null> {
     try {
       if (cached === undefined) {
         const head = await probeIdentity(descriptor, telemetry);
@@ -238,6 +248,8 @@ export class CodexSessionSource implements SessionSource {
       const identityState = this.identity.append(identityBase, decoded.records);
       const metadata = this.identity.metadata(identityState);
       if (metadata.excluded) return "non-primary";
+      const threadId = metadata.threadId;
+      if (!threadId?.trim()) return "missing-identity";
       const normalizerBase =
         decoded.mode === "append" && cached !== undefined
           ? cached.normalizerState
@@ -267,7 +279,7 @@ export class CodexSessionSource implements SessionSource {
         normalizerState === cached.normalizerState &&
         sameOrigin(origin, cached.origin)
           ? cached.normalized
-          : this.normalizer.materialize(normalizerState, metadata, origin);
+          : this.normalizer.materialize(normalizerState, { ...metadata, threadId }, origin);
       const { projectDirectory: bindProjectDirectory, taskName } = mergeBindingMetadata(
         {
           projectDirectory:
@@ -297,7 +309,7 @@ export class CodexSessionSource implements SessionSource {
         descriptor,
         fingerprint,
         normalized,
-        threadId: metadata.threadId,
+        threadId,
         origin,
         checkpoint: decoded.checkpoint,
         identityState,
@@ -341,18 +353,13 @@ function sourceEntries(cache: ReadonlyMap<string, CodexCacheEntry>): SourceSessi
   for (const entry of cache.values()) {
     const { threadId } = entry;
     sessions.push({
-      localId: sourceLocalId(threadId, entry.fingerprint.sourceRelativePath),
+      localId: `thread:${threadId}`,
       nativeSessionId: threadId,
       origin: entry.origin,
       normalized: entry.normalized,
     });
   }
   return sessions;
-}
-
-function sourceLocalId(threadId: string | null, sourceRelativePath: string): string {
-  if (threadId === null) return `resource:${sourceRelativePath}`;
-  return `thread:${threadId}`;
 }
 
 function rolloutUnavailableDiagnostic(): DomainDiagnostic {

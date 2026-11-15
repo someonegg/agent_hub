@@ -41,6 +41,11 @@ it.each(adapters)(
     await utimes(path, 1_700_000_000, 1_700_000_000);
     const source = await adapter.create(agent);
     const before = await source.refresh();
+    expect(before.sessions.length).toBeGreaterThan(0);
+    expect(new Set(before.sessions.map((entry) => entry.localId)).size).toBe(
+      before.sessions.length,
+    );
+    for (const entry of before.sessions) expect(entry.nativeSessionId.trim()).not.toBe("");
     const serialized = JSON.stringify(before);
     expect(await source.refresh()).toBe(before);
     expect(source.lastRefreshTelemetry()).toMatchObject({

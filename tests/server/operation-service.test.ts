@@ -766,7 +766,7 @@ describe("standalone exit operations", () => {
 
   it("does not require a native UUID to exit an unbound session", async () => {
     const { service, set, manager } = setup();
-    set({ sessions: [{ ...session(), sourceId: null }] });
+    set({ sessions: [{ ...session(), sourceId: "native-session" }] });
     const op = service.manage("exit", "session");
     await flush();
     expect(await service.get(op.operationId)).toMatchObject({ status: "succeeded" });

@@ -35,7 +35,7 @@ export interface SessionDetail {
   createdAt: string | null;
   updatedAt: string | null;
   status: SessionStatus;
-  sourceId: string | null;
+  sourceId: string;
 }
 
 interface TimelineItemBase {

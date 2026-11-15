@@ -5,7 +5,7 @@ import type { SessionSourceDescriptor, SessionSourceSnapshot } from "../source/s
 export interface DiagnosticLogRecord extends DomainDiagnostic {
   readonly agent: string;
   readonly sessionId: string | null;
-  readonly scope: "source" | "session" | "aggregate";
+  readonly scope: "source" | "session";
 }
 
 export interface DiagnosticLogger {
@@ -17,11 +17,6 @@ const stderrLogger: DiagnosticLogger = {
     console.error("Session diagnostic", record);
   },
 };
-
-export interface AggregateDiagnostic {
-  readonly sessionId: string;
-  readonly diagnostic: DomainDiagnostic;
-}
 
 interface DiagnosticState {
   readonly reference: readonly DomainDiagnostic[];
@@ -42,7 +37,6 @@ export class RefreshDiagnosticLogger {
       descriptor: SessionSourceDescriptor;
       snapshot: SessionSourceSnapshot;
     }[],
-    aggregates: ReadonlyMap<string, readonly AggregateDiagnostic[]> = new Map(),
   ): void {
     const next = new Map<string, SourceState>();
     for (const { descriptor, snapshot } of sources) {
@@ -93,9 +87,6 @@ export class RefreshDiagnosticLogger {
         if (ids.has(entry.localId)) continue;
         record(`session:${sessionId}`, entry.normalized.session.diagnostics, "session", sessionId);
         ids.add(entry.localId);
-      }
-      for (const { sessionId, diagnostic } of aggregates.get(agent) ?? []) {
-        record(`aggregate:${sessionId}`, [diagnostic], "aggregate", sessionId);
       }
       next.set(agent, { snapshot, diagnostics });
     }

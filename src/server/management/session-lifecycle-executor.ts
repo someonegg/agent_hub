@@ -54,7 +54,6 @@ export class SessionLifecycleExecutor {
         return;
       }
       const nativeId = session.sourceId;
-      if (!nativeId?.trim()) throw new Error("Session has no valid native identity");
       await this.#startExit(entry, sessionId, { type, nativeId });
       if (this.control.pending(entry)) await this.control.observe(entry);
     } catch (error) {

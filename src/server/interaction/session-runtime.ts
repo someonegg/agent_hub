@@ -86,7 +86,7 @@ export class SessionRuntime {
       if (!detail) return deny("Resume validation required");
       if (status === "live") return deny("Session is already live");
       const manager = this.managers.get(session.origin.agent);
-      if (!session.sourceId?.trim() || !manager.isValidNativeId(session.sourceId))
+      if (!manager.isValidNativeId(session.sourceId))
         return deny("Session has no valid native identity");
       const resolved = await resolveResumeDirectory(manager, session);
       if (!this.isCurrent(observed)) return deny("Pane binding changed during validation");

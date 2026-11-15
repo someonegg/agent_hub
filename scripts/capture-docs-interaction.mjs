@@ -810,6 +810,11 @@ async function capture(
   try {
     await demo.goto(`${origin}/sessions/${session.id}`);
     await prepareDesktopPreview();
+    await demo.locator(".session-information summary").click();
+    const nativeId = demo.locator(".session-source-id code");
+    if (!(await nativeId.isVisible()) || (await nativeId.innerText()) !== session.sourceId)
+      throw new Error("Session header did not display the native session ID");
+    await demo.locator(".session-information summary").click();
     await verifyComposerPersistence();
     await prepareDesktopPreview();
     const selectedProject = demo.getByRole("button", {
