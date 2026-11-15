@@ -661,6 +661,8 @@ Each `diff publish <file>` creates UUID-v4 `<hosting>/diffs/<uuid>/` with origin
 `raw.diff` and `metadata.json` (identity, title, creation time, URL). Directory
 publication uses atomic rename under the shared write lock. CLI list reads metadata;
 delete is idempotent. Explicit cleanup preserves source; no project/session association.
+Damaged metadata is diagnosed and treated as missing without blocking other entries;
+filesystem errors other than missing files still propagate.
 
 `/diffs/<uuid>` serves the viewer; `GET /api/v1/diffs/:uuid` returns metadata/`raw`;
 `DELETE` returns `204`. Missing/disabled returns `404`; no HTTP list exists.

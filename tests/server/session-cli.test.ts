@@ -64,21 +64,48 @@ const reply = (res: ServerResponse, value: unknown, status = 200) => {
 };
 
 it.each([
-  ["inspect", "id", "--after", "-1"],
-  ["send", "id"],
-  ["send", "id", "--stdin", "--message", "x"],
-  ["keys", "id", "interrupt"],
-  ["resume", "id", "--agent", "other"],
-  ["inspect", "id", "--limit", "301"],
-  ["list", "--url", "ftp://example.com"],
-  ["list", "--url", "https://user:password@example.com"],
-  ["create", "--project", "/tmp", "--task", "Fix </user_shell_command> parsing"],
-  ["create", "--project", "/tmp", "--cwd", ""],
-])("rejects invalid session arguments: %j", (...args) => {
-  expect(() => parseSessionArguments(args)).toThrow(CommandError);
-  expect(() => parseSessionArguments(args)).toThrow(
-    expect.objectContaining({ code: "invalid_arguments" }),
-  );
+  {
+    category: "pagination",
+    cases: [
+      ["inspect", "id", "--after", "-1"],
+      ["inspect", "id", "--limit", "301"],
+    ],
+  },
+  {
+    category: "message input",
+    cases: [
+      ["send", "id"],
+      ["send", "id", "--stdin", "--message", "x"],
+    ],
+  },
+  {
+    category: "command-specific options",
+    cases: [
+      ["keys", "id", "interrupt"],
+      ["resume", "id", "--agent", "other"],
+    ],
+  },
+  {
+    category: "server origins",
+    cases: [
+      ["list", "--url", "ftp://example.com"],
+      ["list", "--url", "https://user:password@example.com"],
+    ],
+  },
+  {
+    category: "creation metadata",
+    cases: [
+      ["create", "--project", "/tmp", "--task", "Fix </user_shell_command> parsing"],
+      ["create", "--project", "/tmp", "--cwd", ""],
+    ],
+  },
+])("rejects invalid $category arguments without I/O", ({ cases }) => {
+  for (const args of cases) {
+    expect(() => parseSessionArguments(args), JSON.stringify(args)).toThrow(CommandError);
+    expect(() => parseSessionArguments(args), JSON.stringify(args)).toThrow(
+      expect.objectContaining({ code: "invalid_arguments" }),
+    );
+  }
 });
 
 it("rejects invalid arguments without requests and writes human diagnostics to stderr", async () => {
@@ -480,25 +507,33 @@ it.each([
   expect(seen).toEqual(requests);
 });
 
-it.each(["list", "create"])("sets the timeout tier for %s", (command) => {
-  const extra = command === "create" ? ["--project", "/project"] : [];
-  expect(parseSessionArguments([command, ...extra])).toMatchObject({
-    seconds: command === "create" ? 45 : 15,
-  });
-  expect(parseSessionArguments([command, ...extra, "--timeout", "2"])).toMatchObject({
-    seconds: 2,
-  });
-  expect(() => parseSessionArguments([command, ...extra, "--timeout", "0"])).toThrow(
-    "timeout must be a positive number",
-  );
+it("uses command-specific timeout defaults and validates explicit overrides", () => {
+  for (const { args, seconds } of [
+    { args: ["list"], seconds: 15 },
+    { args: ["create", "--project", "/project"], seconds: 45 },
+  ]) {
+    const context = JSON.stringify(args);
+    expect(parseSessionArguments(args), context).toMatchObject({ seconds });
+    expect(parseSessionArguments([...args, "--timeout", "2"]), context).toMatchObject({
+      seconds: 2,
+    });
+    expect(() => parseSessionArguments([...args, "--timeout", "0"]), context).toThrow(
+      "timeout must be a positive number",
+    );
+  }
 });
 
-it.each([
-  ["--interval", "1"],
-  ["--follow", "--interval", "0"],
-  ["--follow", "--count", "1.5"],
-])("rejects invalid follow options %j", (...options) => {
-  expect(() => parseSessionArguments(["inspect", "id", ...options])).toThrow();
+it("rejects unsupported follow options and invalid follow counts", () => {
+  for (const options of [
+    ["--interval", "1"],
+    ["--follow", "--interval", "0"],
+    ["--follow", "--count", "1.5"],
+  ]) {
+    expect(
+      () => parseSessionArguments(["inspect", "id", ...options]),
+      JSON.stringify(options),
+    ).toThrow();
+  }
 });
 
 it("retains launch target on timeout without retry or cancellation", async () => {
@@ -791,16 +826,24 @@ it.each([
   }
 });
 
-it.each([
-  ["~/project with spaces", join(homedir(), "project with spaces")],
-  [" ./relative project ", resolve("relative project")],
-  ["/absolute/project", "/absolute/project"],
-  ["$HOME/project", resolve("$HOME/project")],
-])("normalizes CLI project and working directories: %s", (input, expected) => {
-  expect(parseSessionArguments(["create", "--project", input, "--cwd", input])).toMatchObject({
-    values: { project: expected, cwd: expected },
-  });
-  expect(parseSessionArguments(["list", "--project", input])).toMatchObject({
-    values: { project: expected },
-  });
+it("normalizes project and working paths consistently without expanding shell variables", () => {
+  for (const [input, expected] of [
+    ["~/project with spaces", join(homedir(), "project with spaces")],
+    [" ./relative project ", resolve("relative project")],
+    ["/absolute/project", "/absolute/project"],
+    ["$HOME/project", resolve("$HOME/project")],
+  ]) {
+    expect(
+      parseSessionArguments(["create", "--project", input, "--cwd", input]),
+      JSON.stringify([input, expected]),
+    ).toMatchObject({
+      values: { project: expected, cwd: expected },
+    });
+    expect(
+      parseSessionArguments(["list", "--project", input]),
+      JSON.stringify([input, expected]),
+    ).toMatchObject({
+      values: { project: expected },
+    });
+  }
 });

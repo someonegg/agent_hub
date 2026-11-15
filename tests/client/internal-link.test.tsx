@@ -5,19 +5,20 @@ import { describe, expect, it, vi } from "vitest";
 import { InternalLink } from "../../src/client/components/InternalLink";
 
 describe("internal link browser behavior", () => {
-  it.each([{ metaKey: true }, { ctrlKey: true }, { button: 1 }])(
-    "preserves browser behavior for %o",
-    (options) => {
-      const navigate = vi.fn();
-      render(
-        <InternalLink href="#session" onNavigate={navigate}>
-          Session
-        </InternalLink>,
+  it("preserves modified and nonprimary clicks for the browser", () => {
+    const navigate = vi.fn();
+    render(
+      <InternalLink href="#session" onNavigate={navigate}>
+        Session
+      </InternalLink>,
+    );
+    for (const options of [{ metaKey: true }, { ctrlKey: true }, { button: 1 }]) {
+      expect(fireEvent.click(screen.getByRole("link"), options), JSON.stringify(options)).toBe(
+        true,
       );
-      expect(fireEvent.click(screen.getByRole("link"), options)).toBe(true);
-      expect(navigate).not.toHaveBeenCalled();
-    },
-  );
+      expect(navigate, JSON.stringify(options)).not.toHaveBeenCalled();
+    }
+  });
 
   it("respects a prevented event", () => {
     const navigate = vi.fn();

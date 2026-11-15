@@ -13,12 +13,11 @@ import {
 } from "../../src/server/management/session-manager.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
 
-it.each([null, "relative", "/a\0b", "/a\rb", "/a\nb"])(
-  "rejects invalid project path %j",
-  (value) => {
-    expect(validProjectDirectory(value)).toBe(false);
-  },
-);
+it("rejects nonabsolute project paths and control characters", () => {
+  for (const value of [null, "relative", "/a\0b", "/a\rb", "/a\nb"]) {
+    expect(validProjectDirectory(value), JSON.stringify(value)).toBe(false);
+  }
+});
 it("omits project paths containing NUL from binding commands", () => {
   expect(codexBindingCommand(undefined, "/a\0b")).toMatch(/'' '' 'null'$/);
 });

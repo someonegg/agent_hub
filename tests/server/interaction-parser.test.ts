@@ -111,22 +111,35 @@ it("accepts manual bindings with spaces and commas in the socket path", () => {
 });
 
 it.each([
-  ["relative/socket", "ahub-00000000-0000-0000-0000-000000000001"],
-  ["", "ahub-00000000-0000-0000-0000-000000000001"],
-  ["/tmp/a", "1"],
-  ["/tmp/a", "%a"],
-  ["/tmp/a", "arbitrary-session"],
-  ["/tmp/a", "AHUB-00000000-0000-0000-0000-000000000001"],
-])("rejects invalid target %s %s", (socket, pane) => {
-  expect(
-    codexBindingAttemptsFrom(
-      response(1, {
-        type: "message",
-        role: "user",
-        content: [{ type: "input_text", text: shellText(socket!, pane!) }],
-      }),
-    ),
-  ).toEqual([{ ordinal: 1, valid: false }]);
+  {
+    category: "socket paths",
+    targets: [
+      ["relative/socket", "ahub-00000000-0000-0000-0000-000000000001"],
+      ["", "ahub-00000000-0000-0000-0000-000000000001"],
+    ],
+  },
+  {
+    category: "session names",
+    targets: [
+      ["/tmp/a", "1"],
+      ["/tmp/a", "%a"],
+      ["/tmp/a", "arbitrary-session"],
+      ["/tmp/a", "AHUB-00000000-0000-0000-0000-000000000001"],
+    ],
+  },
+] as const)("rejects invalid binding $category", ({ targets }) => {
+  for (const [socket, pane] of targets) {
+    expect(
+      codexBindingAttemptsFrom(
+        response(1, {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: shellText(socket, pane) }],
+        }),
+      ),
+      JSON.stringify([socket, pane]),
+    ).toEqual([{ ordinal: 1, valid: false }]);
+  }
 });
 
 it("reports a damaged shell wrapper as an invalid attempt", () => {

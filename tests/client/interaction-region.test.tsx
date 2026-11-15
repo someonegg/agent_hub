@@ -699,7 +699,11 @@ describe("image attachments", () => {
 
   it("opens separate camera and gallery inputs and preserves the selection across repeated choices", async () => {
     const { api } = await import("../../src/client/api/client");
-    const upload = vi.spyOn(api, "upload").mockResolvedValue(uploadResult("/tmp/photo space.jpg"));
+    const upload = vi
+      .spyOn(api, "upload")
+      .mockResolvedValueOnce(uploadResult("/tmp/photo space-1.jpg"))
+      .mockResolvedValueOnce(uploadResult("/tmp/photo space-2.jpg"))
+      .mockResolvedValueOnce(uploadResult("/tmp/photo space-3.jpg"));
     const user = userEvent.setup();
     const handlers = props(interaction("connected"));
     render(<StatefulInteractionRegion {...handlers} />);
@@ -743,7 +747,17 @@ describe("image attachments", () => {
     await user.click(screen.getByRole("button", { name: "Attach files" }));
     await user.click(screen.getByRole("menuitem", { name: "Take photo" }));
     await user.upload(camera, file);
-    await vi.waitFor(() => expect(upload).toHaveBeenCalledTimes(3));
+    await vi.waitFor(() => expect(composer).toBeEnabled());
+    expect(upload).toHaveBeenCalledTimes(3);
+    const removeButtons = screen.getAllByRole("button", { name: "Remove photo" });
+    expect(removeButtons).toHaveLength(3);
+    await user.click(removeButtons[1]!);
+    expect(screen.getAllByRole("button", { name: "Remove photo" })).toEqual([
+      removeButtons[0],
+      removeButtons[2],
+    ]);
+    expect(screen.getAllByText("photo")).toHaveLength(2);
+    expect(composer).toHaveValue("before replace after");
     expect(handlers.onSendMessage).not.toHaveBeenCalled();
     upload.mockRestore();
   });

@@ -8,13 +8,14 @@ import {
 import { MessageValidationError } from "../../src/server/interaction/message.js";
 import { INTERACTION_KEYS } from "../../src/shared/api-contract.js";
 
-it.each([{ message: 1 }, { message: "ok", requireIdle: "yes" }])(
-  "rejects invalid message body structure %j",
-  (body) => {
-    expect(() => parseMessageBody(body)).toThrow(RequestBodyError);
-    expect(() => parseMessageBody(body)).toThrow("body must contain only a string message field");
-  },
-);
+it("requires a string message and a boolean idle requirement", () => {
+  for (const body of [{ message: 1 }, { message: "ok", requireIdle: "yes" }]) {
+    expect(() => parseMessageBody(body), JSON.stringify(body)).toThrow(RequestBodyError);
+    expect(() => parseMessageBody(body), JSON.stringify(body)).toThrow(
+      "body must contain only a string message field",
+    );
+  }
+});
 it("validates message bytes after structure without changing the transmitted text", () => {
   const body = { message: "a\r\nb", requireIdle: false };
   expect(parseMessageBody(body)).toEqual(body);
@@ -23,13 +24,15 @@ it("validates message bytes after structure without changing the transmitted tex
   expect(() => parseMessageBody({ message: " \n " })).toThrow(MessageValidationError);
   expect(() => parseMessageBody({ message: " ", extra: true })).toThrow(RequestBodyError);
 });
-it.each([
-  { keys: "enter" },
-  { keys: ["enter"], extra: true },
-  { keys: Array.from({ length: 65 }, () => "left") },
-  { keys: ["interrupt"], requireIdle: true },
-])("rejects invalid keys body %j", (body) => {
-  expect(() => parseKeysBody(body)).toThrow(RequestBodyError);
+it("rejects invalid keys structure, length and idle restrictions", () => {
+  for (const body of [
+    { keys: "enter" },
+    { keys: ["enter"], extra: true },
+    { keys: Array.from({ length: 65 }, () => "left") },
+    { keys: ["interrupt"], requireIdle: true },
+  ]) {
+    expect(() => parseKeysBody(body), JSON.stringify(body)).toThrow(RequestBodyError);
+  }
 });
 it("accepts all supported keys and the sequence boundary with optional idle requirements", () => {
   expect(parseKeysBody({ keys: [...INTERACTION_KEYS] })).toEqual({ keys: [...INTERACTION_KEYS] });

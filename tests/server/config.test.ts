@@ -92,10 +92,12 @@ it("shares the Hub root for uploads and hosting, expanding agent-relative paths"
   });
 });
 
-it.each(["65536", "1.5"])("names --local-port in invalid port errors (%s)", (value) => {
-  expect(() => loadConfig([`--local-port=${value}`])).toThrow(
-    "--local-port must be an integer between 0 and 65535",
-  );
+it("names local-port in integer and range validation errors", () => {
+  for (const value of ["65536", "1.5"]) {
+    expect(() => loadConfig([`--local-port=${value}`]), JSON.stringify(value)).toThrow(
+      "--local-port must be an integer between 0 and 65535",
+    );
+  }
 });
 
 it("resolves the global Claude readiness script and rejects empty paths", () => {
@@ -104,9 +106,8 @@ it("resolves the global Claude readiness script and rejects empty paths", () => 
   expect(() => runnable(["--claude-ready-script", " "])).toThrow("must not be empty");
 });
 
-it.each(["~/config with spaces", "./config with spaces", "/tmp/config with spaces"])(
-  "resolves all server path options consistently: %s",
-  (path) => {
+it("resolves all server path options consistently for home, relative and absolute paths", () => {
+  for (const path of ["~/config with spaces", "./config with spaces", "/tmp/config with spaces"]) {
     const expected = path.startsWith("~/") ? resolve(homedir(), path.slice(2)) : resolve(path);
     const config = runnable([
       "--codex-agent",
@@ -128,7 +129,7 @@ it.each(["~/config with spaces", "./config with spaces", "/tmp/config with space
       "--ssl-ca",
       path,
     ]);
-    expect(config).toMatchObject({
+    expect(config, JSON.stringify(path)).toMatchObject({
       agents: [
         { nickname: "codex", path: resolve(expected, "codex") },
         { nickname: "claude", path: resolve(expected, "claude") },
@@ -144,5 +145,5 @@ it.each(["~/config with spaces", "./config with spaces", "/tmp/config with space
         certificateAuthorityPath: expected,
       },
     });
-  },
-);
+  }
+});

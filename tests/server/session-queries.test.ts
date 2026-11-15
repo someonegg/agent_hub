@@ -157,12 +157,17 @@ it("defaults to 10 messages and accepts the maximum page length", () => {
   ]);
 });
 
-it.each([0, 301, 1.5, NaN])("rejects invalid item limit %s", (limit) => {
+it("rejects item limits outside the integer page range", () => {
   const queries = new SessionQueries();
-  expect(() => queries.messages(snapshot([]), session.id, { limit })).toThrow(RepositoryQueryError);
-  expect(() => queries.messages(snapshot([]), session.id, { limit })).toThrow(
-    expect.objectContaining({ code: "invalid_query" }),
-  );
+  const empty = snapshot([]);
+  for (const limit of [0, 301, 1.5, NaN]) {
+    expect(() => queries.messages(empty, session.id, { limit }), String(limit)).toThrow(
+      RepositoryQueryError,
+    );
+    expect(() => queries.messages(empty, session.id, { limit }), String(limit)).toThrow(
+      expect.objectContaining({ code: "invalid_query" }),
+    );
+  }
 });
 
 it("fills byte-bounded pages and reads every long UTF-8 message exactly once", () => {

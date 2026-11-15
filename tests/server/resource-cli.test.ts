@@ -44,12 +44,18 @@ const invalidOptions = [
   { resource: "page", action: "delete", option: "name" },
   { resource: "diff", action: "publish", option: "project" },
 ];
-it.each(invalidOptions)("rejects inapplicable options: %j", ({ resource, action, option }) => {
-  const args = [...(action === "list" ? [] : ["/missing-source"]), `--${option}`, "value"];
-  expect(() => parseResourceArguments(resource, action, args)).toThrow(
-    `Option --${option} is not supported for ${resource} ${action}`,
-  );
-  expect(() => parseResourceArguments(resource, action, args)).toThrow(CommandError);
+it("restricts resource options to their owning actions", () => {
+  for (const { resource, action, option } of invalidOptions) {
+    const args = [...(action === "list" ? [] : ["/missing-source"]), `--${option}`, "value"];
+    expect(
+      () => parseResourceArguments(resource, action, args),
+      JSON.stringify([resource, action, option]),
+    ).toThrow(`Option --${option} is not supported for ${resource} ${action}`);
+    expect(
+      () => parseResourceArguments(resource, action, args),
+      JSON.stringify([resource, action, option]),
+    ).toThrow(CommandError);
+  }
 });
 
 it.each(["page", "diff"])(
@@ -166,14 +172,17 @@ it.each([["~/project with spaces", join(homedir(), "project with spaces")]])(
   },
 );
 
-it.each([
-  ["page", ["", "--project", "/project"]],
-  ["page", ["/source", "--project", "   "]],
-  ["diff", ["   "]],
-] as const)("rejects empty publication paths: %s %j", (resource, args) => {
-  expect(() => parseResourceArguments(resource, "publish", [...args])).toThrow(
-    expect.objectContaining({ code: "invalid_arguments" }),
-  );
+it("rejects empty source and project publication paths", () => {
+  for (const [resource, args] of [
+    ["page", ["", "--project", "/project"]],
+    ["page", ["/source", "--project", "   "]],
+    ["diff", ["   "]],
+  ] as const) {
+    expect(
+      () => parseResourceArguments(resource, "publish", [...args]),
+      JSON.stringify([resource, args]),
+    ).toThrow(expect.objectContaining({ code: "invalid_arguments" }));
+  }
 });
 
 it("preserves delete IDs without path normalization", () => {

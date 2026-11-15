@@ -122,9 +122,10 @@ ahub-cli session inspect <id>
 ahub-cli session inspect <id> --follow
 ```
 
-Use a Hub ID returned by `list` or `create`. `list` excludes archived sessions
-unless `--all` is supplied. Pass the
-returned `Next after` value as `--after <value>` to read the next page.
+Use a Hub ID returned by `list` or `create`. `list` returns the full list without
+pagination and excludes archived sessions unless `--all` is supplied.
+For `inspect`, pass the returned `Next after` value to
+`ahub-cli session inspect <id> --after <value>` to read the next page of messages.
 `--follow` keeps observing until `Ctrl+C`; it does not stop when a task finishes.
 
 Create defaults to the project directory and first configured Agent. Use `--cwd`

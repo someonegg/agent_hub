@@ -81,18 +81,20 @@ describe("Claude JSONL adapter", () => {
     );
   });
 
-  it.each([undefined, "max_tokens", "unknown"])(
-    "never infers a final phase for %s",
-    async (stop_reason) => {
-      const state = await appendClaudeLines(createClaudeState(id), [
+  it("does not infer a final phase from missing or nonfinal stop reasons", async () => {
+    const state = await appendClaudeLines(
+      createClaudeState(id),
+      [undefined, "max_tokens", "unknown"].map((stop_reason) =>
         JSON.stringify({
           type: "assistant",
           message: { role: "assistant", stop_reason, content: [{ type: "text", text: "body" }] },
         }),
-      ]);
-      expect(state.timeline[0]).toMatchObject({ phase: null });
-    },
-  );
+      ),
+    );
+    expect(state.timeline).toEqual(
+      Array.from({ length: 3 }, () => expect.objectContaining({ phase: null })),
+    );
+  });
 
   it("selects native metadata and only accepts main-shell binding stdout", async () => {
     const bindings = new PaneBindingManager();

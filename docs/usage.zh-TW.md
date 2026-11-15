@@ -102,8 +102,10 @@ ahub-cli session inspect <id>
 ahub-cli session inspect <id> --follow
 ```
 
-使用 `list` 或 `create` 傳回的 Hub ID。`list` 預設不含封存工作階段，傳入 `--all` 可包含；
-將傳回的 `Next after` 值傳給 `--after <value>` 讀取下一頁。
+使用 `list` 或 `create` 傳回的 Hub ID。
+`list` 傳回完整列表而不分頁，預設不含封存工作階段；傳入 `--all` 可包含封存工作階段。
+對於 `inspect`，將傳回的 `Next after` 值傳給
+`ahub-cli session inspect <id> --after <value>` 讀取下一頁訊息。
 `--follow` 持續觀察直到按 `Ctrl+C` 停止，不會因任務完成自動結束。
 
 建立預設使用專案目錄和第一個已設定智慧體。用 `--cwd` 修改工作目錄而保留專案歸屬，
