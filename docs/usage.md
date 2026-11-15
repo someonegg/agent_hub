@@ -270,7 +270,8 @@ with `--local-port 4174`, then use:
 ahub-cli session list --url http://127.0.0.1:4174
 ```
 
-This additional HTTP listener is disabled by default and binds to `127.0.0.1`.
+This additional HTTP listener is disabled by default and binds to `127.0.0.1`;
+use `--local-host <host>` to change its listen address.
 Other local users and processes can access it; do not forward external proxy traffic to it.
 
 ## Troubleshooting

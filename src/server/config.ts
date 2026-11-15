@@ -33,6 +33,7 @@ export interface ServerConfig {
   host: string;
   port: number;
   localPort?: number;
+  localHost?: string;
   clientDirectory: string;
   tls: ServerTlsConfig;
   interactionEnabled: boolean;
@@ -78,6 +79,7 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       host: { type: "string" },
       port: { type: "string" },
       "local-port": { type: "string" },
+      "local-host": { type: "string" },
       ssl: { type: "boolean" },
       "ssl-cert": { type: "string" },
       "ssl-key": { type: "string" },
@@ -161,6 +163,7 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
     kind: "run",
     config: {
       host,
+      localHost: nonEmptyOption("local-host", values["local-host"]) ?? LOOPBACK_HOST,
       ...(values["claude-ready-script"] !== undefined
         ? {
             claudeReadyScript: resolvePathOption(
@@ -206,7 +209,8 @@ Options:
   Any explicit agent replaces both defaults; argument order determines the default agent.
   --host <host>        Listen host (default: 127.0.0.1)
   --port <port>        Listen port, or 0 for a free port (default: 4173)
-  --local-port <port>  Additional HTTP listener on 127.0.0.1 (disabled by default)
+  --local-port <port>  Additional HTTP listener (disabled by default)
+  --local-host <host>  Additional HTTP listen host (default: 127.0.0.1)
   --ssl                Enable TLS; the port will accept HTTPS only
   --ssl-cert <path>    PEM server certificate or certificate chain
   --ssl-key <path>     PEM server private key
