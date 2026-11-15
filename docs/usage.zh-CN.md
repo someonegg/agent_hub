@@ -5,7 +5,7 @@
 ## 启动 Hub
 
 ```sh
-npx @someonegg/agent-hub@latest
+agent-hub
 ```
 
 打开 <http://127.0.0.1:4173> 或服务器打印的地址，按 `Ctrl-C` 停止服务器。
@@ -23,7 +23,7 @@ npx @someonegg/agent-hub@latest
 
 ## 创建与管理会话
 
-点击项目旁的 **+**，或全局 **+** 后选择已有项目目录。选择**其他目录…**可输入新的本机绝对目录。
+点击项目旁的 **+**，或全局 **+** 后选择已有项目目录。选择**其他目录…**可输入 Hub 服务器上已存在目录的绝对路径。
 选择 [智能体](#多个智能体) 和可选的启动设置：
 
 - **Worktree：**在独立 Git worktree 中启动，隔离代码改动。
@@ -35,7 +35,7 @@ npx @someonegg/agent-hub@latest
 通过会话的 **…** 菜单执行：
 
 - **退出：**停止已连接终端，保留历史。
-- **归档：**停止运行，将会话移到归档列表。
+- **归档（仅 Codex）：**停止运行，将会话移到归档列表。
 - **删除：**确认后永久删除会话历史。
 
 创建与恢复使用 tmux。启动若被登录或权限确认阻塞，通过 **… → 连接 tmux** 或显示的连接命令在终端完成操作。
@@ -65,6 +65,7 @@ npx @someonegg/agent-hub@latest
 从会话标题区域打开**上传记录**，预览、下载或删除文件，包括未发送的上传文件。
 从草稿移除附件不会删除已上传文件；从上传记录删除文件也会将其从草稿移除。
 
+发送附件时，Hub 会将文件在服务器上的绝对路径加入提示，由智能体读取。
 文件保存在 [Hub 数据目录](#配置服务器)的 `uploads/` 下，智能体必须能访问此目录。
 删除会话触发后台清理，归档与退出保留文件。存储和清理细节见[上传参考（英文）](technical-reference.md#file-uploads)，
 也可[查看上传记录截图](images/zh-CN/ahub-uploads.png)。
@@ -78,15 +79,7 @@ npx @someonegg/agent-hub@latest
 
 ## 使用 CLI
 
-`agent-hub` 启动服务器，`ahub-cli` 管理会话和发布资源。下文示例假定已全局安装：
-
-```sh
-npm install -g @someonegg/agent-hub
-ahub-cli --help
-```
-
-无需全局安装时，将示例中的 `ahub-cli` 替换为
-`npx --package=@someonegg/agent-hub@latest ahub-cli`。添加 `--json` 可获取结构化命令结果。
+`agent-hub` 启动服务器，`ahub-cli` 管理会话和发布资源。用 `ahub-cli --help` 查看可用命令，添加 `--json` 可获取结构化命令结果。
 
 ### 会话命令
 
@@ -127,7 +120,7 @@ ahub-cli session inspect <id> --follow
 
 发送成功不表示任务完成。超时或退出码为 `2`（写入结果不明）时，先用 `list`、`inspect` 或 `terminal` 核查再重试。
 停止客户端不会取消已提交操作。生命周期命令（包括删除）不会在 CLI 中再次要求确认。
-全部命令见 `ahub-cli session --help`，结果与超时契约见 [CLI 参考（英文）](technical-reference.md#session-cli-and-observation)。
+全部命令见 `ahub-cli session --help`，结果与超时契约见 [CLI 参考（英文）](technical-reference.md#session-cli)。
 
 ## 发布网页与差异
 
@@ -150,7 +143,7 @@ ahub-cli page publish ./demo --project /path/to/project --name demo --title "Des
 以相同项目和名称再次发布即可更新并保留 URL。省略 `--name` 时使用来源目录名。
 worktree 请将原项目传给 `--project`。
 
-打开**已发布网页**（`/artifacts`）浏览、复制链接或删除网页及其快照。
+打开**网页**（`/artifacts`）浏览、复制链接或删除网页及其快照。
 CLI 也支持 `page list` 和 `page delete <id>`。移除来源目录或 worktree 不会删除已发布网页。
 详见[托管参考（英文）](technical-reference.md#optional-hosting)。
 
@@ -171,7 +164,7 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 ### 通过智能体发布
 
 安装附带的 [`ahub-publish` skill](../skills/ahub-publish)，并按名称请求使用。
-执行 `ahub-cli skill path ahub-publish` 定位目录；使用 `npx` 时，请将返回的缓存目录复制到长期使用的技能位置。
+执行 `ahub-cli skill path ahub-publish` 定位目录。
 
 ## 配置服务器
 
@@ -184,12 +177,12 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 | `--hosting`            | 关闭           | 提供已发布网页与差异访问                    |
 | `--tmux-socket <path>` | tmux 默认值    | 使用自定义 tmux socket                      |
 
-Agent Hub 默认使用 `~/.agent-hub`，不会自动迁移旧数据。如需使用原有 Codex Hub 数据目录，请为服务器和资源管理命令传入 `--home-dir ~/.codex-hub`。
+Agent Hub 默认使用 `~/.agent-hub`，不会自动迁移旧数据。
 
 ### 多个智能体
 
-智能体是独立拥有配置、Skills、记忆和模型设置的身份。Codex 和 Claude Code 是执行引擎。智能体目录在 Codex 中包含 `sessions/`，在 Claude Code 中包含 `projects/`。
-每个智能体需使用唯一昵称和目录：
+可配置多个 Codex 或 Claude Code 配置目录，每个目录使用唯一昵称。
+Codex 目录包含 `sessions/`，Claude Code 目录包含 `projects/`：
 
 ```sh
 agent-hub \
@@ -236,16 +229,17 @@ ahub-cli session list --url http://127.0.0.1:4174
 - **端口占用：**换用其他端口，例如 `agent-hub --port 4180`。
 - **无法发送输入：**通过**连接 tmux**完成 CLI 提示，正忙时等待，或在可用时使用**恢复**。归档会话只读，仅有日志不代表终端已连接。
 - **创建或恢复状态不明：**重试前检查 tmux 并刷新会话列表，避免重复启动。关闭页面不会停止操作，重启服务器会丢失进度追踪。
-- **相机不可用或上传中断：**使用文件选择器，检查会话已连接且空闲后重试。
+- **相机不可用：**改用文件选择器。
+- **上传中断：**检查会话已连接后重试。
 
 运行与恢复细节见[技术参考（英文）](technical-reference.md)。
 
 ## 卸载
 
-停止服务器。全局安装时执行：
+停止服务器后执行：
 
 ```sh
 npm uninstall -g @someonegg/agent-hub
 ```
 
-`npx` 无需全局卸载。会话、worktree、运行中的 tmux 会话、上传文件和托管快照仍会保留，请按需另行清理。
+会话、worktree、运行中的 tmux 会话、上传文件和托管快照仍会保留，请按需另行清理。

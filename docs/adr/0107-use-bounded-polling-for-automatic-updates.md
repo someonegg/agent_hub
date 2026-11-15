@@ -45,5 +45,5 @@ Reconstructed on the date above from legacy [0011](legacy-index.md#adr-0011),
 [timestamp revision change](https://github.com/someonegg/agent_hub/commit/8c79416b5dd02065b83172196d2f08dabdd15190).
 This records existing policy; the old separate update endpoint and completed
 connection-result cache do not survive. See
-[reader limits](../technical-reference.md#reader-and-automatic-updates) and
+[reader limits](../technical-reference.md#conversation-reads) and
 [catalog polling](0104-long-poll-complete-catalog-structure.md).

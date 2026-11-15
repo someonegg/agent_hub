@@ -27,13 +27,7 @@
 Hub 默认读取 `~/.codex` 和 `~/.claude`，两种运行时可单独或同时使用。
 自定义目录见[多个智能体配置](docs/usage.zh-CN.md#多个智能体)。
 
-无需全局安装即可试用：
-
-```sh
-npx @someonegg/agent-hub@latest
-```
-
-也可以安装后长期使用：
+全局安装并启动 Hub：
 
 ```sh
 npm install -g @someonegg/agent-hub
@@ -81,7 +75,7 @@ agent-hub
 
 如需智能体协助管理会话，可使用 npm 包附带的
 [`ahub-control` skill](skills/ahub-control)。运行
-`ahub-cli skill path ahub-control` 查看目录。`npx` 返回缓存路径，长期使用请复制该目录。
+`ahub-cli skill path ahub-control` 查看目录。
 
 ## 安全
 

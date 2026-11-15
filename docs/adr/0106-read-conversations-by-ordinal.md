@@ -41,6 +41,6 @@ Reconstructed on the date above from legacy [0025](legacy-index.md#adr-0025).
 The retired chain [0004](legacy-index.md#adr-0004),
 [0006](legacy-index.md#adr-0006), and [0009](legacy-index.md#adr-0009)
 explains the stronger continuity guarantee intentionally given up.
-See [reader contracts](../technical-reference.md#reader-and-automatic-updates),
+See [reader contracts](../technical-reference.md#conversation-reads),
 [incremental loading](0102-use-immutable-incremental-session-snapshots.md), and
 [automatic updates](0107-use-bounded-polling-for-automatic-updates.md).

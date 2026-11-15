@@ -5,7 +5,7 @@
 ## 啟動 Hub
 
 ```sh
-npx @someonegg/agent-hub@latest
+agent-hub
 ```
 
 開啟 <http://127.0.0.1:4173> 或伺服器輸出的位址，按 `Ctrl-C` 停止伺服器。
@@ -23,7 +23,7 @@ npx @someonegg/agent-hub@latest
 
 ## 建立與管理工作階段
 
-點選專案旁的 **+**，或全域 **+** 後選擇已有專案目錄。選擇**其他目錄…**可輸入新的本機絕對目錄。
+點選專案旁的 **+**，或全域 **+** 後選擇已有專案目錄。選擇**其他目錄…**可輸入 Hub 伺服器上已存在目錄的絕對路徑。
 選擇 [智慧體](#多個智慧體) 和可選的啟動設定：
 
 - **Worktree：**在獨立 Git worktree 中啟動，隔離程式碼變更。
@@ -35,7 +35,7 @@ npx @someonegg/agent-hub@latest
 透過工作階段的 **…** 選單執行：
 
 - **退出：**停止已連線終端，保留歷史。
-- **封存：**停止執行，將工作階段移到封存列表。
+- **封存（僅 Codex）：**停止執行，將工作階段移到封存列表。
 - **刪除：**確認後永久刪除工作階段歷史。
 
 建立與恢復使用 tmux。啟動若被登入或權限確認阻擋，透過 **… → 連線 tmux** 或顯示的連線命令在終端完成操作。
@@ -65,6 +65,7 @@ npx @someonegg/agent-hub@latest
 從工作階段標題區域開啟**上傳記錄**，預覽、下載或刪除檔案，包括未傳送的上傳檔案。
 從草稿移除附件不會刪除已上傳檔案；從上傳記錄刪除檔案也會將其從草稿移除。
 
+傳送附件時，Hub 會將檔案在伺服器上的絕對路徑加入提示，由智慧體讀取。
 檔案儲存在 [Hub 資料目錄](#設定伺服器)的 `uploads/` 下，智慧體必須能存取此目錄。
 刪除工作階段觸發背景清理，封存與退出保留檔案。儲存和清理細節見[上傳參考（英文）](technical-reference.md#file-uploads)，
 也可[檢視上傳記錄截圖](images/zh-TW/ahub-uploads.png)。
@@ -78,15 +79,7 @@ npx @someonegg/agent-hub@latest
 
 ## 使用 CLI
 
-`agent-hub` 啟動伺服器，`ahub-cli` 管理工作階段和發布資源。下文範例假定已全域安裝：
-
-```sh
-npm install -g @someonegg/agent-hub
-ahub-cli --help
-```
-
-不需全域安裝時，將範例中的 `ahub-cli` 替換為
-`npx --package=@someonegg/agent-hub@latest ahub-cli`。加入 `--json` 可取得結構化命令結果。
+`agent-hub` 啟動伺服器，`ahub-cli` 管理工作階段和發布資源。用 `ahub-cli --help` 檢視可用命令，加入 `--json` 可取得結構化命令結果。
 
 ### 工作階段命令
 
@@ -127,7 +120,7 @@ ahub-cli session inspect <id> --follow
 
 傳送成功不表示任務完成。逾時或結束代碼為 `2`（寫入結果不明）時，先用 `list`、`inspect` 或 `terminal` 核查再重試。
 停止用戶端不會取消已提交操作。生命週期命令（包括刪除）不會在 CLI 中再次要求確認。
-全部命令見 `ahub-cli session --help`，結果與逾時契約見 [CLI 參考（英文）](technical-reference.md#session-cli-and-observation)。
+全部命令見 `ahub-cli session --help`，結果與逾時契約見 [CLI 參考（英文）](technical-reference.md#session-cli)。
 
 ## 發布網頁與差異
 
@@ -150,7 +143,7 @@ ahub-cli page publish ./demo --project /path/to/project --name demo --title "Des
 以相同專案和名稱再次發布即可更新並保留 URL。省略 `--name` 時使用來源目錄名。
 worktree 請將原專案傳給 `--project`。
 
-開啟**已發布網頁**（`/artifacts`）瀏覽、複製連結或刪除網頁及其快照。
+開啟**網頁**（`/artifacts`）瀏覽、複製連結或刪除網頁及其快照。
 CLI 也支援 `page list` 和 `page delete <id>`。移除來源目錄或 worktree 不會刪除已發布網頁。
 詳見[託管參考（英文）](technical-reference.md#optional-hosting)。
 
@@ -171,7 +164,7 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 ### 透過智慧體發布
 
 安裝附帶的 [`ahub-publish` skill](../skills/ahub-publish)，並按名稱請求使用。
-執行 `ahub-cli skill path ahub-publish` 定位目錄；使用 `npx` 時，請將傳回的快取目錄複製到長期使用的技能位置。
+執行 `ahub-cli skill path ahub-publish` 定位目錄。
 
 ## 設定伺服器
 
@@ -184,12 +177,12 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 | `--hosting`            | 關閉           | 提供已發布網頁與差異存取                    |
 | `--tmux-socket <path>` | tmux 預設值    | 使用自訂 tmux socket                        |
 
-Agent Hub 預設使用 `~/.agent-hub`，不會自動遷移舊資料。如需使用原有 Codex Hub 資料目錄，請為伺服器和資源管理命令傳入 `--home-dir ~/.codex-hub`。
+Agent Hub 預設使用 `~/.agent-hub`，不會自動遷移舊資料。
 
 ### 多個智慧體
 
-智慧體是獨立擁有設定、Skills、記憶和模型設定的身分。Codex 和 Claude Code 是執行引擎。智慧體目錄在 Codex 中包含 `sessions/`，在 Claude Code 中包含 `projects/`。
-每個智慧體需使用唯一暱稱和目錄：
+可設定多個 Codex 或 Claude Code 設定目錄，每個目錄使用唯一暱稱。
+Codex 目錄包含 `sessions/`，Claude Code 目錄包含 `projects/`：
 
 ```sh
 agent-hub \
@@ -236,16 +229,17 @@ ahub-cli session list --url http://127.0.0.1:4174
 - **連接埠占用：**改用其他連接埠，例如 `agent-hub --port 4180`。
 - **無法傳送輸入：**透過**連線 tmux**完成 CLI 提示，忙碌時等待，或在可用時使用**恢復**。封存工作階段唯讀，僅有日誌不代表終端已連線。
 - **建立或恢復狀態不明：**重試前檢查 tmux 並重新整理工作階段列表，避免重複啟動。關閉頁面不會停止操作，重新啟動伺服器會遺失進度追蹤。
-- **相機不可用或上傳中斷：**使用檔案選擇器，檢查工作階段已連線且閒置後重試。
+- **相機不可用：**改用檔案選擇器。
+- **上傳中斷：**檢查工作階段已連線後重試。
 
 執行與恢復細節見[技術參考（英文）](technical-reference.md)。
 
 ## 移除安裝
 
-停止伺服器。全域安裝時執行：
+停止伺服器後執行：
 
 ```sh
 npm uninstall -g @someonegg/agent-hub
 ```
 
-`npx` 不需全域移除安裝。工作階段、worktree、執行中的 tmux 工作階段、上傳檔案和託管快照仍會保留，請按需另行清理。
+工作階段、worktree、執行中的 tmux 工作階段、上傳檔案和託管快照仍會保留，請按需另行清理。

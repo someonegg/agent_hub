@@ -5,7 +5,7 @@ English | [简体中文](usage.zh-CN.md) | [繁體中文](usage.zh-TW.md)
 ## Start the hub
 
 ```sh
-npx @someonegg/agent-hub@latest
+agent-hub
 ```
 
 Open <http://127.0.0.1:4173> or the URL printed by the server. Press `Ctrl-C`
@@ -27,7 +27,7 @@ individual plans, including opening several at once.
 ## Create and manage sessions
 
 Click a project's **+**, or the global **+** to select an existing project directory.
-Choose **Other directory…** to enter a new absolute local directory.
+Choose **Other directory…** to enter the absolute path of an existing directory on the Hub server.
 Choose an [Agent](#multiple-agents) and optional launch settings:
 
 - **Worktree:** start in a separate Git worktree for isolated changes.
@@ -41,7 +41,7 @@ sure its original process has exited.
 Use the session's **…** menu to:
 
 - **Exit session:** stop its connected terminal and retain history.
-- **Archive:** stop execution and move the session to the archived list.
+- **Archive (Codex only):** stop execution and move the session to the archived list.
 - **Delete:** permanently remove session history after confirmation.
 
 Creating and resuming use tmux. If login or permission confirmation blocks startup,
@@ -80,6 +80,7 @@ Open **Upload history** from the session header to preview, download, or delete
 files, including unsent uploads. Removing an attachment from a draft does not
 delete its uploaded file; deleting it from history also removes it from the draft.
 
+When sending attachments, Hub adds their absolute server paths to the prompt for the agent to read.
 Files persist under `uploads/` in the [Hub data root](#configure-the-server), which
 must be accessible to the agent. Session deletion triggers background cleanup;
 archive and exit retain uploads. See the [upload reference](technical-reference.md#file-uploads)
@@ -97,16 +98,7 @@ and do not translate conversation or terminal content.
 ## Use the CLI
 
 `agent-hub` starts the server; `ahub-cli` manages sessions and published resources.
-The examples below assume a global installation:
-
-```sh
-npm install -g @someonegg/agent-hub
-ahub-cli --help
-```
-
-Without installing globally, replace `ahub-cli` in any example with
-`npx --package=@someonegg/agent-hub@latest ahub-cli`.
-Add `--json` for structured command results.
+Use `ahub-cli --help` for available commands. Add `--json` for structured command results.
 
 ### Session commands
 
@@ -153,7 +145,7 @@ Successful sending does not mean task completion. After a timeout or exit code `
 Stopping the client does not cancel a submitted operation. Lifecycle commands,
 including delete, run without a CLI confirmation prompt.
 See `ahub-cli session --help` for all commands and the
-[CLI reference](technical-reference.md#session-cli-and-observation) for result and timeout contracts.
+[CLI reference](technical-reference.md#session-cli) for result and timeout contracts.
 
 ## Publish pages and diffs
 
@@ -203,8 +195,7 @@ See the [diff reference](technical-reference.md#temporary-diffs) and
 ### Publish with an agent
 
 Install the bundled [`ahub-publish` skill](../skills/ahub-publish) and request it
-by name. Run `ahub-cli skill path ahub-publish` to locate it; if using `npx`, copy
-the returned cache directory to a lasting skill location.
+by name. Run `ahub-cli skill path ahub-publish` to locate it.
 
 ## Configure the server
 
@@ -218,14 +209,12 @@ for the full list.
 | `--hosting`            | Disabled       | Serve published pages and diffs                    |
 | `--tmux-socket <path>` | tmux default   | Use a custom tmux socket                           |
 
-Agent Hub uses `~/.agent-hub` by default and does not migrate old data. To use an existing Codex Hub data directory, pass `--home-dir ~/.codex-hub` to the server and resource commands.
+Agent Hub uses `~/.agent-hub` by default and does not migrate old data.
 
 ### Multiple agents
 
-An Agent is an identity with its own configuration, Skills, memory, and model settings.
-Codex and Claude Code are Runtimes.
-Each Agent has a unique nickname and directory, containing `sessions/` for Codex
-or `projects/` for Claude Code:
+You can configure multiple Codex or Claude Code configuration directories, each with a unique nickname.
+Each directory contains `sessions/` for Codex or `projects/` for Claude Code:
 
 ```sh
 agent-hub \
@@ -285,18 +274,18 @@ Other local users and processes can access it; do not forward external proxy tra
 - **Create/resume status unclear:** inspect tmux and refresh the session list before
   retrying to avoid duplicates. Closing the page does not stop an operation;
   restarting the server loses its progress tracking.
-- **Camera unavailable or upload interrupted:** use the file picker, check that
-  the session is connected and idle, and retry.
+- **Camera unavailable:** use the file picker instead.
+- **Upload interrupted:** check that the session is connected and retry.
 
 For runtime and recovery details, see the [technical reference](technical-reference.md).
 
 ## Uninstall
 
-Stop the server. For a global installation, run:
+Stop the server, then run:
 
 ```sh
 npm uninstall -g @someonegg/agent-hub
 ```
 
-An `npx` run needs no global uninstall. Sessions, worktrees, running tmux sessions,
+Sessions, worktrees, running tmux sessions,
 uploads, and hosted snapshots remain; clean them up separately as needed.

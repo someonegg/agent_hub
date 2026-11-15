@@ -43,4 +43,4 @@ The original choice was client-side nickname precedence with nickname excluded
 from update revisions; that choice was subsequently reversed. This record
 consolidates the implemented successor, without changing behavior.
 See [catalog titles](../technical-reference.md#catalog) and
-[reader revisions](../technical-reference.md#reader-and-automatic-updates).
+[reader revisions](../technical-reference.md#conversation-reads).
