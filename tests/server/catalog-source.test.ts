@@ -55,8 +55,10 @@ describe("catalog discovery", () => {
       JSON.stringify({ type: "session_meta", payload: { id } }) + "\n";
     await writeFile(file, content("first"));
     const decoder = new CheckpointedJsonlDecoder();
-    const decode = vi.fn(decoder.decode.bind(decoder));
-    const source = new CodexSessionSource(agent, "archive-once", { decoder: { decode } });
+    const decode = vi.spyOn(decoder, "decode");
+    const source = new CodexSessionSource(agent, "archive-once", {
+      decoder,
+    });
     const first = await source.refresh();
 
     await writeFile(file, content("changed"));

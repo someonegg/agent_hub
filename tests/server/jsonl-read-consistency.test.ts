@@ -102,3 +102,44 @@ it.each(["ESTALE", "EISDIR", "ELOOP", "EACCES"])(
     }
   },
 );
+
+it("keeps the head handle through continuation and defers post-stat appends", async () => {
+  const root = await createTempDirectory("jsonl-head-eof-");
+  const path = join(root, "log.jsonl");
+  const original = '{"head":true}\n' + JSON.stringify({ body: "界".repeat(30000) }) + "\n";
+  const appended = '{"appended":true}\n';
+  await writeFile(path, original);
+  const decoder = new CheckpointedJsonlDecoder();
+  hooks.afterStat = () => appendFile(path, appended);
+  const first = await decoder.decode({ path }, undefined, {
+    maxBytes: 65536,
+    inspect: () => "continue",
+  });
+  if (first.mode === "stopped") throw new Error("unexpected stop");
+  expect(first.records.map((r) => Object.keys(r.value)[0])).toEqual(["head", "body"]);
+  expect(first.telemetry.totalBytes).toBe(Buffer.byteLength(original));
+  const next = await decoder.decode({ path }, first.checkpoint);
+  expect(next.mode).toBe("append");
+  expect(next.records.map((r) => r.value)).toEqual([{ appended: true }]);
+
+  // Replace the path after the head has actually been parsed, before continuation.
+  const replacement = join(root, "replacement.jsonl");
+  await writeFile(replacement, '{"replacement":true}\n');
+  const { renameSync } = await import("node:fs");
+  const retained = await decoder.decode({ path }, undefined, {
+    maxBytes: 65536,
+    inspect: () => {
+      renameSync(replacement, path);
+      return "continue";
+    },
+  });
+  if (retained.mode === "stopped") throw new Error("unexpected stop");
+  expect(retained.records.map((r) => Object.keys(r.value)[0])).toEqual([
+    "head",
+    "body",
+    "appended",
+  ]);
+  expect((await decoder.decode({ path })).records.map((r) => r.value)).toEqual([
+    { replacement: true },
+  ]);
+});
