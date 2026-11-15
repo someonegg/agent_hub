@@ -1,4 +1,3 @@
-import { open } from "node:fs/promises";
 import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
@@ -18,8 +17,6 @@ import type {
 import { mergeBindingMetadata } from "../shared/binding-protocol.js";
 import {
   CheckpointedJsonlDecoder,
-  type DecodedRecord,
-  isObject,
   type JsonlCheckpoint,
   type JsonlDecoder,
 } from "../shared/jsonl-decoder.js";
@@ -222,22 +219,23 @@ export class CodexSessionSource implements SessionSource {
     binds: Map<string, Omit<SourceBindingEvent, "localId">[]>,
   ): Promise<CodexCacheEntry | "non-primary" | "missing-identity" | null> {
     try {
-      if (cached === undefined) {
-        const head = await probeIdentity(descriptor, telemetry);
-        const state = this.identity.append(this.identity.create(descriptor), head.records);
-        // A filename match cannot be superseded by later metadata. At EOF the
-        // first metadata is also definitive; otherwise use the complete decoder.
-        if (
-          (state.firstMatchingMetadata !== null || head.eof) &&
-          this.identity.metadata(state).excluded
-        )
-          return "non-primary";
-      }
       const decodeStartedAt = performance.now();
-      const decoded = await this.decoder.decode(descriptor, cached?.checkpoint);
+      const decoded =
+        cached === undefined
+          ? await this.decoder.decode(descriptor, undefined, {
+              maxBytes: IDENTITY_HEAD_BYTES,
+              inspect: (records, complete) => {
+                const state = this.identity.append(this.identity.create(descriptor), records);
+                const conclusive = state.firstMatchingMetadata !== null || complete;
+                if (conclusive && this.identity.metadata(state).excluded) return "stop";
+                return "continue";
+              },
+            })
+          : await this.decoder.decode(descriptor, cached.checkpoint);
       telemetry.decodeMs += performance.now() - decodeStartedAt;
       telemetry.probeBytes += decoded.telemetry.probeBytes;
       telemetry.decodeBytes += decoded.telemetry.decodeBytes;
+      if (decoded.mode === "stopped") return "non-primary";
       telemetry[decoded.mode === "append" ? "appendFiles" : "fullFiles"] += 1;
 
       const normalizeStartedAt = performance.now();
@@ -381,36 +379,3 @@ function sameOrigin(left: DomainSessionOrigin, right: DomainSessionOrigin): bool
 }
 
 const IDENTITY_HEAD_BYTES = 64 * 1024;
-
-async function probeIdentity(
-  descriptor: RolloutDescriptor,
-  telemetry: RefreshTelemetry,
-): Promise<{ records: DecodedRecord[]; eof: boolean }> {
-  const handle = await open(descriptor.path, "r");
-  try {
-    const info = await handle.stat();
-    const buffer = Buffer.alloc(Math.min(info.size, IDENTITY_HEAD_BYTES));
-    let length = 0;
-    while (length < buffer.length) {
-      const read = await handle.read(buffer, length, buffer.length - length, length);
-      telemetry.probeBytes += read.bytesRead;
-      if (read.bytesRead === 0) break;
-      length += read.bytesRead;
-    }
-    const text = buffer.subarray(0, length).toString("utf8");
-    const lines = text.split("\n");
-    lines.pop(); // Only newline-terminated JSONL records are eligible for probing.
-    const records: DecodedRecord[] = [];
-    for (const [index, line] of lines.entries()) {
-      try {
-        const value: unknown = JSON.parse(line);
-        if (isObject(value)) records.push({ ordinal: index + 1, value });
-      } catch {
-        /* The full decoder owns malformed-record diagnostics. */
-      }
-    }
-    return { records, eof: length === info.size && text.endsWith("\n") };
-  } finally {
-    await handle.close();
-  }
-}

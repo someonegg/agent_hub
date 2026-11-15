@@ -18,11 +18,14 @@ async function setup(content: string) {
   const file = join(root, "sessions/rollout-test.jsonl");
   await writeFile(file, content);
   const decoder = new CheckpointedJsonlDecoder();
-  const decode = vi.fn(decoder.decode.bind(decoder));
+  const decode = vi.spyOn(decoder, "decode");
   const normalizer = new DefaultSessionNormalizer();
   const append = vi.spyOn(normalizer, "append");
   const materialize = vi.spyOn(normalizer, "materialize");
-  const source = new CodexSessionSource(root, root, { decoder: { decode }, normalizer });
+  const source = new CodexSessionSource(root, root, {
+    decoder,
+    normalizer,
+  });
   return { root, file, source, decode, append, materialize };
 }
 
@@ -33,7 +36,7 @@ it.each([
   { source: { subagent: { thread_spawn: { parent_thread_id: "parent" } } } },
   { source: { subagent: {} } },
 ])(
-  "bounds head reads and filters native metadata %j before decoding or normalization",
+  "bounds head reads and filters native metadata %j before completing decoding or normalization",
   async (marker) => {
     const { source, decode, append, materialize } = await setup(
       meta({ id: "test", ...marker }) + padding(),
@@ -42,7 +45,7 @@ it.each([
     expect(snapshot.sessions).toEqual([]);
     expect(snapshot.bindings).toEqual([]);
     expect(snapshot.diagnostics).toEqual([]);
-    expect(decode).not.toHaveBeenCalled();
+    expect(decode).toHaveBeenCalledTimes(1);
     expect(append).not.toHaveBeenCalled();
     expect(materialize).not.toHaveBeenCalled();
     expect(source.lastRefreshTelemetry()).toMatchObject({
@@ -100,22 +103,24 @@ it("does not read excluded paths after append or replacement; absence and new in
   await writeFile(file, meta({ id: "test" }));
   expect((await source.refresh()).sessions).toEqual([]);
   expect(source.lastRefreshTelemetry()).toMatchObject({ probeBytes: 0, decodeBytes: 0 });
-  expect(decode).not.toHaveBeenCalled();
+  expect(decode).toHaveBeenCalledTimes(1);
   expect((await new CodexSessionSource(root, root).refresh()).sessions).toHaveLength(1);
   await unlink(file);
   await source.refresh();
   await writeFile(file, meta({ id: "test" }));
   expect((await source.refresh()).sessions).toHaveLength(1);
-  expect(decode).toHaveBeenCalledTimes(1);
+  expect(decode).toHaveBeenCalledTimes(2);
 });
 
 it("retries read failures rather than excluding their paths", async () => {
   const { root, file } = await setup(padding() + meta({ id: "test", parent_id: "parent" }));
   const decoder = new CheckpointedJsonlDecoder();
   const decode = vi
-    .fn(decoder.decode.bind(decoder))
+    .spyOn(decoder, "decode")
     .mockRejectedValueOnce(Object.assign(new Error("unavailable"), { code: "EACCES" }));
-  const source = new CodexSessionSource(root, root, { decoder: { decode } });
+  const source = new CodexSessionSource(root, root, {
+    decoder,
+  });
   expect((await source.refresh()).diagnostics).toMatchObject([{ code: "rollout_unavailable" }]);
   await writeFile(file, meta({ id: "test" }));
   expect((await source.refresh()).sessions).toHaveLength(1);
@@ -128,4 +133,14 @@ it("defers an incomplete metadata line until it is newline terminated", async ()
   expect(decode).toHaveBeenCalledTimes(1);
   await appendFile(file, "\n");
   expect((await source.refresh()).sessions).toEqual([]);
+});
+
+it.each(["", padding()])("reads an ordinary rollout once across head and body", async (body) => {
+  const content = meta({ id: "test" }) + body;
+  const { source } = await setup(content);
+  expect((await source.refresh()).sessions).toHaveLength(1);
+  const telemetry = source.lastRefreshTelemetry();
+  expect(telemetry.probeBytes).toBe(Math.min(65536, Buffer.byteLength(content)));
+  expect(telemetry.probeBytes + telemetry.decodeBytes).toBe(Buffer.byteLength(content));
+  expect(telemetry.fullFiles).toBe(1);
 });

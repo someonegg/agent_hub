@@ -272,3 +272,58 @@ async function jsonlFile(name: string, contents: string | Uint8Array) {
   await writeFile(path, contents);
   return { path, descriptor: { path } };
 }
+
+it.each([1, 7, 17, 18, 65536, 2000000])(
+  "continues the same parser after a %i-byte head",
+  async (maxBytes) => {
+    const content = Buffer.from(
+      "{}\r\n\n[]\ninvalid\n" +
+        JSON.stringify({ text: "界".repeat(30000) }) +
+        "\r\n" +
+        JSON.stringify({ text: "x".repeat(MAX_JSONL_LINE_BYTES + 1) }) +
+        "\n" +
+        '{"last":true}\n{"unfinished":',
+    );
+    const { descriptor } = await jsonlFile("head-state", content);
+    const decoder = new CheckpointedJsonlDecoder();
+    const full = await decoder.decode(descriptor);
+    let inspections = 0;
+    const checked = await decoder.decode(descriptor, undefined, {
+      maxBytes,
+      inspect: (records, complete) => {
+        inspections++;
+        const lines = content.subarray(0, maxBytes).filter((byte) => byte === 10).length;
+        expect(records).toEqual(full.records.filter((r) => r.ordinal <= lines));
+        expect(complete).toBe(false);
+        return "continue";
+      },
+    });
+    expect(inspections).toBe(1);
+    if (checked.mode === "stopped") throw new Error("unexpected stop");
+    expect(checked.records).toEqual(full.records);
+    expect(checked.diagnostics).toEqual(full.diagnostics);
+    expect(checked.batchDiagnostics).toEqual(full.batchDiagnostics);
+    expect(checked.checkpoint).toEqual(full.checkpoint);
+    expect(checked.telemetry).toEqual({
+      probeBytes: Math.min(maxBytes, content.length),
+      decodeBytes: Math.max(0, content.length - maxBytes),
+      totalBytes: content.length,
+    });
+  },
+);
+
+it("stops explicitly without a checkpoint and reports complete heads", async () => {
+  const { descriptor } = await jsonlFile("head-stop", "{}\r\n");
+  const result = await new CheckpointedJsonlDecoder().decode(descriptor, undefined, {
+    maxBytes: 65536,
+    inspect: (records, complete) => {
+      expect(records).toEqual([{ ordinal: 1, value: {} }]);
+      expect(complete).toBe(true);
+      return "stop";
+    },
+  });
+  expect(result).toEqual({
+    mode: "stopped",
+    telemetry: { probeBytes: 4, decodeBytes: 0, totalBytes: 4 },
+  });
+});

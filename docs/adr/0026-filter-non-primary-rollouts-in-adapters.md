@@ -23,15 +23,18 @@ Adapters publish independent sessions without subagent identity or parent/child
 relationship fields. Keep session-level task associations. Claude continues to
 filter native auxiliary records and clean up associated files on deletion.
 
-Before fully decoding a new Codex rollout, read at most 64 KiB and structurally
-parse only complete JSONL lines. A valid `session_meta.payload` identifies a
+For a new Codex rollout, the shared decoder checks up to 64 KiB of complete
+records, then continues as needed on the same handle with the same parser state
+to the initially observed EOF. A valid `session_meta.payload` identifies a
 non-primary rollout through non-empty `parent_thread_id` or `parent_id`, or an
 explicit `source.subagent` marker. Use the existing filename-matching, then first
 metadata identity selection. Decide from the head only when that selection is
 conclusive; otherwise fully decode and apply the same selection before
 normalization or binding extraction. Files without a selected exclusion marker
 remain ordinary sessions. I/O failures retain diagnostics and retry behavior.
-Probe reads contribute to source I/O telemetry.
+Count head bytes as probe I/O and remaining bytes as decode I/O. Early stops
+produce no checkpoint or completed decode count; existing checkpoints use the
+incremental path.
 
 Keep an in-memory exclusion cache by source-relative path, distinguishing
 non-primary rollouts from duplicate native identities. Preserve first selection

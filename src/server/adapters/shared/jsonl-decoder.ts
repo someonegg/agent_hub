@@ -52,18 +52,44 @@ export interface IncrementalDecodedJsonl extends DecodedJsonl {
   readonly telemetry: JsonlDecodeTelemetry;
 }
 
+export interface JsonlHeadCheck {
+  readonly maxBytes: number;
+  /** complete means observed EOF was reached with no unterminated physical line. */
+  readonly inspect: (records: readonly DecodedRecord[], complete: boolean) => "continue" | "stop";
+}
+
+export interface StoppedJsonl {
+  readonly mode: "stopped";
+  readonly telemetry: JsonlDecodeTelemetry;
+}
+
 export interface JsonlDecoder {
   decode(
     descriptor: JsonlDescriptor,
     checkpoint?: JsonlCheckpoint,
   ): Promise<IncrementalDecodedJsonl>;
+  decode(
+    descriptor: JsonlDescriptor,
+    checkpoint: undefined,
+    headCheck: JsonlHeadCheck,
+  ): Promise<IncrementalDecodedJsonl | StoppedJsonl>;
 }
 
 export class CheckpointedJsonlDecoder implements JsonlDecoder {
+  decode(
+    descriptor: JsonlDescriptor,
+    checkpoint?: JsonlCheckpoint,
+  ): Promise<IncrementalDecodedJsonl>;
+  decode(
+    descriptor: JsonlDescriptor,
+    checkpoint: undefined,
+    headCheck: JsonlHeadCheck,
+  ): Promise<IncrementalDecodedJsonl | StoppedJsonl>;
   async decode(
     descriptor: JsonlDescriptor,
     checkpoint?: JsonlCheckpoint,
-  ): Promise<IncrementalDecodedJsonl> {
+    headCheck?: JsonlHeadCheck,
+  ): Promise<IncrementalDecodedJsonl | StoppedJsonl> {
     const handle = await open(descriptor.path, "r");
     try {
       const info = await handle.stat();
@@ -83,7 +109,22 @@ export class CheckpointedJsonlDecoder implements JsonlDecoder {
       const start = appendCheckpoint?.committedOffset ?? 0;
       const baseOrdinal = appendCheckpoint?.physicalLineCount ?? 0;
       const priorDiagnostics = appendCheckpoint?.diagnostics ?? [];
-      const decoded = await decodeRange(handle, start, observedEof, baseOrdinal, priorDiagnostics);
+      const decoded = await decodeRange(
+        handle,
+        start,
+        observedEof,
+        baseOrdinal,
+        priorDiagnostics,
+        headCheck,
+      );
+      probeBytes += decoded.probeBytes;
+      const decodeBytes = decoded.bytesRead - decoded.probeBytes;
+      if (decoded.stopped) {
+        return {
+          mode: "stopped",
+          telemetry: { probeBytes, decodeBytes: 0, totalBytes: probeBytes },
+        };
+      }
       const probes = createProbes(observedEof, [
         ...validatedWindows,
         { offset: start, contents: decoded.headBytes },
@@ -107,8 +148,8 @@ export class CheckpointedJsonlDecoder implements JsonlDecoder {
         checkpoint: nextCheckpoint,
         telemetry: {
           probeBytes,
-          decodeBytes: decoded.bytesRead,
-          totalBytes: probeBytes + decoded.bytesRead,
+          decodeBytes,
+          totalBytes: probeBytes + decodeBytes,
         },
       };
     } finally {
@@ -118,6 +159,8 @@ export class CheckpointedJsonlDecoder implements JsonlDecoder {
 }
 
 interface RangeDecodeResult {
+  readonly stopped: boolean;
+  readonly probeBytes: number;
   readonly records: DecodedRecord[];
   readonly diagnostics: Diagnostic[];
   readonly batchDiagnostics: Diagnostic[];
@@ -135,6 +178,7 @@ async function decodeRange(
   observedEof: number,
   baseOrdinal: number,
   priorDiagnostics: readonly Diagnostic[],
+  headCheck?: JsonlHeadCheck,
 ): Promise<RangeDecodeResult> {
   const records: DecodedRecord[] = [];
   const diagnostics = priorDiagnostics.slice(0, MAX_SESSION_DIAGNOSTICS).map(cloneDiagnostic);
@@ -149,62 +193,80 @@ async function decodeRange(
   let headLength = 0;
   let tailBytes: Buffer = Buffer.alloc(0);
 
-  if (start < observedEof) {
-    const stream = handle.createReadStream({
-      autoClose: false,
-      start,
-      end: observedEof - 1,
-    });
-    for await (const rawChunk of stream) {
-      const chunk = rawChunk as Buffer;
-      bytesRead += chunk.length;
-      if (headLength < PROBE_BYTES) {
-        const part = chunk.subarray(0, PROBE_BYTES - headLength);
-        headParts.push(part);
-        headLength += part.length;
-      }
-      tailBytes = tailWindow(tailBytes, chunk);
-      let cursor = 0;
-      while (cursor < chunk.length) {
-        const newline = chunk.indexOf(0x0a, cursor);
-        const end = newline < 0 ? chunk.length : newline;
-        if (!droppingOversizedLine && end > cursor) {
-          const part = chunk.subarray(cursor, end);
-          lineBytes += part.length;
-          // Keep one possible trailing CR until the newline decides whether it
-          // is part of a CRLF terminator. decodeLine applies the final limit
-          // after stripping that CR.
-          if (lineBytes > MAX_JSONL_LINE_BYTES + 1) {
-            lineChunks.length = 0;
-            droppingOversizedLine = true;
-          } else {
-            lineChunks.push(part);
-          }
-        }
-        if (newline < 0) break;
-
-        ordinal += 1;
-        committedOffset = start + bytesRead - (chunk.length - newline - 1);
-        if (droppingOversizedLine) {
-          retainDiagnostic(diagnostics, batchDiagnostics, lineTooLargeDiagnostic(ordinal));
-        } else {
-          decodeLine(
-            lineBuffer(lineChunks, lineBytes),
-            ordinal,
-            records,
-            diagnostics,
-            batchDiagnostics,
-          );
-        }
-        lineChunks.length = 0;
-        lineBytes = 0;
-        droppingOversizedLine = false;
-        cursor = newline + 1;
-      }
+  const feed = (chunk: Buffer) => {
+    bytesRead += chunk.length;
+    if (headLength < PROBE_BYTES) {
+      const part = chunk.subarray(0, PROBE_BYTES - headLength);
+      headParts.push(part);
+      headLength += part.length;
     }
+    tailBytes = tailWindow(tailBytes, chunk);
+    let cursor = 0;
+    while (cursor < chunk.length) {
+      const newline = chunk.indexOf(0x0a, cursor);
+      const end = newline < 0 ? chunk.length : newline;
+      if (!droppingOversizedLine && end > cursor) {
+        const part = chunk.subarray(cursor, end);
+        lineBytes += part.length;
+        // Keep one possible trailing CR until the newline decides whether it
+        // is part of a CRLF terminator. decodeLine applies the final limit
+        // after stripping that CR.
+        if (lineBytes > MAX_JSONL_LINE_BYTES + 1) {
+          lineChunks.length = 0;
+          droppingOversizedLine = true;
+        } else {
+          lineChunks.push(part);
+        }
+      }
+      if (newline < 0) break;
+
+      ordinal += 1;
+      committedOffset = start + bytesRead - (chunk.length - newline - 1);
+      if (droppingOversizedLine) {
+        retainDiagnostic(diagnostics, batchDiagnostics, lineTooLargeDiagnostic(ordinal));
+      } else {
+        decodeLine(
+          lineBuffer(lineChunks, lineBytes),
+          ordinal,
+          records,
+          diagnostics,
+          batchDiagnostics,
+        );
+      }
+      lineChunks.length = 0;
+      lineBytes = 0;
+      droppingOversizedLine = false;
+      cursor = newline + 1;
+    }
+  };
+
+  const readUntil = async (end: number) => {
+    while (start + bytesRead < end) {
+      const buffer = Buffer.alloc(Math.min(64 * 1024, end - start - bytesRead));
+      const read = await handle.read(buffer, 0, buffer.length, start + bytesRead);
+      if (read.bytesRead === 0) break;
+      feed(buffer.subarray(0, read.bytesRead));
+    }
+  };
+  let probeBytes = 0;
+  let stopped = false;
+  if (headCheck !== undefined) {
+    if (!Number.isSafeInteger(headCheck.maxBytes) || headCheck.maxBytes <= 0) {
+      throw new Error("Head byte limit must be a positive safe integer");
+    }
+    await readUntil(Math.min(observedEof, start + headCheck.maxBytes));
+    probeBytes = bytesRead;
+    stopped =
+      headCheck.inspect(
+        records,
+        start + bytesRead === observedEof && committedOffset === observedEof,
+      ) === "stop";
   }
+  if (!stopped) await readUntil(observedEof);
 
   return {
+    stopped,
+    probeBytes,
     records,
     diagnostics,
     batchDiagnostics,

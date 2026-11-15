@@ -40,8 +40,9 @@ Loaded archives remain cached until restart or restoration, even after in-place
 edits. Discovery, removal, advisory metadata refresh, and failed-load retries continue.
 
 Codex filters auxiliary rollouts inside the adapter before normalization and
-binding extraction. It probes at most 64 KiB of complete JSONL lines, falling back
-to full identity decoding when needed. Confirmed exclusions and duplicate files
+binding extraction. The shared decoder checks up to 64 KiB of complete records,
+then continues as needed on the same handle with the same parser state to the
+initially observed EOF. Confirmed exclusions and duplicate files
 stay excluded by source-relative path until discovery observes their absence or
 the source is rebuilt. File changes and loss of an accepted original do not clear
 exclusions. Ordinary sessions retain incremental checkpoints. See
