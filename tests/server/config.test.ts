@@ -21,6 +21,7 @@ describe("server command line", () => {
     expect(runnable([])).toMatchObject({
       host: "127.0.0.1",
       port: 4173,
+      localHost: "127.0.0.1",
       agents: (existsSync(resolve(homedir(), ".codex"))
         ? ["codex", "claude"]
         : ["claude", "codex"]
@@ -40,6 +41,10 @@ describe("server command line", () => {
         "0.0.0.0",
         "--port",
         "0",
+        "--local-host",
+        " 0.0.0.0 ",
+        "--local-port",
+        "4174",
         "--ssl",
         "--ssl-cert",
         "certs/server.pem",
@@ -51,6 +56,8 @@ describe("server command line", () => {
     ).toMatchObject({
       host: "0.0.0.0",
       port: 0,
+      localHost: "0.0.0.0",
+      localPort: 4174,
       agents: [{ nickname: "personal", path: resolve("fixtures/codex") }],
       tls: {
         enabled: true,
@@ -70,6 +77,7 @@ describe("server command line", () => {
   it("rejects malformed general options", () => {
     expect(() => loadConfig(["--port", "65536"])).toThrow("--port must be an integer");
     expect(() => loadConfig(["--unknown"])).toThrow();
+    expect(() => loadConfig(["--local-host", " "])).toThrow("--local-host must not be empty");
     expect(() => loadConfig(["--tmux-socket", " "])).toThrow("--tmux-socket must not be empty");
     expect(() => loadConfig(["positional"])).toThrow();
   });

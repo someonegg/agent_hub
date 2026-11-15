@@ -9,7 +9,7 @@ import { createServer as createHttpsServer } from "node:https";
 import type { Server as NetServer } from "node:net";
 import { extname, resolve, sep } from "node:path";
 
-import type { ServerConfig } from "../config.js";
+import { LOOPBACK_HOST, type ServerConfig } from "../config.js";
 import { DiffStore } from "../hosting/diff-store.js";
 import { hostingRoutes } from "../hosting/routes.js";
 import type { ApiRouterOptions } from "./api-router.js";
@@ -202,10 +202,13 @@ export async function startServer(
         () => {},
         listenerUpgrades,
       );
-      await listenServer(local, config.localPort, "127.0.0.1");
+      const localHost = config.localHost ?? LOOPBACK_HOST;
+      await listenServer(local, config.localPort, localHost);
       const address = local.address();
-      if (address && typeof address === "object")
-        console.log(`Agent Hub local HTTP listening on http://127.0.0.1:${address.port}`);
+      if (address && typeof address === "object") {
+        const urlHost = localHost.includes(":") ? `[${localHost}]` : localHost;
+        console.log(`Agent Hub local HTTP listening on http://${urlHost}:${address.port}`);
+      }
     }
     const server = primary;
     const close = server.close.bind(server);

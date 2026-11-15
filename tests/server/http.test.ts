@@ -386,7 +386,7 @@ describe("secure HTTP foundation", () => {
   });
 });
 
-it("serves an optional loopback HTTP listener and closes shared services once", async () => {
+it("serves an optional HTTP listener on the configured host and closes shared services once", async () => {
   const clientDirectory = await createTempDirectory("codex-local-http-");
   await writeFile(join(clientDirectory, "index.html"), "local endpoint");
   const log = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -396,6 +396,7 @@ it("serves an optional loopback HTTP listener and closes shared services once", 
       host: LOOPBACK_HOST,
       port: 0,
       localPort: 0,
+      localHost: "0.0.0.0",
       agents: [],
       clientDirectory,
       tls: { enabled: false },
@@ -404,7 +405,9 @@ it("serves an optional loopback HTTP listener and closes shared services once", 
     async () => false,
     cleanup,
   );
-  const url = String(log.mock.calls[0][0]).split(" on ")[1];
+  const loggedUrl = String(log.mock.calls[0][0]).split(" on ")[1];
+  expect(new URL(loggedUrl).hostname).toBe("0.0.0.0");
+  const url = loggedUrl.replace("0.0.0.0", LOOPBACK_HOST);
   log.mockRestore();
   expect(await (await fetch(url)).text()).toBe("local endpoint");
   await new Promise<void>((resolve) => server.close(() => resolve()));
