@@ -32,6 +32,7 @@ export const namespaceKeys = {
     "exitSession",
     "filterByAgent",
     "agent",
+    "loadingNodes",
     "loadingSessions",
     "newProjectSession",
     "newSession",
