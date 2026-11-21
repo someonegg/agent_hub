@@ -1,11 +1,9 @@
 import { validTaskName } from "../../../shared/task-name.js";
-import { validProjectDirectory } from "../../domain/project-directory.js";
 import type {
   DomainAgentInteraction,
   InteractionBindingAttempt,
 } from "../../domain/session-domain.js";
-import { shellQuote } from "../../interaction/tmux-launcher.js";
-import { bindingAttempts } from "../shared/binding-protocol.js";
+import { bindingAttempts, formatBindingCommand } from "../shared/binding-protocol.js";
 import type { DecodedRecord } from "../shared/jsonl-decoder.js";
 import { DEFAULT_KEY_BINDINGS, interruptSteps } from "../shared/session-management.js";
 
@@ -19,8 +17,7 @@ export function claudeBindingCommand(
 ): string {
   if (operationId && !validClaudeId(operationId)) throw new Error("Invalid operation ID");
   if (taskName !== null && !validTaskName(taskName)) throw new Error("Invalid task name");
-  // Claude worktree isolation rejects tmux commands; the launcher supplies its known name.
-  return `! printf 'AHUB_TMUX_BIND_V3\\n%s\\n%s\\n%s\\n%s\\n%s\\n' "\${TMUX%%,*}" "$AHUB_TMUX_SESSION_NAME" ${shellQuote(operationId)} ${shellQuote(validProjectDirectory(projectDirectory) ? projectDirectory : "")} ${shellQuote(JSON.stringify(taskName))}`;
+  return formatBindingCommand(operationId, projectDirectory, taskName);
 }
 
 /** Only call with the main user record's native bash stdout wrapper. */

@@ -506,7 +506,7 @@ it("confirms user sends without Web viewers and shares the Web control connectio
     listen,
   );
   const abort = new AbortController();
-  const frames: unknown[] = [];
+  let snapshot: TerminalPreviewSnapshot | null = null;
   const errors: unknown[] = [];
   try {
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -516,23 +516,25 @@ it("confirms user sends without Web viewers and shares the Web control connectio
     previews.subscribe(
       binding,
       () => {},
-      (frame) => frames.push(frame),
+      (frame) => {
+        snapshot = applyPreview(snapshot, frame);
+      },
       (error) => errors.push(error),
       abort.signal,
     );
-    await vi.waitFor(() => expect(frames.length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(snapshot).not.toBeNull());
     let clients = 0;
     await transport.sendMessage(binding, "printf 'second-confirmed\\n'", undefined, {
       async prepare(read) {
         const result = await submission().prepare(read);
-        clients = tmux("list-clients", "-F", "#{client_name}").trim().split("\n").length;
+        clients = tmux("list-clients", "-F", "#{client_name}").split("\n").filter(Boolean).length;
         return result;
       },
     });
     expect(clients).toBe(1);
-    const before = frames.length;
-    tmux("send-keys", "-t", sessionName, "printf 'web-still-active\\n'", "Enter");
-    await vi.waitFor(() => expect(frames.length).toBeGreaterThan(before));
+    // Keep the marker out of the echoed command so only its output satisfies the check.
+    tmux("send-keys", "-t", sessionName, "printf '%s-%s\\n' web-still active", "Enter");
+    await vi.waitFor(() => expect(snapshot?.content).toContain("web-still-active"));
     expect(errors).toEqual([]);
     expect((await transport.captureTerminal(binding)).content).toContain("second-confirmed");
   } finally {
