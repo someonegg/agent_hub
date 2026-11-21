@@ -7,8 +7,6 @@ export const messages: Record<keyof typeof english, string> = {
   collapseSidebar: "收起侧栏",
   expandSidebar: "展开侧栏",
   task: "任务",
-  top: "顶部",
-  end: "底部",
   resumeUnavailable: "此会话无法恢复。",
 
   enter: "Enter",

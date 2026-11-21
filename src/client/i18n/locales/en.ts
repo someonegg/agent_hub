@@ -6,8 +6,6 @@ export const messages = {
   collapseSidebar: "Collapse sidebar",
   expandSidebar: "Expand sidebar",
   task: "Task",
-  top: "TOP",
-  end: "END",
   resumeUnavailable: "This session cannot be resumed.",
 
   enter: "Enter",
