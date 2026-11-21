@@ -11,19 +11,21 @@ import {
   nextRetryMs,
   waitForRetry,
 } from "./retry-policy";
+import type { SessionCache } from "./session-cache";
 
-export function useSessionList() {
-  const [list, setList] = useState<SessionListResponse | null>(null);
+export function useSessionList(cache?: SessionCache) {
+  const [list, setList] = useState<SessionListResponse | null>(() => cache?.list ?? null);
   const [listError, setError] = useState<string | null>(null);
   const [listRetrying, setRetrying] = useState(false);
-  const revision = useRef<string | undefined>(undefined);
+  const revision = useRef(cache?.list?.revision);
   const listRequest = useRef<AbortController | null>(null);
   const [connection, reconnect] = useState(0);
   const refresh = useCallback(() => {
     listRequest.current?.abort();
     revision.current = undefined;
+    if (cache) cache.list = null;
     reconnect((value) => value + 1);
-  }, []);
+  }, [cache]);
 
   useEffect(() => {
     const channel = createRequestChannel();
@@ -44,6 +46,7 @@ export function useSessionList() {
             if (!request.isCurrent()) return;
             if (data) {
               revision.current = data.revision;
+              if (cache) cache.list = data;
               setList((previous) => {
                 const times = new Map(
                   previous?.sessions.map((session) => [session.id, session.updatedAt]),
@@ -83,7 +86,7 @@ export function useSessionList() {
       channel.cancel();
       document.removeEventListener("visibilitychange", start);
     };
-  }, [connection]);
+  }, [cache, connection]);
 
   const reportUpdatedAt = useCallback((id: string, updatedAt: string | null) => {
     setList((previous) => {

@@ -12,12 +12,15 @@ import { t } from "./i18n";
 import { currentNode, localPagePath, subscribeNode } from "./node-path";
 import { SessionPage } from "./SessionPage";
 import { browserStorage } from "./state/browser-storage";
+import { SessionCache, SessionMessageCache } from "./state/session-cache";
 import { SessionDraftProvider } from "./state/session-drafts";
 import { useHubNavigation } from "./state/use-hub-navigation";
 import { useSessionList } from "./state/use-session-list";
 export function App({ multi = false }: { multi?: boolean } = {}) {
   const url = useSyncExternalStore(subscribeNode, () => location.href);
   const node = currentNode();
+  const [messageCache] = useState(() => new SessionMessageCache());
+  const caches = useRef(new Map<string | undefined, SessionCache>());
   const recentPaths = useRef(new Map<string, string>());
   useEffect(() => {
     if (!multi) return;
@@ -35,6 +38,11 @@ export function App({ multi = false }: { multi?: boolean } = {}) {
   const path = localPagePath();
   if (path.startsWith("/diffs/")) return <DiffPage />;
   if (path === "/artifacts") return <ArtifactsPage />;
+  let cache = caches.current.get(node);
+  if (!cache) {
+    cache = new SessionCache(messageCache, node);
+    caches.current.set(node, cache);
+  }
   return (
     <SessionDraftProvider>
       <div className="hub-with-header">
@@ -48,15 +56,15 @@ export function App({ multi = false }: { multi?: boolean } = {}) {
             <span className="hub-brand-label">Agent Hub</span>
           </header>
         )}
-        {!multi || node ? <SessionHub key={node} /> : null}
+        {!multi || node ? <SessionHub key={node} cache={cache} /> : null}
       </div>
     </SessionDraftProvider>
   );
 }
 
-function SessionHub() {
+function SessionHub({ cache }: { cache: SessionCache }) {
   useTranslation();
-  const catalog = useSessionList();
+  const catalog = useSessionList(cache);
   const [agentFilter, setAgentFilter] = useState(() => browserStorage.getItem("ahub.agent") ?? "");
   const agents = catalog.list?.agents ?? [];
   const selectedAgent = agents.some((agent) => agent.nickname === agentFilter) ? agentFilter : "";
@@ -142,6 +150,7 @@ function SessionHub() {
               />
             ) : (
               <SessionPage
+                cache={cache}
                 key={sessionId}
                 sessionId={sessionId}
                 agents={agents}

@@ -9,10 +9,12 @@ import { InternalLink } from "./components/InternalLink";
 import { SessionReader } from "./components/SessionReader";
 import { t } from "./i18n";
 import { nodePagePath } from "./node-path";
+import type { SessionCache } from "./state/session-cache";
 import { useHubOperation } from "./state/use-hub-operation";
 import { useSessionReader } from "./state/use-session-reader";
 
 interface SessionPageProps {
+  cache?: SessionCache;
   agents?: readonly SessionAgent[];
   sessionId: string;
   onNavigate?: (id: string | null) => void;
@@ -22,6 +24,7 @@ interface SessionPageProps {
 
 export function SessionPage({
   sessionId,
+  cache,
   agents = [],
   onNavigate,
   onCatalogChanged,
@@ -29,12 +32,14 @@ export function SessionPage({
 }: SessionPageProps) {
   useTranslation();
   const focused = useRef(false);
-  const reader = useSessionReader(sessionId);
+  const reader = useSessionReader(sessionId, cache);
   const [managementOperation, setManagementOperation] = useState(false);
   const operation = useHubOperation(sessionId, (op) => {
     onCatalogChanged?.();
-    if (op.type === "delete") onNavigate?.(null);
-    else void reader.refreshLatest();
+    if (op.type === "delete") {
+      cache?.storeMessages(sessionId, null);
+      onNavigate?.(null);
+    } else void reader.refreshLatest();
   });
   const showManagementStatus = operation.operation
     ? operation.operation.type === "archive" || operation.operation.type === "delete"
@@ -93,6 +98,7 @@ export function SessionPage({
               onStart={() => setManagementOperation(true)}
               session={reader.context.session}
               onDeleted={() => {
+                cache?.storeMessages(sessionId, null);
                 onCatalogChanged?.();
                 onNavigate?.(null);
               }}
