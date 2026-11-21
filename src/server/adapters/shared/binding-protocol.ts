@@ -3,7 +3,20 @@ import { isAbsolute } from "node:path";
 import { validTaskName } from "../../../shared/task-name.js";
 import { validProjectDirectory } from "../../domain/project-directory.js";
 import type { InteractionBindingAttempt } from "../../domain/session-domain.js";
+import { shellQuote } from "../../interaction/tmux-launcher.js";
 import { validTmuxSessionName } from "../../interaction/tmux-target.js";
+
+export const BINDING_MARKER = "AHUB_TMUX_BIND_V3";
+
+export function formatBindingCommand(
+  operationId: string,
+  projectDirectory: string | null | undefined,
+  taskName: string | null,
+): string {
+  const project = validProjectDirectory(projectDirectory) ? projectDirectory : "";
+  // Claude's worktree isolation rejects tmux commands, so use the launcher's session name.
+  return `! printf '${BINDING_MARKER}\\n%s\\n%s\\n%s\\n%s\\n%s\\n' "\${TMUX%%,*}" "$AHUB_TMUX_SESSION_NAME" ${shellQuote(operationId)} ${shellQuote(project)} ${shellQuote(JSON.stringify(taskName))}`;
+}
 
 /** Parse protocol fields only after the adapter has established native provenance. */
 export function bindingAttempts(
@@ -13,7 +26,7 @@ export function bindingAttempts(
 ): InteractionBindingAttempt[] {
   const found: InteractionBindingAttempt[] = [];
   for (let index = 0; index < lines.length; index++) {
-    if (lines[index] !== "AHUB_TMUX_BIND_V3") continue;
+    if (lines[index] !== BINDING_MARKER) continue;
     const socketPath = lines[index + 1] ?? "";
     const sessionName = lines[index + 2] ?? "";
     const operationId = lines[index + 3] ?? "";

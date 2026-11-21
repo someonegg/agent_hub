@@ -1,15 +1,16 @@
 import { TASK_NAME_ERROR, validTaskName } from "../../../shared/task-name.js";
-import { validProjectDirectory } from "../../domain/project-directory.js";
 import type {
   DomainAgentInteraction,
   InteractionBindingAttempt,
 } from "../../domain/session-domain.js";
-import { bindingAttempts } from "../shared/binding-protocol.js";
+import {
+  BINDING_MARKER,
+  bindingAttempts,
+  formatBindingCommand,
+} from "../shared/binding-protocol.js";
 import type { DecodedRecord } from "../shared/jsonl-decoder.js";
 import { isObject } from "../shared/jsonl-decoder.js";
 import { DEFAULT_KEY_BINDINGS, interruptSteps } from "../shared/session-management.js";
-
-const BINDING_MARKER = "AHUB_TMUX_BIND_V3";
 
 export function codexInteraction(
   projectDirectory?: string | null,
@@ -70,10 +71,7 @@ export function codexBindingCommand(
     throw new Error(TASK_NAME_ERROR);
   if (operationId !== undefined && !validOperationId(operationId))
     throw new Error("Invalid operation ID");
-  const quote = (value: string) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
-  const project = validProjectDirectory(projectDirectory) ? projectDirectory : "";
-
-  return `! printf '${BINDING_MARKER}\\n%s\\n%s\\n%s\\n%s\\n%s\\n' "\${TMUX%%,*}" "$AHUB_TMUX_SESSION_NAME" ${quote(operationId ?? "")} ${quote(project)} ${quote(JSON.stringify(taskName ?? null))}`;
+  return formatBindingCommand(operationId ?? "", projectDirectory, taskName ?? null);
 }
 
 function validOperationId(id: string): boolean {
