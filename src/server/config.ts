@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
+import { NODE_ID_PATTERN } from "../shared/node-id.js";
+
+const NODE_ID = new RegExp(`^${NODE_ID_PATTERN}$`);
+
 export function resolveHomeDirectory(value?: string): string {
   return value === undefined
     ? resolve(homedir(), ".agent-hub")
@@ -214,9 +218,9 @@ function parseNodes(values: readonly string[]): NodeTarget[] {
     const separator = value.indexOf("=");
     const id = value.slice(0, separator);
     const address = value.slice(separator + 1);
-    if (separator < 0 || !/^[a-z0-9-]+$/.test(id)) {
+    if (separator < 0 || !NODE_ID.test(id)) {
       throw new Error(
-        "--node requires a lowercase node ID and address in id=http(s)://host format",
+        "--node requires id=http(s)://host with an ID containing only ASCII letters, digits, or hyphens",
       );
     }
     const url = URL.parse(address);

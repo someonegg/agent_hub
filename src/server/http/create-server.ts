@@ -10,6 +10,7 @@ import type { Server as NetServer } from "node:net";
 import { extname, resolve, sep } from "node:path";
 import { pipeline } from "node:stream";
 
+import { NODE_ID_PATTERN } from "../../shared/node-id.js";
 import { LOOPBACK_HOST, type ServerConfig } from "../config.js";
 import { DiffStore } from "../hosting/diff-store.js";
 import { hostingRoutes } from "../hosting/routes.js";
@@ -24,6 +25,8 @@ import {
 import { type ApiRouter, emptyApiRouter, sendJson } from "./router.js";
 import { applySecurityHeaders } from "./security.js";
 import type { ServerUpgradeHandler } from "./terminal-preview-websocket.js";
+
+const NODE_PAGE_PATH = new RegExp(`^/nodes/(${NODE_ID_PATTERN})(/.*)?$`);
 
 const CONTENT_TYPES: Record<string, string> = {
   ".css": "text/css; charset=utf-8",
@@ -116,7 +119,7 @@ export function createServer(
         return;
       }
       const url = requestUrl(request);
-      const nodePage = hub && /^\/nodes\/([a-z0-9-]+)(\/.*)?$/.exec(url.pathname);
+      const nodePage = hub && NODE_PAGE_PATH.exec(url.pathname);
       if (nodePage && !hub.nodes.some(({ id }) => id === nodePage[1])) {
         sendText(response, 404, "Not found", headOnly);
         return;

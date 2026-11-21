@@ -1,4 +1,6 @@
-const NODE_PATH = /^\/nodes\/([a-z0-9-]+)(?=\/|$)/;
+import { NODE_ID_PATTERN } from "../shared/node-id";
+
+const NODE_PATH = new RegExp(`^/nodes/(${NODE_ID_PATTERN})(?=/|$)`);
 
 export function currentNode() {
   return NODE_PATH.exec(window.location.pathname)?.[1];

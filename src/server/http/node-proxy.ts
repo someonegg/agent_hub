@@ -9,14 +9,15 @@ import {
 import { Agent as HttpsAgent, request as httpsRequest } from "node:https";
 import type { Duplex } from "node:stream";
 
+import { NODE_ID_PATTERN } from "../../shared/node-id.js";
 import type { NodeTarget, ServerMode } from "../config.js";
 import { MalformedRequestError, requestUrl } from "./request-errors.js";
 import { type ApiRouter, emptyApiRouter, sendJson } from "./router.js";
 import { SESSION_ID_PATTERN, SESSION_ROOT } from "./session-path.js";
 import type { ServerUpgradeHandler } from "./terminal-preview-websocket.js";
 
-const API_PATH = /^\/api\/nodes\/([a-z0-9-]+)(\/v1(?:\/.*)?)$/;
-const WEB_PATH = /^\/nodes\/([a-z0-9-]+)(\/web(?:\/.*)?)$/;
+const API_PATH = new RegExp(`^/api/nodes/(${NODE_ID_PATTERN})(/v1(?:/.*)?)$`);
+const WEB_PATH = new RegExp(`^/nodes/(${NODE_ID_PATTERN})(/web(?:/.*)?)$`);
 const TERMINAL_PATH = new RegExp(`^${SESSION_ROOT}/${SESSION_ID_PATTERN}/terminal-preview$`);
 const HOP_HEADERS = [
   "connection",
