@@ -446,13 +446,14 @@ async function capture(
       });
     }
     if (path.endsWith("/messages")) {
+      const after = Number(url.searchParams.get("after") ?? 0);
       return route.fulfill({
         json: {
           ...snapshot,
           session: path.includes("/docs-demo-session-keyboard/")
             ? { ...session, id: "docs-demo-session-keyboard", title: "Add keyboard navigation" }
             : session,
-          items,
+          items: after > 0 ? items.filter((item) => item.ordinal > after) : items,
         },
       });
     }

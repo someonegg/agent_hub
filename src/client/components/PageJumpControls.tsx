@@ -78,7 +78,7 @@ export function PageJumpControls({
         tabIndex={visible.top ? 0 : -1}
         onClick={() => scrollTo(0)}
       >
-        <span aria-hidden="true">↑</span> {t("top")}
+        <span aria-hidden="true">↑</span>
       </button>
       <button
         type="button"
@@ -88,7 +88,7 @@ export function PageJumpControls({
         tabIndex={visible.bottom ? 0 : -1}
         onClick={() => scrollTo(scrollElement?.scrollHeight ?? 0)}
       >
-        <span aria-hidden="true">↓</span> {t("end")}
+        <span aria-hidden="true">↓</span>
       </button>
     </nav>
   );
