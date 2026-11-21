@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import { t } from "../i18n";
+import { nodePagePath } from "../node-path";
 import { InternalLink } from "./InternalLink";
 
 interface UploadHistoryLinkProps {
@@ -12,7 +13,7 @@ interface UploadHistoryLinkProps {
 
 export function UploadHistoryLink({ sessionId, onNavigate, ...props }: UploadHistoryLinkProps) {
   useTranslation();
-  const href = `/sessions/${encodeURIComponent(sessionId)}/uploads`;
+  const href = nodePagePath(`/sessions/${encodeURIComponent(sessionId)}/uploads`);
   return (
     <InternalLink
       {...props}

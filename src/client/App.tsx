@@ -1,24 +1,28 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ArtifactsPage } from "./components/ArtifactsPage";
 import { DiffPage } from "./components/DiffPage";
 import { CreateSession } from "./components/HubManagement";
 import { HubSidebar } from "./components/HubSidebar";
+import { NodeOverview, NodeOverviewLink } from "./components/NodeOverview";
 import { SidebarToggle } from "./components/SidebarToggle";
 import { UploadsPage } from "./components/UploadsPage";
 import { t } from "./i18n";
+import { currentNode, localPagePath, subscribeNode } from "./node-path";
 import { SessionPage } from "./SessionPage";
 import { browserStorage } from "./state/browser-storage";
 import { SessionDraftProvider } from "./state/session-drafts";
 import { useHubNavigation } from "./state/use-hub-navigation";
 import { useSessionList } from "./state/use-session-list";
-export function App() {
-  if (location.pathname.startsWith("/diffs/")) return <DiffPage />;
-  if (location.pathname === "/artifacts") return <ArtifactsPage />;
+export function App({ multi = false }: { multi?: boolean } = {}) {
+  const node = useSyncExternalStore(subscribeNode, currentNode);
+  const path = localPagePath();
+  if (path.startsWith("/diffs/")) return <DiffPage />;
+  if (path === "/artifacts") return <ArtifactsPage />;
   return (
     <SessionDraftProvider>
-      <SessionHub />
+      {multi && !node ? <NodeOverview /> : <SessionHub key={node} />}
     </SessionDraftProvider>
   );
 }
@@ -81,6 +85,7 @@ function SessionHub() {
       />
       <div className="hub-content">
         <div className="hub-topbar">
+          {sessionId || sidebarCollapsed ? <NodeOverviewLink /> : null}
           {sidebarCollapsed ? <SidebarToggle collapsed onToggle={toggleSidebar} /> : null}
           {sessionId ? (
             <>
@@ -137,23 +142,20 @@ function SessionHub() {
           </section>
         )}
       </div>
-      <CreateSession
-        agents={agents}
-        selectedAgent={selectedAgent}
-        project={createDirectory ?? ""}
-        projects={(catalog.list?.projects ?? []).map((item) => ({ project: item.directory }))}
-        open={createOpen}
-        onRecovered={() => setCreateOpen(true)}
-        onClose={() => setCreateOpen(false)}
-        onCreated={(operation) => {
-          setCreateOpen(false);
-          catalog.refresh();
-          if (!operation.sessionId) return;
-          if (createOpen) {
-            navigate(operation.sessionId);
-          }
-        }}
-      />
+      {createOpen ? (
+        <CreateSession
+          agents={agents}
+          selectedAgent={selectedAgent}
+          project={createDirectory ?? ""}
+          projects={(catalog.list?.projects ?? []).map((item) => ({ project: item.directory }))}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(operation) => {
+            setCreateOpen(false);
+            catalog.refresh();
+            if (operation.sessionId) navigate(operation.sessionId);
+          }}
+        />
+      ) : null}
     </main>
   );
 }

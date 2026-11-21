@@ -7,6 +7,7 @@ import { api } from "../api/client";
 import type { PlainMessageKey } from "../i18n";
 import { formatDate, t } from "../i18n";
 import { LocalizedError } from "../i18n/localized-error";
+import { nodePagePath } from "../node-path";
 import { RequestError } from "./RequestError";
 
 export function ArtifactsPage() {
@@ -20,7 +21,7 @@ export function ArtifactsPage() {
   const [busy, setBusy] = useState(true);
   async function copyLink(url: string) {
     try {
-      await navigator.clipboard.writeText(location.origin + url);
+      await navigator.clipboard.writeText(location.origin + nodePagePath(url));
       setNotice("linkCopied");
     } catch {
       setError(new LocalizedError("couldNotCopyLink"));
@@ -57,7 +58,7 @@ export function ArtifactsPage() {
   }, [loadProjects, runOperation]);
   return (
     <section className="artifacts-page">
-      <a href="/">← Agent Hub</a>
+      <a href={nodePagePath("/")}>← Agent Hub</a>
       <header className="artifacts-heading">
         <div>
           <p className="eyebrow">{t("publishedSnapshots")}</p>
@@ -88,7 +89,7 @@ export function ArtifactsPage() {
                 })}
               </time>
               <div className="artifact-actions">
-                <a href={artifact.url} target="_blank" rel="noreferrer">
+                <a href={nodePagePath(artifact.url)} target="_blank" rel="noreferrer">
                   {t("open")}
                 </a>
                 <button type="button" onClick={() => void copyLink(artifact.url)}>

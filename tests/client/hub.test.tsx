@@ -5,6 +5,7 @@ import type { HubOperation, SessionListResponse } from "../../src/shared/api-con
 
 import { api, ApiClientError } from "../../src/client/api/client";
 import { App } from "../../src/client/App";
+import { navigateNode } from "../../src/client/node-path";
 import { browserStorage } from "../../src/client/state/browser-storage";
 import { baseSession, firstPage, listBody, OTHER_SESSION_ID, SESSION_ID } from "./session.fixtures";
 
@@ -118,7 +119,7 @@ describe("unified hub", () => {
     expect(screen.getByRole("heading", { name: "Reader work" })).toBeInTheDocument();
   });
 
-  it.each([false, true])(
+  it.each([null, "button", "escape"])(
     "respects creation dialog dismissal on completion: %s",
     async (dismiss) => {
       vi.mocked(api.sessions)
@@ -143,7 +144,7 @@ describe("unified hub", () => {
         updatedAt: "2026-10-16T00:00:00Z",
       };
       vi.spyOn(api, "createSession").mockResolvedValue(pending);
-      vi.spyOn(api, "operation").mockResolvedValue({
+      const query = vi.spyOn(api, "operation").mockResolvedValue({
         ...pending,
         status: "succeeded",
         sessionId: OTHER_SESSION_ID,
@@ -155,7 +156,14 @@ describe("unified hub", () => {
       fireEvent.click(screen.getByRole("button", { name: /^reader.*1/ }));
       await flush();
       if (dismiss) {
-        fireEvent.click(screen.getByRole("button", { name: "Close new session" }));
+        if (dismiss === "escape") {
+          fireEvent(
+            screen.getByRole("dialog", { name: "New session" }),
+            new Event("cancel", { cancelable: true }),
+          );
+        } else {
+          fireEvent.click(screen.getByRole("button", { name: "Close new session" }));
+        }
         fireEvent.click(screen.getByRole("button", { name: /^reader.*1/ }));
         fireEvent.click(screen.getByRole("link", { name: /Reader work/ }));
         await flush();
@@ -165,6 +173,7 @@ describe("unified hub", () => {
         await vi.advanceTimersByTimeAsync(1000);
       });
       if (dismiss) {
+        expect(query).not.toHaveBeenCalled();
         expect(window.location.pathname).toBe(`/sessions/${SESSION_ID}`);
         expect(screen.getByRole("heading", { name: "Reader work" })).toBeInTheDocument();
       } else {
@@ -271,10 +280,11 @@ describe("unified hub", () => {
     });
     fireEvent.click(within(dialog).getByRole("button", { name: "Close new session" }));
     fireEvent.click(screen.getByRole("button", { name: "New session in reader" }));
-    expect(within(dialog).getByRole("heading", { name: "New session" })).toHaveFocus();
-    expect(within(dialog).getByLabelText("Project directory")).toHaveValue("/project/reader");
-    expect(within(dialog).queryByRole("textbox")).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Close new session" }));
+    const reopened = screen.getByRole("dialog", { name: "New session" });
+    expect(within(reopened).getByRole("heading", { name: "New session" })).toHaveFocus();
+    expect(within(reopened).getByLabelText("Project directory")).toHaveValue("/project/reader");
+    expect(within(reopened).queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(within(reopened).getByRole("button", { name: "Close new session" }));
     fireEvent.click(screen.getByRole("button", { name: /^reader.*1/ }));
     expect(screen.queryByRole("link", { name: /Reader work/ })).not.toBeInTheDocument();
     expect(JSON.parse(browserStorage.getItem("ahub.navigation")!).expanded).toEqual([]);
@@ -453,3 +463,66 @@ it("preselects the default creation agent and respects an explicit agent filter"
   fireEvent.click(screen.getAllByRole("button", { name: "New session" })[0]!);
   expect(screen.getByLabelText("Session agent")).toHaveValue("work");
 });
+
+it.each(["pending", "failed", "succeeded", "rejected"] as const)(
+  "discards a late creation %s result after switching Nodes",
+  async (outcome) => {
+    window.history.replaceState(null, "", "/nodes/local/");
+    vi.mocked(api.sessions)
+      .mockReset()
+      .mockImplementation(async (query) =>
+        query?.after ? new Promise(() => {}) : multiAgentCatalog(),
+      );
+    let resolve!: (operation: HubOperation) => void;
+    let reject!: (error: Error) => void;
+    const create = vi.spyOn(api, "createSession").mockReturnValue(
+      new Promise((res, rej) => {
+        resolve = res;
+        reject = rej;
+      }),
+    );
+    const query = vi.spyOn(api, "operation");
+    render(<App multi />);
+    await flush();
+    const openForm = () => {
+      fireEvent.click(screen.getAllByRole("button", { name: "New session" })[0]!);
+      fireEvent.change(screen.getByLabelText("Project directory"), { target: { value: "custom" } });
+      fireEvent.change(screen.getByLabelText("Directory path"), { target: { value: "/project" } });
+    };
+    openForm();
+    fireEvent.click(screen.getByRole("button", { name: "Create session" }));
+    act(() => navigateNode("/nodes/remote/"));
+    act(() => navigateNode("/nodes/local/"));
+    await flush();
+    expect(screen.queryByRole("dialog", { name: "New session" })).toBeNull();
+    openForm();
+
+    const result: HubOperation = {
+      operationId: "create-op",
+      type: "create",
+      status: outcome === "rejected" ? "failed" : outcome,
+      sessionId: outcome === "succeeded" ? OTHER_SESSION_ID : null,
+      phase: null,
+      attachCommand: null,
+      error: outcome === "failed" ? "Creation failed on Node" : null,
+      createdAt: "2026-10-16T00:00:00Z",
+      updatedAt: "2026-10-16T00:00:00Z",
+    };
+    vi.useFakeTimers();
+    if (outcome === "rejected") reject(new Error("Creation response lost"));
+    else resolve(result);
+    await flush();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    expect(query).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("ahub.operation.create.node.local")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "New session" })).toBeVisible();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(window.location.pathname).toBe("/nodes/local/");
+    create.mockResolvedValue({ ...result, status: "failed", error: "New submission failed" });
+    fireEvent.click(screen.getByRole("button", { name: "Create session" }));
+    await flush();
+    expect(create.mock.calls[1]?.[0].requestId).not.toBe(create.mock.calls[0]?.[0].requestId);
+  },
+);

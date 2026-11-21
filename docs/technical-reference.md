@@ -613,8 +613,9 @@ creation time, URL). CLI list reads metadata; delete is idempotent and preserves
 the source. Diffs have no project/session association or HTTP list endpoint.
 Damaged metadata is diagnosed/treated as missing; other filesystem errors propagate.
 
-`/diffs/<uuid>` serves the viewer; `GET /api/v1/diffs/:uuid` returns metadata/`raw`,
-DELETE returns `204`, missing/disabled returns `404`. Responses use
+`/diffs/<uuid>` serves the viewer. `GET /api/v1/diffs/:uuid` returns metadata and
+`raw`. `HEAD` checks existence without reading the raw diff, and `DELETE`
+returns `204`. Missing diffs and disabled hosting return `404`. Responses use
 `private, no-store`, Hub CSP, and text rendering; Markdown links open new tabs.
 The viewer supports Git unified diffs, renames, modes, binary markers, and C-quoted
 paths; unsupported/incomplete input warns and retains raw-text access.
@@ -622,8 +623,8 @@ paths; unsupported/incomplete input warns and retains raw-text access.
 ## Browser state
 
 `ahub.preferences.v1` localStorage synchronizes same-origin preferences;
-`ahub.browser-state.v1` sessionStorage holds tab-local browsing. Recovery/drafts
-have independent lifecycles; storage failures preserve in-memory behavior.
+`ahub.browser-state.v1` sessionStorage holds tab-local browsing. Recovery and drafts
+have independent lifecycles. Storage failures preserve in-memory behavior.
 
 ### Requests and recovery
 
@@ -635,10 +636,12 @@ The reader starts at `after=0`, loading up to 300 items per page on scroll.
 History and tail waiting share one request slot; unarchived sessions tail at EOF.
 Session changes, hiding, or unmount cancel reads; appends preserve reading position.
 
-Management polls one second after query completion. Hidden pages pause reads,
-while submitted writes continue. Stored operation IDs survive reload; terminal
-results/`404` clear recovery markers. Nonretryable query errors need manual retry;
-launch network retries reuse request IDs until terminal results.
+Management polls one second after query completion. Hidden pages pause reads
+while submitted writes continue. Creation tracking ends when the dialog closes.
+Retrying a failed submission with the same parameters in the open dialog reuses
+the request ID. Other operations recover stored IDs after reload. Terminal
+results and `404` clear recovery markers. Nonretryable query errors need manual
+retry.
 
 ### Interface localization
 
@@ -655,3 +658,51 @@ translations fall back to English. New languages require catalog registration an
 validation tests; no runtime fetch or browser-language detection exists.
 Notifications retain keys until rendering; structured API errors use codes,
 never English-message matching.
+
+## Multi-node routing and TLS
+
+A standalone Node serves `/api/v1` and optional `/web/` hosting. Single-machine
+mode also serves the Web UI. A Hub configured with `--node id=origin` serves
+the UI and proxies requests to its Nodes. IDs use lowercase ASCII letters, digits,
+and hyphens. Origins must be HTTP or HTTPS with no credentials, query, fragment,
+or path beyond the root.
+
+### Hub routes
+
+| Hub route                                | Behavior                                                                                               |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GET /api/nodes`                         | Lists Node IDs in configuration order.                                                                 |
+| `/api/nodes/<id>/v1/…`                   | Proxies `/api/v1/…` on the Node, including terminal WebSocket upgrades.                                |
+| `/nodes/<id>/web/…`                      | Proxies `/web/…` on the Node and rewrites `/web/` redirects under the Node prefix.                     |
+| `GET` or `HEAD /nodes/<id>/diffs/<uuid>` | Checks `HEAD /api/v1/diffs/<uuid>` on the Node and uses the resulting status for the Hub viewer route. |
+| `/nodes/<id>/…`                          | Scopes the session list, session deep links, upload history, and Pages to the Node.                    |
+
+Drafts and staged attachments survive in-app Node changes within the loaded tab.
+Operation IDs, tab-local navigation state, and the default Agent are scoped per
+Node. Language and theme are shared.
+
+The Hub streams HTTP bodies and WebSocket traffic. Unknown Nodes return `404`.
+Upstream connection failures return `502` and timeouts return `504`. The
+35-second response-header deadline starts after the Hub forwards the request
+body, allowing the Node's 25-second long poll. Uploads and response streams
+have a separate 35-second inactivity limit. Downstream disconnects cancel
+upstream requests. The Hub never retries writes.
+
+For proxied API and hosted requests other than `GET` and `HEAD`, and for
+WebSocket upgrades, a supplied `Origin` must match the incoming socket protocol
+and `Host`. The Hub sends the configured Node's `Host` upstream and strips
+`Origin`.
+
+### TLS
+
+Each mode supports the primary `--ssl*` listener and an optional loopback-by-default
+HTTP listener via `--local-port` and `--local-host`. With `--ssl-ca`, the primary
+listener requires client certificates for its pages, APIs, resources and upgrades.
+For HTTPS and WSS upstreams, all Nodes share the Hub's optional
+`--node-client-cert` / `--node-client-key` identity. The Hub verifies the Node's
+certificate and hostname with Node.js trust roots and any `NODE_EXTRA_CA_CERTS`.
+The Node verifies the Hub identity using the Node's own `--ssl-ca`.
+
+Hosted pages run in the Hub origin. Only publish content trusted to access
+same-origin APIs for every configured Node. Keep snapshot resource links
+relative so assets resolve below the node and snapshot prefix.

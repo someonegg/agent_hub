@@ -13,6 +13,7 @@ import remarkMath from "remark-math";
 import type { MessageItem as Message } from "../../shared/domain";
 
 import { t } from "../i18n";
+import { nodePagePath } from "../node-path";
 import { EventTime } from "./EventTime";
 
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
@@ -25,7 +26,11 @@ const PREVIEW_PARSE_OPTIONS = {
 const MARKDOWN_COMPONENTS = {
   a: ({ href, children }: ComponentProps<"a">) =>
     href ? (
-      <a href={href} target="_blank" rel="noreferrer noopener">
+      <a
+        href={/^\/(?:web|diffs)\//.test(href) ? nodePagePath(href) : href}
+        target="_blank"
+        rel="noreferrer noopener"
+      >
         {children}
       </a>
     ) : (

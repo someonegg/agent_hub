@@ -1,12 +1,9 @@
 #!/usr/bin/env node
 
 import { commandLineHelp, loadConfig } from "./config.js";
-import { createAhub } from "./create-hub.js";
-import { createApiRouter } from "./http/api-router.js";
 import { startServer } from "./http/create-server.js";
-import { createTerminalPreviewWebSocket } from "./http/terminal-preview-websocket.js";
-import { uploadDirectory } from "./http/upload-routes.js";
-import { UploadStore } from "./uploads/store.js";
+import { createNodeProxy } from "./http/node-proxy.js";
+import { startNode } from "./node.js";
 import { packageVersion } from "./version.js";
 
 async function main(): Promise<void> {
@@ -22,21 +19,12 @@ async function main(): Promise<void> {
   }
 
   const { config } = command;
-  const uploads = new UploadStore(await uploadDirectory(config.uploadDirectory));
-  await uploads.initialize();
-  const hub = await createAhub({
-    agents: config.agents,
-    socket: config.tmuxSocket,
-    claudeReadyScript: config.claudeReadyScript,
-    interactionEnabled: config.interactionEnabled,
-    uploads,
-  });
-  const server = await startServer(
-    config,
-    createApiRouter({ ...hub, uploads }),
-    hub.close,
-    createTerminalPreviewWebSocket(hub.interaction),
-  );
+  const proxy = config.mode?.kind === "hub" ? createNodeProxy(config.mode) : undefined;
+  const server = proxy
+    ? await startServer(config, proxy.route, () => {}, proxy, {
+        diffPageStatus: proxy.diffPageStatus,
+      })
+    : await startNode(config);
   const address = server.address();
   const port = typeof address === "object" && address ? address.port : config.port;
   const host = config.host.includes(":") ? `[${config.host}]` : config.host;

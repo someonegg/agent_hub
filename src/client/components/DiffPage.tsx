@@ -9,6 +9,7 @@ import { type DiffLine, parseDiff } from "../../shared/diff";
 import { api, ApiClientError } from "../api/client";
 import type { PlainMessageKey } from "../i18n";
 import { t } from "../i18n";
+import { localPagePath } from "../node-path";
 import { DiffFileTree } from "./DiffFileTree";
 
 const lineSigns = { add: "+", remove: "−", context: " " };
@@ -45,7 +46,7 @@ export function DiffPage() {
   useEffect(() => {
     const controller = new AbortController();
     api
-      .diff(decodeURIComponent(location.pathname.slice("/diffs/".length)), controller.signal)
+      .diff(decodeURIComponent(localPagePath().slice("/diffs/".length)), controller.signal)
       .then(setEntry)
       .catch((error: Error) => {
         if (error.name !== "AbortError") {

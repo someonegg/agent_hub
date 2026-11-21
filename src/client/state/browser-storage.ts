@@ -1,3 +1,4 @@
+import { currentNode, nodeStorageKey } from "../node-path";
 const key = "ahub.browser-state.v1";
 
 function read(): Record<string, string> | null {
@@ -24,11 +25,13 @@ function refresh() {
 
 /** Centralized tab-local persistence with in-memory fallback. */
 export const browserStorage = {
-  getItem(name: string): string | null {
+  getItem(name: string, node = currentNode() ?? null): string | null {
+    name = nodeStorageKey(name, node);
     refresh();
     return typeof memory[name] === "string" ? memory[name] : null;
   },
-  setItem(name: string, value: string) {
+  setItem(name: string, value: string, node = currentNode() ?? null) {
+    name = nodeStorageKey(name, node);
     refresh();
     memory = { ...memory, [name]: value };
     pending = { ...pending, [name]: value };

@@ -385,3 +385,50 @@
 .hub.has-session:has(.session-layout) .hub-topbar {
   flex-shrink: 0;
 }
+
+.hub-node-link {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-sidebar > .hub-node-link {
+  flex-shrink: 0;
+  margin: 0 22px 8px;
+  padding: 8px 0;
+}
+
+.hub-topbar .hub-node-link {
+  max-width: 35%;
+}
+
+.node-overview {
+  width: min(100% - 2rem, 72rem);
+  margin: 2rem auto;
+}
+
+.node-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+}
+
+.node-card {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--mist);
+  border-radius: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.node-card h2 {
+  margin: 0;
+}
+
+.node-card ul {
+  display: grid;
+  gap: 0.625rem;
+  padding-inline-start: 1.25rem;
+}

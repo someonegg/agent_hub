@@ -1,5 +1,7 @@
 import { createContext, type ReactNode, useContext, useState } from "react";
 
+import { nodeStorageKey } from "../node-path";
+
 export interface DraftAttachment {
   id: string;
   file: File;
@@ -25,15 +27,16 @@ export function SessionDraftProvider({ children }: { children: ReactNode }) {
 export function useSessionDraft(sessionId: string) {
   const localStore = useDraftStore();
   const [drafts, setDrafts] = useContext(SessionDraftContext) ?? localStore;
-  const draft = drafts.get(sessionId);
+  const key = nodeStorageKey(sessionId);
+  const draft = drafts.get(key);
   const message = draft?.text ?? "";
   const attachments = draft?.attachments ?? [];
   const updateDraft = (update: (current: SessionDraft) => SessionDraft) => {
     setDrafts((current) => {
       const next = new Map(current);
-      const updated = update(current.get(sessionId) ?? { text: "", attachments: [] });
-      if (updated.text || updated.attachments.length) next.set(sessionId, updated);
-      else next.delete(sessionId);
+      const updated = update(current.get(key) ?? { text: "", attachments: [] });
+      if (updated.text || updated.attachments.length) next.set(key, updated);
+      else next.delete(key);
       return next;
     });
   };
@@ -48,9 +51,9 @@ export function useSessionDraft(sessionId: string) {
   const clearSentMessage = () => {
     setDrafts((current) => {
       // Compare edit identity, not text: a newer draft may contain the same text.
-      if (current.get(sessionId) !== draft) return current;
+      if (current.get(key) !== draft) return current;
       const next = new Map(current);
-      next.delete(sessionId);
+      next.delete(key);
       return next;
     });
   };

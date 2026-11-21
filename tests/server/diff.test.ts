@@ -229,7 +229,11 @@ it("serves pages and deletes resources without loading diff bodies", async () =>
   }
   const removable = await store.publish(source);
   const deleteUrl = new URL(`/api/v1/diffs/${removable.id}`, url);
+  const head = await fetch(deleteUrl, { method: "HEAD" });
+  expect(head.status).toBe(200);
+  expect(await head.text()).toBe("");
   expect((await fetch(deleteUrl, { method: "DELETE" })).status).toBe(204);
+  expect((await fetch(deleteUrl, { method: "HEAD" })).status).toBe(404);
   expect((await fetch(deleteUrl, { method: "DELETE" })).status).toBe(404);
   expect(readBody).not.toHaveBeenCalled();
   const raw = join(root, "hosting", "diffs", entry.id, "raw.diff");

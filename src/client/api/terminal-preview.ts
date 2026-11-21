@@ -1,6 +1,7 @@
 import type { TerminalPreviewFrame, TerminalPreviewMessage } from "../../shared/api-contract";
 
 import { LocalizedError } from "../i18n/localized-error";
+import { nodeApiPath } from "../node-path";
 import { ApiClientError } from "./client";
 
 export interface PreviewConnectionCallbacks {
@@ -14,7 +15,7 @@ export function connectTerminalPreview(
   callbacks: PreviewConnectionCallbacks,
 ): () => void {
   const url = new URL(
-    `/api/v1/sessions/${encodeURIComponent(sessionId)}/terminal-preview`,
+    nodeApiPath(`/api/v1/sessions/${encodeURIComponent(sessionId)}/terminal-preview`),
     window.location.href,
   );
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";

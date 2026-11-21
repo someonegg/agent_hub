@@ -8,6 +8,7 @@ import { ManageSession, OperationStatus, ResumeSession } from "./components/HubM
 import { InternalLink } from "./components/InternalLink";
 import { SessionReader } from "./components/SessionReader";
 import { t } from "./i18n";
+import { nodePagePath } from "./node-path";
 import { useHubOperation } from "./state/use-hub-operation";
 import { useSessionReader } from "./state/use-session-reader";
 
@@ -118,7 +119,10 @@ export function SessionPage({
             retryLabel={t("retryOpeningSession")}
           />
           {reader.missing ? (
-            <InternalLink href="/" onNavigate={onNavigate ? () => onNavigate(null) : undefined}>
+            <InternalLink
+              href={nodePagePath("/")}
+              onNavigate={onNavigate ? () => onNavigate(null) : undefined}
+            >
               {t("backToHome")}
             </InternalLink>
           ) : null}

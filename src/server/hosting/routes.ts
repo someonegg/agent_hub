@@ -1,6 +1,7 @@
 import { createReadStream } from "node:fs";
 import { realpath, stat } from "node:fs/promises";
 import { extname, join, resolve, sep } from "node:path";
+import { pipeline } from "node:stream";
 
 import type { ApiRouterOptions } from "../http/api-router.js";
 import {
@@ -58,14 +59,24 @@ export function hostingRoutes(directory?: string, options: ApiRouterOptions = {}
       const entry = diffs && match && request.method === "GET" ? await diffs.get(match[1]) : null;
       if (entry) {
         sendJson(response, 200, entry);
-      } else if (diffs && match && request.method === "DELETE" && (await diffs.exists(match[1]))) {
-        await diffs.delete(match[1]);
-        response.statusCode = 204;
+      } else if (
+        diffs &&
+        match &&
+        (head || request.method === "DELETE") &&
+        (await diffs.exists(match[1]))
+      ) {
+        if (!head) await diffs.delete(match[1]);
+        response.statusCode = head ? 200 : 204;
         response.end();
       } else {
-        sendJson(response, 404, {
-          error: { code: "not_found", message: "Diff not found or already cleaned up" },
-        });
+        sendJson(
+          response,
+          404,
+          {
+            error: { code: "not_found", message: "Diff not found or already cleaned up" },
+          },
+          head,
+        );
       }
       return true;
     }
@@ -163,13 +174,11 @@ export function hostingRoutes(directory?: string, options: ApiRouterOptions = {}
       );
       response.setHeader("Content-Length", info.size);
       if (head) response.end();
-      else
-        createReadStream(file)
-          .on("error", (error) => {
-            response.destroy();
+      else if (!response.destroyed)
+        pipeline(createReadStream(file), response, (error) => {
+          if (error && (error as NodeJS.ErrnoException).code !== "ERR_STREAM_PREMATURE_CLOSE")
             reportRequestError(request, response, error, options);
-          })
-          .pipe(response);
+        });
     } catch (error) {
       if (!isMissingFile(error)) throw error;
       missing();

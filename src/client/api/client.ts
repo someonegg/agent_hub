@@ -13,6 +13,8 @@ import type {
 } from "../../shared/api-contract";
 import type { UploadAttachment } from "../../shared/uploads";
 
+import { nodeApiPath } from "../node-path";
+
 export class ApiClientError extends Error {
   constructor(
     public readonly status: number,
@@ -24,7 +26,11 @@ export class ApiClientError extends Error {
   }
 }
 
-async function request<T>(path: string, signal?: AbortSignal, init: RequestInit = {}): Promise<T> {
+async function requestJson<T>(
+  path: string,
+  signal?: AbortSignal,
+  init: RequestInit = {},
+): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers: { Accept: "application/json", ...init.headers },
@@ -45,6 +51,18 @@ async function request<T>(path: string, signal?: AbortSignal, init: RequestInit 
     );
   }
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
+}
+
+function request<T>(path: string, signal?: AbortSignal, init?: RequestInit) {
+  return requestJson<T>(nodeApiPath(path), signal, init);
+}
+
+export function listNodes(signal: AbortSignal) {
+  return requestJson<{ nodes: { id: string }[] }>("/api/nodes", signal);
+}
+
+export function nodeCatalog(id: string, signal: AbortSignal) {
+  return requestJson<SessionListResponse>(nodeApiPath("/api/v1/sessions", id), signal);
 }
 
 function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {

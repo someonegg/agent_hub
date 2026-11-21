@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { SessionListResponse } from "../../shared/api-contract";
 
+import { currentNode, localPagePath, nodePagePath } from "../node-path";
 import { browserStorage } from "./browser-storage";
 import { projectForSession } from "./catalog-groups";
 
@@ -22,18 +23,19 @@ function readNavigation(): NavigationState {
   }
   return { includeArchived: false, expanded: [], scroll: 0 };
 }
-function saveNavigation(navigation: NavigationState) {
+function saveNavigation(navigation: NavigationState, node: string | null) {
   try {
-    browserStorage.setItem(NAVIGATION_KEY, JSON.stringify(navigation));
+    browserStorage.setItem(NAVIGATION_KEY, JSON.stringify(navigation), node);
   } catch {
     /* Optional storage. */
   }
 }
 export function useHubNavigation(list: SessionListResponse | null) {
+  const node = currentNode() ?? null;
   const [uploadsOpen, setUploadsOpen] = useState(() =>
     /\/uploads\/?$/.test(window.location.pathname),
   );
-  const [sessionId, setSessionId] = useState(() => sessionIdFromPath(window.location.pathname));
+  const [sessionId, setSessionId] = useState(() => sessionIdFromPath(localPagePath()));
   const [navigation, setNavigation] = useState(readNavigation);
   const navigationRef = useRef(navigation);
   const scrollSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -41,39 +43,41 @@ export function useHubNavigation(list: SessionListResponse | null) {
   const sidebar = useRef<HTMLElement>(null);
   const projectNav = useRef<HTMLElement>(null);
   const navigate = (id: string | null) => {
-    const path = id === null ? "/" : `/sessions/${id}`;
+    const path = nodePagePath(id === null ? "/" : `/sessions/${id}`);
     if (window.location.pathname !== path) window.history.pushState(null, "", path);
     setUploadsOpen(false);
     setSessionId(id);
     window.scrollTo(0, 0);
     if (id === null) {
       const target =
-        sidebar.current?.querySelector<HTMLAnchorElement>(`a[href="/sessions/${sessionId}"]`) ??
-        sidebar.current?.querySelector<HTMLAnchorElement>(".hub-brand a");
+        sidebar.current?.querySelector<HTMLAnchorElement>(
+          `a[href="${nodePagePath(`/sessions/${sessionId}`)}"]`,
+        ) ?? sidebar.current?.querySelector<HTMLAnchorElement>(".hub-brand a");
       requestAnimationFrame(() => target?.focus({ preventScroll: true }));
     }
   };
   useEffect(() => {
     const pop = () => {
-      setSessionId(sessionIdFromPath(window.location.pathname));
+      if ((currentNode() ?? null) !== node) return;
+      setSessionId(sessionIdFromPath(localPagePath()));
       setUploadsOpen(/\/uploads\/?$/.test(window.location.pathname));
     };
     window.addEventListener("popstate", pop);
     return () => window.removeEventListener("popstate", pop);
-  }, []);
+  }, [node]);
   useEffect(() => {
     if (scrollSaveTimer.current !== null) {
       clearTimeout(scrollSaveTimer.current);
       scrollSaveTimer.current = null;
     }
-    saveNavigation(navigationRef.current);
-  }, [navigation]);
+    saveNavigation(navigationRef.current, node);
+  }, [navigation, node]);
   useEffect(() => {
     const flushScroll = () => {
       if (scrollSaveTimer.current === null) return;
       clearTimeout(scrollSaveTimer.current);
       scrollSaveTimer.current = null;
-      saveNavigation(navigationRef.current);
+      saveNavigation(navigationRef.current, node);
     };
     const onVisibilityChange = () => {
       if (document.hidden) flushScroll();
@@ -83,7 +87,7 @@ export function useHubNavigation(list: SessionListResponse | null) {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       flushScroll();
     };
-  }, []);
+  }, [node]);
   const catalogLoaded = list !== null;
   useLayoutEffect(() => {
     if (projectNav.current?.getClientRects().length)
@@ -124,7 +128,7 @@ export function useHubNavigation(list: SessionListResponse | null) {
     if (scrollSaveTimer.current !== null) clearTimeout(scrollSaveTimer.current);
     scrollSaveTimer.current = setTimeout(() => {
       scrollSaveTimer.current = null;
-      saveNavigation(navigationRef.current);
+      saveNavigation(navigationRef.current, node);
     }, SCROLL_SAVE_DELAY_MS);
   };
   return {

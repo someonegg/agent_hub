@@ -10,6 +10,7 @@ import {
 import { api } from "../api/client";
 import { formatDate, formatNumber, t } from "../i18n";
 import { LocalizedError } from "../i18n/localized-error";
+import { nodeApiPath, nodePagePath } from "../node-path";
 import { useSessionDraft } from "../state/session-drafts";
 import { InternalLink } from "./InternalLink";
 import { RequestError } from "./RequestError";
@@ -46,7 +47,10 @@ export function UploadsPage({ sessionId, onBack }: { sessionId: string; onBack: 
   }, [sessionId, retry]);
   return (
     <section className="uploads-page">
-      <InternalLink href={`/sessions/${encodeURIComponent(sessionId)}`} onNavigate={onBack}>
+      <InternalLink
+        href={nodePagePath(`/sessions/${encodeURIComponent(sessionId)}`)}
+        onNavigate={onBack}
+      >
         {t("backToSession")}
       </InternalLink>
       <h1>{t("uploadHistory")}</h1>
@@ -105,7 +109,9 @@ function UploadEntry({ item, onDeleted }: { item: UploadAttachment; onDeleted: (
         if (!controller.current!.signal.aborted) setBusy(false);
       });
   };
-  const attachmentUrl = `/api/v1/sessions/${encodeURIComponent(item.sessionId)}/uploads/${encodeURIComponent(item.id)}`;
+  const attachmentUrl = nodeApiPath(
+    `/api/v1/sessions/${encodeURIComponent(item.sessionId)}/uploads/${encodeURIComponent(item.id)}`,
+  );
   const contentUrl = `${attachmentUrl}/content`;
   const thumbnailUnavailable = !supportsUploadThumbnail(item.type) || thumbnailBroken;
   const image = isPreviewableUploadType(item.type);
