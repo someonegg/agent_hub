@@ -1,9 +1,8 @@
 import type { messages as english } from "./en";
 export const messages: Record<keyof typeof english, string> = {
   nodes: "節點",
-  nodeUnavailable: "節點暫時無法連線",
-  nodeNoSessions: "暫無工作階段",
-  runOnNode: "在節點 {{node}} 上執行",
+  scrollNodesLeft: "向左捲動節點標籤",
+  scrollNodesRight: "向右捲動節點標籤",
 
   collapseSidebar: "收合側欄",
   expandSidebar: "展開側欄",

@@ -81,6 +81,7 @@ export function SessionReader({
   useEffect(() => {
     const viewport = window.visualViewport;
     const host =
+      reader.current?.closest<HTMLElement>(".hub-with-header") ??
       reader.current?.closest<HTMLElement>(".hub") ??
       reader.current?.closest<HTMLElement>(".session-layout");
     if (!viewport || !host) return;

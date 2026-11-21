@@ -1,8 +1,7 @@
 export const messages = {
   nodes: "Nodes",
-  nodeUnavailable: "Node unavailable",
-  nodeNoSessions: "No sessions",
-  runOnNode: "Run on node {{node}}",
+  scrollNodesLeft: "Scroll nodes left",
+  scrollNodesRight: "Scroll nodes right",
 
   collapseSidebar: "Collapse sidebar",
   expandSidebar: "Expand sidebar",
