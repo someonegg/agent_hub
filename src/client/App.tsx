@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ArtifactsPage } from "./components/ArtifactsPage";
 import { DiffPage } from "./components/DiffPage";
 import { CreateSession } from "./components/HubManagement";
 import { HubSidebar } from "./components/HubSidebar";
-import { NodeOverview, NodeOverviewLink } from "./components/NodeOverview";
+import { NodeTabs } from "./components/NodeTabs";
 import { SidebarToggle } from "./components/SidebarToggle";
 import { UploadsPage } from "./components/UploadsPage";
 import { t } from "./i18n";
@@ -16,13 +16,40 @@ import { SessionDraftProvider } from "./state/session-drafts";
 import { useHubNavigation } from "./state/use-hub-navigation";
 import { useSessionList } from "./state/use-session-list";
 export function App({ multi = false }: { multi?: boolean } = {}) {
-  const node = useSyncExternalStore(subscribeNode, currentNode);
+  const url = useSyncExternalStore(subscribeNode, () => location.href);
+  const node = currentNode();
+  const recentPaths = useRef(new Map<string, string>());
+  useEffect(() => {
+    if (!multi) return;
+    const remember = () => {
+      const active = currentNode();
+      const path = localPagePath();
+      if (active && (path === "/" || path.startsWith("/sessions/"))) {
+        const { pathname, search, hash } = window.location;
+        recentPaths.current.set(active, pathname + search + hash);
+      }
+    };
+    remember();
+    return subscribeNode(remember);
+  }, [multi]);
   const path = localPagePath();
   if (path.startsWith("/diffs/")) return <DiffPage />;
   if (path === "/artifacts") return <ArtifactsPage />;
   return (
     <SessionDraftProvider>
-      {multi && !node ? <NodeOverview /> : <SessionHub key={node} />}
+      <div className="hub-with-header">
+        {multi ? (
+          <NodeTabs node={node} activeUrl={url} recentPaths={recentPaths.current} />
+        ) : (
+          <header className="hub-header">
+            <span className="hub-brand-icon">
+              <img className="brand-logo" src="/favicon.svg" alt="" width="24" height="24" />
+            </span>
+            <span className="hub-brand-label">Agent Hub</span>
+          </header>
+        )}
+        {!multi || node ? <SessionHub key={node} /> : null}
+      </div>
     </SessionDraftProvider>
   );
 }
@@ -63,7 +90,7 @@ function SessionHub() {
     requestAnimationFrame(() => {
       document
         .querySelector<HTMLButtonElement>(
-          collapsed ? ".hub-topbar .hub-sidebar-toggle" : ".hub-brand .hub-sidebar-toggle",
+          collapsed ? ".hub-topbar .hub-sidebar-toggle" : ".hub-sidebar .hub-sidebar-toggle",
         )
         ?.focus({ preventScroll: true });
     });
@@ -85,7 +112,6 @@ function SessionHub() {
       />
       <div className="hub-content">
         <div className="hub-topbar">
-          {sessionId || sidebarCollapsed ? <NodeOverviewLink /> : null}
           {sidebarCollapsed ? <SidebarToggle collapsed onToggle={toggleSidebar} /> : null}
           {sessionId ? (
             <>

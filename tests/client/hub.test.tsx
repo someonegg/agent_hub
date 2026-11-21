@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HubOperation, SessionListResponse } from "../../src/shared/api-contract";
 
+import * as client from "../../src/client/api/client";
 import { api, ApiClientError } from "../../src/client/api/client";
 import { App } from "../../src/client/App";
 import { navigateNode } from "../../src/client/node-path";
@@ -77,7 +78,7 @@ describe("unified hub", () => {
     },
   );
 
-  it("offers a agent link below a missing session error without redirecting automatically", async () => {
+  it("offers a home link below a missing session error without redirecting automatically", async () => {
     window.history.replaceState(null, "", `/sessions/${SESSION_ID}`);
     vi.mocked(api.messages).mockRejectedValue(
       new ApiClientError(404, "session_not_found", "Session missing"),
@@ -231,7 +232,7 @@ describe("unified hub", () => {
     );
   });
 
-  it("opens nothing on agent, toggles archived records, and retains navigation through history", async () => {
+  it("opens no session on the home page, toggles archived records, and retains navigation through history", async () => {
     render(<App />);
     await flush();
     const nav = screen.getByRole("navigation", { name: "Projects and sessions" });
@@ -337,7 +338,6 @@ it("feeds displayed session updatedAt back into sidebar ordering without refresh
   const order = () =>
     within(sidebar)
       .getAllByRole("link")
-      .slice(1)
       .map((link) => link.getAttribute("href"));
   expect(order()).toEqual(["/sessions/other", `/sessions/${SESSION_ID}`]);
   fireEvent.click(within(sidebar).getByRole("link", { name: "Reader work" }));
@@ -467,6 +467,7 @@ it("preselects the default creation agent and respects an explicit agent filter"
 it.each(["pending", "failed", "succeeded", "rejected"] as const)(
   "discards a late creation %s result after switching Nodes",
   async (outcome) => {
+    vi.spyOn(client, "listNodes").mockResolvedValue({ nodes: [{ id: "remote" }, { id: "local" }] });
     window.history.replaceState(null, "", "/nodes/local/");
     vi.mocked(api.sessions)
       .mockReset()
@@ -526,3 +527,27 @@ it.each(["pending", "failed", "succeeded", "rejected"] as const)(
     expect(create.mock.calls[1]?.[0].requestId).not.toBe(create.mock.calls[0]?.[0].requestId);
   },
 );
+
+it("opens the first node and restores upload history after switching nodes", async () => {
+  vi.spyOn(client, "listNodes").mockResolvedValue({ nodes: [{ id: "remote" }, { id: "local" }] });
+  window.history.replaceState(null, "", "/");
+  vi.spyOn(api, "uploads").mockResolvedValue({ items: [] });
+  render(<App multi />);
+  await flush();
+  expect(location.pathname).toBe("/nodes/remote/");
+  const tabs = screen.getByRole("navigation", { name: "Nodes" });
+  expect(within(tabs).getByRole("link", { name: "remote" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  fireEvent.click(screen.getByRole("button", { name: /^reader, 1 sessions$/ }));
+  fireEvent.click(screen.getByRole("link", { name: /^Reader work/ }));
+  await flush();
+  fireEvent.click(screen.getByRole("link", { name: "Upload history" }));
+  expect(location.pathname).toBe(`/nodes/remote/sessions/${SESSION_ID}/uploads`);
+  fireEvent.click(within(tabs).getByRole("link", { name: "local" }));
+  expect(location.pathname).toBe("/nodes/local/");
+  fireEvent.click(within(tabs).getByRole("link", { name: "remote" }));
+  expect(location.pathname).toBe(`/nodes/remote/sessions/${SESSION_ID}/uploads`);
+  expect(screen.getByRole("heading", { name: "Upload history" })).toBeVisible();
+});

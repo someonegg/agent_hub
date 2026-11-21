@@ -4,7 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { HubOperation, InteractionResponse } from "../../src/shared/api-contract";
 
 import { api, ApiClientError } from "../../src/client/api/client";
-import { AttachCommand } from "../../src/client/components/AttachCommand";
 import { CreateSession, ManageSession } from "../../src/client/components/HubManagement";
 import { browserStorage } from "../../src/client/state/browser-storage";
 import { setSessionComposerExpanded } from "../../src/client/state/composer-preferences";
@@ -65,27 +64,6 @@ it("expands the resumed target after recovering an operation from sessionStorage
   expect(browserStorage.getItem(`ahub.composer-expanded.${SESSION_ID}`)).toBe("true");
 });
 describe("hub management", () => {
-  it("shows the node separately from the copied tmux command", async () => {
-    const originalUrl = window.location.href;
-    const command = "tmux attach-session -t test";
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
-    window.history.replaceState(null, "", "/nodes/local/");
-    try {
-      const { container } = render(<AttachCommand command={command} />);
-      expect(screen.getByText("Run on node local")).toBeVisible();
-      expect(container.querySelector("pre")?.textContent).toBe(command);
-      fireEvent.click(screen.getByRole("button", { name: "Copy command" }));
-      await flush();
-      expect(writeText).toHaveBeenCalledExactlyOnceWith(command);
-    } finally {
-      window.history.replaceState(null, "", originalUrl);
-      if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
-      else Reflect.deleteProperty(navigator, "clipboard");
-    }
-  });
-
   it("uses current interaction state for ordered access and exit actions", async () => {
     const command = "tmux attach-session -t test";
     const writeText = vi.fn().mockResolvedValue(undefined);

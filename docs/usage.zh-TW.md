@@ -234,7 +234,7 @@ agent-hub --node-only --host 127.0.0.1 --port 4174
 agent-hub --node mac=http://127.0.0.1:4174
 ```
 
-按顯示順序為每個節點加入一個 `--node id=origin`。開啟 Hub 並選擇節點，在介面標示的節點上執行複製的 tmux 指令。
+按顯示順序為每個節點加入一個 `--node id=origin`。Hub 預設開啟第一個節點，使用頂部標籤切換節點。在目前選取的節點上執行複製的 tmux 指令。
 
 ## 疑難排解
 

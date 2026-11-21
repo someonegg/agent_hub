@@ -677,6 +677,8 @@ or path beyond the root.
 | `GET` or `HEAD /nodes/<id>/diffs/<uuid>` | Checks `HEAD /api/v1/diffs/<uuid>` on the Node and uses the resulting status for the Hub viewer route. |
 | `/nodes/<id>/…`                          | Scopes the session list, session deep links, upload history, and Pages to the Node.                    |
 
+The Hub root opens the first configured Node. Tabs restore each Node’s last
+session list, session, or upload history URL during the current page load.
 Drafts and staged attachments survive in-app Node changes within the loaded tab.
 Operation IDs, tab-local navigation state, and the default Agent are scoped per
 Node. Language and theme are shared.

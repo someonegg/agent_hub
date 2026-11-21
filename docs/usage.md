@@ -277,8 +277,8 @@ agent-hub --node-only --host 127.0.0.1 --port 4174
 agent-hub --node mac=http://127.0.0.1:4174
 ```
 
-Add one `--node id=origin` per Node in display order. Open the Hub and select a
-Node. Run copied tmux commands on the indicated Node.
+Add one `--node id=origin` per Node in display order. The Hub opens the first
+Node. Use the tabs at the top to switch Nodes. Run copied tmux commands on the selected Node.
 
 ## Troubleshooting
 

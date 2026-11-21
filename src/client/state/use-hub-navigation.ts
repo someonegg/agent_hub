@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { SessionListResponse } from "../../shared/api-contract";
 
-import { currentNode, localPagePath, nodePagePath } from "../node-path";
+import { currentNode, localPagePath, navigateNode, nodePagePath } from "../node-path";
 import { browserStorage } from "./browser-storage";
 import { projectForSession } from "./catalog-groups";
 
@@ -44,15 +44,14 @@ export function useHubNavigation(list: SessionListResponse | null) {
   const projectNav = useRef<HTMLElement>(null);
   const navigate = (id: string | null) => {
     const path = nodePagePath(id === null ? "/" : `/sessions/${id}`);
-    if (window.location.pathname !== path) window.history.pushState(null, "", path);
+    if (window.location.pathname !== path) navigateNode(path);
+    else window.scrollTo(0, 0);
     setUploadsOpen(false);
     setSessionId(id);
-    window.scrollTo(0, 0);
     if (id === null) {
-      const target =
-        sidebar.current?.querySelector<HTMLAnchorElement>(
-          `a[href="${nodePagePath(`/sessions/${sessionId}`)}"]`,
-        ) ?? sidebar.current?.querySelector<HTMLAnchorElement>(".hub-brand a");
+      const target = sidebar.current?.querySelector<HTMLAnchorElement>(
+        `a[href="${nodePagePath(`/sessions/${sessionId}`)}"]`,
+      );
       requestAnimationFrame(() => target?.focus({ preventScroll: true }));
     }
   };

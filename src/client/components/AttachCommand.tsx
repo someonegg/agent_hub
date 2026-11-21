@@ -3,16 +3,13 @@ import { useTranslation } from "react-i18next";
 
 import type { PlainMessageKey } from "../i18n";
 import { t } from "../i18n";
-import { currentNode } from "../node-path";
 
 export function AttachCommand({ command }: { command: string }) {
   useTranslation();
-  const node = currentNode();
   const [message, setMessage] = useState<PlainMessageKey | "">("");
   return (
     <div className="attach-command">
       <p>{t("tmuxAccessLabel")}</p>
-      {node ? <small>{t("runOnNode", { node })}</small> : null}
       <pre>{command}</pre>
       <button
         type="button"

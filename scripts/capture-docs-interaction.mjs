@@ -207,11 +207,13 @@ async function capture(
     const verify = async (top) => {
       await settle();
       const aligned = await demo.evaluate((top) => {
+        const header = document.querySelector(".hub-header").getBoundingClientRect();
         const shell = document.querySelector(".hub").getBoundingClientRect();
         const dock = document.querySelector(".interaction-dock").getBoundingClientRect();
         const messages = document.querySelector(".message-region").getBoundingClientRect();
         return (
-          Math.abs(shell.top - top) < 1 &&
+          Math.abs(header.top - top) < 1 &&
+          Math.abs(shell.top - header.bottom) < 1 &&
           Math.abs(shell.bottom - top - 400) < 1 &&
           Math.abs(dock.bottom - shell.bottom) < 1 &&
           messages.bottom <= dock.top + 1
@@ -232,8 +234,13 @@ async function capture(
     });
     await settle();
     const restored = await demo.locator(".hub").evaluate((element) => {
+      const header = document.querySelector(".hub-header").getBoundingClientRect();
       const rect = element.getBoundingClientRect();
-      return Math.abs(rect.top) < 1 && Math.abs(rect.bottom - window.visualViewport.height) < 1;
+      return (
+        Math.abs(header.top) < 1 &&
+        Math.abs(rect.top - header.bottom) < 1 &&
+        Math.abs(rect.bottom - window.visualViewport.height) < 1
+      );
     });
     if (!restored) throw new Error("Session shell did not recover after the keyboard closed");
   };

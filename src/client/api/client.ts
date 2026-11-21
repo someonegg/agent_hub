@@ -61,10 +61,6 @@ export function listNodes(signal: AbortSignal) {
   return requestJson<{ nodes: { id: string }[] }>("/api/nodes", signal);
 }
 
-export function nodeCatalog(id: string, signal: AbortSignal) {
-  return requestJson<SessionListResponse>(nodeApiPath("/api/v1/sessions", id), signal);
-}
-
 function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   return request<T>(path, signal, {
     method: "POST",

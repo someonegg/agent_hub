@@ -25,8 +25,9 @@ export function subscribeNode(listener: () => void) {
   return () => window.removeEventListener("popstate", listener);
 }
 
-export function navigateNode(path: string) {
-  window.history.pushState(null, "", path);
+export function navigateNode(path: string, mode: "push" | "replace" = "push") {
+  if (mode === "replace") window.history.replaceState(null, "", path);
+  else window.history.pushState(null, "", path);
   window.dispatchEvent(new PopStateEvent("popstate"));
   window.scrollTo(0, 0);
 }
