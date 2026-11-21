@@ -529,14 +529,14 @@ it.each(["pending", "failed", "succeeded", "rejected"] as const)(
 );
 
 it("opens the first node and restores upload history after switching nodes", async () => {
-  vi.spyOn(client, "listNodes").mockResolvedValue({ nodes: [{ id: "remote" }, { id: "local" }] });
+  vi.spyOn(client, "listNodes").mockResolvedValue({ nodes: [{ id: "Remote" }, { id: "local" }] });
   window.history.replaceState(null, "", "/");
   vi.spyOn(api, "uploads").mockResolvedValue({ items: [] });
   render(<App multi />);
   await flush();
-  expect(location.pathname).toBe("/nodes/remote/");
+  expect(location.pathname).toBe("/nodes/Remote/");
   const tabs = screen.getByRole("navigation", { name: "Nodes" });
-  expect(within(tabs).getByRole("link", { name: "remote" })).toHaveAttribute(
+  expect(within(tabs).getByRole("link", { name: "Remote" })).toHaveAttribute(
     "aria-current",
     "page",
   );
@@ -544,16 +544,16 @@ it("opens the first node and restores upload history after switching nodes", asy
   fireEvent.click(screen.getByRole("link", { name: /^Reader work/ }));
   await flush();
   fireEvent.click(screen.getByRole("link", { name: "Upload history" }));
-  expect(location.pathname).toBe(`/nodes/remote/sessions/${SESSION_ID}/uploads`);
+  expect(location.pathname).toBe(`/nodes/Remote/sessions/${SESSION_ID}/uploads`);
   fireEvent.click(within(tabs).getByRole("link", { name: "local" }));
   expect(location.pathname).toBe("/nodes/local/");
-  fireEvent.click(within(tabs).getByRole("link", { name: "remote" }));
-  expect(location.pathname).toBe(`/nodes/remote/sessions/${SESSION_ID}/uploads`);
+  fireEvent.click(within(tabs).getByRole("link", { name: "Remote" }));
+  expect(location.pathname).toBe(`/nodes/Remote/sessions/${SESSION_ID}/uploads`);
   expect(screen.getByRole("heading", { name: "Upload history" })).toBeVisible();
 });
 
 it("restores a node's catalog and messages while syncing from their saved cursors", async () => {
-  vi.spyOn(client, "listNodes").mockResolvedValue({ nodes: [{ id: "local" }, { id: "remote" }] });
+  vi.spyOn(client, "listNodes").mockResolvedValue({ nodes: [{ id: "local" }, { id: "Remote" }] });
   const suffix = `/sessions/${SESSION_ID}`;
   window.history.replaceState(null, "", `/nodes/local${suffix}`);
   const remoteList = { ...listBody, revision: "r".repeat(43) };
@@ -589,7 +589,7 @@ it("restores a node's catalog and messages while syncing from their saved cursor
 
   sessionRequests.mockClear();
   messageRequests.mockClear();
-  act(() => navigateNode(`/nodes/remote${suffix}`));
+  act(() => navigateNode(`/nodes/Remote${suffix}`));
   await flush();
   expect(screen.getByRole("heading", { name: "Remote trace" })).toBeInTheDocument();
   expect(sessionRequests.mock.calls[0]?.[0]).toEqual({ after: undefined });

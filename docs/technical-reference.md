@@ -663,9 +663,9 @@ never English-message matching.
 
 A standalone Node serves `/api/v1` and optional `/web/` hosting. Single-machine
 mode also serves the Web UI. A Hub configured with `--node id=origin` serves
-the UI and proxies requests to its Nodes. IDs use lowercase ASCII letters, digits,
-and hyphens. Origins must be HTTP or HTTPS with no credentials, query, fragment,
-or path beyond the root.
+the UI and proxies requests to its Nodes. IDs are case-sensitive and use ASCII
+letters, digits, and hyphens. Origins must be HTTP or HTTPS with no credentials,
+query, fragment, or path beyond the root.
 
 ### Hub routes
 

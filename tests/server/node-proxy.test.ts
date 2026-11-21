@@ -30,14 +30,14 @@ it("selects the mode without resolving local agents or storage for a multi-node 
     "--node",
     "local=http://127.0.0.1:4174",
     "--node",
-    "remote=https://example.test/",
+    "Local=https://example.test/",
     "--hosting",
     "--codex-agent",
     "unused",
   ]);
   expect(result).toMatchObject({
     kind: "run",
-    config: { mode: { kind: "hub", nodes: [{ id: "local" }, { id: "remote" }] }, agents: [] },
+    config: { mode: { kind: "hub", nodes: [{ id: "local" }, { id: "Local" }] }, agents: [] },
   });
   if (result.kind !== "run") throw new Error("Expected run configuration");
   expect(result.config.uploadDirectory).toBeUndefined();
@@ -46,7 +46,7 @@ it("selects the mode without resolving local agents or storage for a multi-node 
 });
 
 it.each([
-  ["--node", "UPPER=http://localhost"],
+  ["--node", "invalid_id=http://localhost"],
   ["--node", "node=ftp://localhost"],
   ["--node", "node=http://user:pass@localhost"],
   ["--node", "node=http://@localhost"],
@@ -62,7 +62,7 @@ it.each([
 
 async function fixture(timeoutMs = 5000) {
   const hostingDirectory = await createTempDirectory("node-proxy-hosting-");
-  const upstreams = ["local", "remote"].map((id) => {
+  const upstreams = ["local", "Remote"].map((id) => {
     const requests: IncomingMessage[] = [];
     const upgrades = new WebSocketServer({ noServer: true });
     const hosting = hostingRoutes(id === "local" ? hostingDirectory : undefined);
@@ -187,7 +187,7 @@ it("uses the target Node's diff status for both GET and HEAD without fetching th
     }
     await check("local", entry.id, 200);
     await check("local", missingDiff, 404);
-    await check("remote", entry.id, 404);
+    await check("Remote", entry.id, 404);
     await store.delete(entry.id);
     await check("local", entry.id, 404);
     await check("offline", entry.id, 502);
@@ -238,9 +238,9 @@ it("isolates routes and preserves streams, upstream status, query, and response 
   const { url, upstreams, cleanup } = await fixture();
   try {
     expect(await (await fetch(url + "/api/nodes")).json()).toEqual({
-      nodes: [{ id: "local" }, { id: "remote" }, { id: "offline" }],
+      nodes: [{ id: "local" }, { id: "Remote" }, { id: "offline" }],
     });
-    for (const path of ["/", "/index.html", "/nodes/local/", `/nodes/remote/sessions/${session}`]) {
+    for (const path of ["/", "/index.html", "/nodes/local/", `/nodes/Remote/sessions/${session}`]) {
       const response = await fetch(url + path);
       expect(response.status).toBe(200);
       expect(await response.text()).toContain("ahub-multi-node");
@@ -248,6 +248,8 @@ it("isolates routes and preserves streams, upstream status, query, and response 
     for (const path of [
       "/api/v1/capabilities",
       "/api/nodes/missing/v1/sessions",
+      "/api/nodes/remote/v1/sessions",
+      "/nodes/remote/",
       "/nodes/missing/",
     ])
       expect((await fetch(url + path)).status).toBe(404);
@@ -256,13 +258,13 @@ it("isolates routes and preserves streams, upstream status, query, and response 
     const remote = upstreams[1]!;
     const remoteHost = new URL(address(remote.server)).host;
     const path = "/v1/uploads?filename=hello.txt";
-    const response = await fetch(url + "/api/nodes/remote" + path, {
+    const response = await fetch(url + "/api/nodes/Remote" + path, {
       method: "POST",
       headers: { Origin: url },
       body: "hello",
     });
     expect(await response.json()).toEqual({
-      id: "remote",
+      id: "Remote",
       host: remoteHost,
       request: "/api" + path,
       method: "POST",
@@ -270,7 +272,7 @@ it("isolates routes and preserves streams, upstream status, query, and response 
     });
     const { body } = await new Promise<{ body: string }>((resolve, reject) => {
       const streaming = request(
-        url + "/api/nodes/remote" + path,
+        url + "/api/nodes/Remote" + path,
         {
           method: "DELETE",
           headers: { "Transfer-Encoding": "chunked" },
@@ -295,9 +297,9 @@ it("isolates routes and preserves streams, upstream status, query, and response 
     expect(catalog.status).toBe(204);
     expect(catalog.headers.get("retry-after")).toBe("2");
     expect(upstreams[0]!.requests[0]?.headers.origin).toBeUndefined();
-    const hosted = await fetch(url + "/nodes/remote/web/page/?view=1", { redirect: "manual" });
+    const hosted = await fetch(url + "/nodes/Remote/web/page/?view=1", { redirect: "manual" });
     expect(hosted.status).toBe(302);
-    expect(hosted.headers.get("location")).toBe("/nodes/remote/web/page/snapshot/?view=1");
+    expect(hosted.headers.get("location")).toBe("/nodes/Remote/web/page/snapshot/?view=1");
     expect(hosted.headers.get("content-security-policy")).toBeNull();
   } finally {
     await cleanup();
