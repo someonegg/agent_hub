@@ -72,6 +72,8 @@ async function capture(
       throw new Error("Page jumps must stay within the message region without document scrolling");
   };
   const verifyDockBehavior = async () => {
+    const topButton = demo.getByRole("button", { name: label("Back to top"), exact: true });
+    const endButton = demo.getByRole("button", { name: label("Jump to bottom"), exact: true });
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     const draft = await composer.inputValue();
     const attachments = await demo.locator(".interaction-attachment").count();
@@ -130,19 +132,27 @@ async function capture(
       ) > 1
     )
       throw new Error("New messages moved the reading position");
-    await demo.getByRole("button", { name: label("Jump to bottom"), exact: true }).click();
+    const topPosition = await topButton.boundingBox();
+    const endPosition = await endButton.boundingBox();
+    await endButton.click();
     await demo.waitForFunction(() => {
       const scroll = document.querySelector(".message-scroll");
       return scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 2;
     });
+    await endButton.waitFor({ state: "hidden" });
+    if (JSON.stringify(await topButton.boundingBox()) !== JSON.stringify(topPosition))
+      throw new Error("Top moved when End disappeared");
     const uncovered = await demo.evaluate(
       () =>
         document.querySelector(".terminal-preview").getBoundingClientRect().bottom <=
         document.querySelector(".interaction-region").getBoundingClientRect().top,
     );
     if (!uncovered) throw new Error("Dock covers the terminal at End");
-    await demo.getByRole("button", { name: label("Back to top"), exact: true }).click();
+    await topButton.click();
     await demo.waitForFunction(() => document.querySelector(".message-scroll").scrollTop < 2);
+    await topButton.waitFor({ state: "hidden" });
+    if (JSON.stringify(await endButton.boundingBox()) !== JSON.stringify(endPosition))
+      throw new Error("End moved when Top disappeared");
     await demo.evaluate(() => document.querySelector("#scroll-verification").remove());
     await settle();
   };

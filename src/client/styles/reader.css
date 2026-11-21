@@ -200,6 +200,7 @@ body:has(.session-layout) {
   bottom: clamp(0.9rem, 2.2vw, 1.75rem);
   display: grid;
   gap: 0.35rem;
+  pointer-events: none;
 }
 .page-jump-control {
   min-width: 4.5rem;
@@ -218,12 +219,12 @@ body:has(.session-layout) {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(0.45rem);
+  visibility: hidden;
 }
 .page-jump-control.is-visible {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0);
+  visibility: visible;
 }
 .page-jump-control:hover {
   color: var(--paper);
@@ -274,7 +275,6 @@ body:has(.session-layout) {
   .page-jump-control {
     transition:
       opacity 180ms ease,
-      transform 180ms ease,
       color 120ms ease,
       background 120ms ease,
       border-color 120ms ease;
@@ -325,9 +325,6 @@ body:has(.session-layout) {
   }
 }
 
-.page-jump-control[aria-hidden="true"] {
-  display: none;
-}
 @container (height < 140px) {
   .page-jump-controls {
     display: flex;
