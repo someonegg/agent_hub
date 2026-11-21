@@ -165,7 +165,7 @@ export function NodeTabs({
           </button>
         </>
       ) : nodes.length === 0 ? (
-        <span role="status">{t("loadingSessions")}</span>
+        <span role="status">{t("loadingNodes")}</span>
       ) : null}
     </nav>
   );

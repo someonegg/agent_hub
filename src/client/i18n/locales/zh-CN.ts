@@ -115,6 +115,7 @@ export const messages: Record<keyof typeof english, string> = {
 
   loadingMoreMessages: "正在加载更多消息…",
   loadingPages: "正在加载页面…",
+  loadingNodes: "正在加载节点…",
   loadingSessions: "正在加载会话…",
 
   loadingUploads: "正在加载上传记录…",

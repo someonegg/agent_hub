@@ -117,6 +117,7 @@ export const messages = {
 
   loadingMoreMessages: "Loading more messages…",
   loadingPages: "Loading pages…",
+  loadingNodes: "Loading nodes…",
   loadingSessions: "Loading sessions…",
 
   loadingUploads: "Loading uploads…",
