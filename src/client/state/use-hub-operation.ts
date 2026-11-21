@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import type { HubOperation } from "../../shared/api-contract";
 
 import { api, ApiClientError } from "../api/client";
+import { nodeStorageKey } from "../node-path";
 import { setSessionComposerExpanded } from "./composer-preferences";
 import { createRequestChannel } from "./request-channel";
 import { messageFor } from "./request-errors";
@@ -78,30 +79,67 @@ interface OperationRun {
   channel: ReturnType<typeof createRequestChannel>;
 }
 
-export function useHubOperation(scope: string, onSuccess: (operation: HubOperation) => void) {
-  const key = `ahub.operation.${scope}`;
+function disposeRun(run: OperationRun) {
+  run.disposed = true;
+  run.channel.cancel();
+  clearTimeout(run.timer);
+}
+
+const submissions = new Map<string, Promise<HubOperation>>();
+
+export function useHubOperation(
+  scope: string,
+  onSuccess: (operation: HubOperation) => void,
+  {
+    lifetime,
+    onTerminal,
+  }: { lifetime?: "mount"; onTerminal?: (operation: HubOperation) => void } = {},
+) {
+  const storageKey = `ahub.operation.${scope}`;
+  const key = nodeStorageKey(storageKey);
+  const recoverable = lifetime !== "mount";
   const [state, setState] = useState<State>(initial);
   const current = useRef<State>(initial);
   const runtime = useRef<OperationRun | null>(null);
   const success = useRef(onSuccess);
   success.current = onSuccess;
+  const terminal = useRef(onTerminal);
+  terminal.current = onTerminal;
   const query = useRef<() => Promise<void>>(async () => {});
-  const commit = (run: OperationRun, action: Action) => {
-    if (runtime.current !== run || run.disposed) return;
-    current.current = reducer(current.current, action);
-    setState(current.current);
-  };
+  const isActive = useCallback(
+    (run: OperationRun) =>
+      runtime.current === run && !run.disposed && nodeStorageKey(storageKey) === key,
+    [key, storageKey],
+  );
+  useLayoutEffect(() => {
+    if (recoverable) return;
+    return () => {
+      const run = runtime.current;
+      if (run) disposeRun(run);
+    };
+  }, [key, recoverable]);
+  const commit = useCallback(
+    (run: OperationRun, action: Action) => {
+      if (!isActive(run)) return;
+      current.current = reducer(current.current, action);
+      setState(current.current);
+    },
+    [isActive],
+  );
   const removeMarker = useCallback(() => {
+    if (!recoverable) return;
     try {
       sessionStorage.removeItem(key);
     } catch {
       /* Optional storage. */
     }
-  }, [key]);
+  }, [key, recoverable]);
   const receive = useCallback(
     (run: OperationRun, next: HubOperation) => {
-      const terminal = next.status !== "pending";
-      if (terminal) removeMarker();
+      if (next.status !== "pending") {
+        removeMarker();
+        terminal.current?.(next);
+      }
       commit(run, { type: "receive", operation: next });
       if (next.status === "succeeded" && !run.reported) {
         run.reported = true;
@@ -110,23 +148,18 @@ export function useHubOperation(scope: string, onSuccess: (operation: HubOperati
         success.current(next);
       }
     },
-    [removeMarker],
+    [commit, removeMarker],
   );
   const schedule = (run: OperationRun, delay: number) => {
     clearTimeout(run.timer);
-    if (
-      runtime.current === run &&
-      !run.disposed &&
-      operationId(current.current) &&
-      document.visibilityState !== "hidden"
-    )
+    if (isActive(run) && operationId(current.current) && document.visibilityState !== "hidden")
       run.timer = setTimeout(() => void query.current(), delay);
   };
   query.current = async () => {
     const run = runtime.current;
     if (
       !run ||
-      run.disposed ||
+      !isActive(run) ||
       run.querying ||
       document.visibilityState === "hidden" ||
       !operationId(current.current)
@@ -138,12 +171,12 @@ export function useHubOperation(scope: string, onSuccess: (operation: HubOperati
     let delay: number | null = null;
     try {
       const next = await api.operation(operationId(current.current)!, request.signal);
-      if (!request.isCurrent() || runtime.current !== run) return;
+      if (!request.isCurrent() || !isActive(run)) return;
       receive(run, next);
       run.retry = INITIAL_RETRY_MS;
       if (next.status === "pending") delay = 1000;
     } catch (reason) {
-      if (!request.isCurrent() || runtime.current !== run) return;
+      if (!request.isCurrent() || !isActive(run)) return;
       const missing = reason instanceof ApiClientError && reason.status === 404;
       const retryable = isRetryableRequestError(reason);
       if (missing) removeMarker();
@@ -163,10 +196,25 @@ export function useHubOperation(scope: string, onSuccess: (operation: HubOperati
       if (request.isCurrent() && delay !== null) schedule(run, delay);
     }
   };
+  const watchSubmission = useRef<
+    (run: OperationRun, submission: Promise<HubOperation>) => Promise<void>
+  >(async () => {});
+  watchSubmission.current = async (run, submission) => {
+    run.reported = false;
+    commit(run, { type: "submit" });
+    try {
+      const next = await submission;
+      if (!isActive(run)) return;
+      receive(run, next);
+      if (next.status === "pending") schedule(run, 1000);
+    } catch (reason) {
+      commit(run, { type: "failure", phase: "submit", error: messageFor(reason) });
+    }
+  };
   useEffect(() => {
     let id: string | null = null;
     try {
-      id = sessionStorage.getItem(key);
+      if (recoverable) id = sessionStorage.getItem(key);
     } catch {
       /* Optional storage. */
     }
@@ -189,41 +237,41 @@ export function useHubOperation(scope: string, onSuccess: (operation: HubOperati
       }
     };
     document.addEventListener("visibilitychange", visibility);
-    if (id) void query.current();
+    const submitting = recoverable ? submissions.get(key) : undefined;
+    if (submitting) void watchSubmission.current(run, submitting);
+    else if (id) void query.current();
     return () => {
       document.removeEventListener("visibilitychange", visibility);
-      run.disposed = true;
-      run.channel.cancel();
-      clearTimeout(run.timer);
+      disposeRun(run);
     };
-  }, [key]);
+  }, [commit, key, recoverable]);
   const start = useCallback(
     async (submit: () => Promise<HubOperation>) => {
       const run = runtime.current;
       if (
         !run ||
-        run.disposed ||
+        !isActive(run) ||
         current.current.lifecycle === "submitting" ||
         operationId(current.current)
       )
         return;
-      run.reported = false;
-      commit(run, { type: "submit" });
-      try {
+      if (!recoverable) {
+        await watchSubmission.current(run, (async () => submit())());
+        return;
+      }
+      const submission = (async () => {
         const next = await submit();
-        if (runtime.current !== run || run.disposed) return;
         try {
           sessionStorage.setItem(key, next.operationId);
         } catch {
           /* Optional storage. */
         }
-        receive(run, next);
-        if (next.status === "pending") schedule(run, 1000);
-      } catch (reason) {
-        commit(run, { type: "failure", phase: "submit", error: messageFor(reason) });
-      }
+        return next;
+      })().finally(() => submissions.delete(key));
+      submissions.set(key, submission);
+      await watchSubmission.current(run, submission);
     },
-    [key, receive],
+    [isActive, key, recoverable],
   );
   return {
     ...state,

@@ -16,6 +16,6 @@ if (!root) throw new Error("Application root is missing");
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <App multi={document.querySelector('meta[name="ahub-multi-node"]') !== null} />
   </StrictMode>,
 );

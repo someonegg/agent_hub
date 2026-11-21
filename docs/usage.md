@@ -33,6 +33,9 @@ Choose an [Agent](#multiple-agents) and optional launch settings:
 - **Worktree:** start in a separate Git worktree for isolated changes.
 - **Permission mode:** **Default** uses native configuration; **Auto** uses native automatic approval; **YOLO** skips approval prompts and also disables the Codex sandbox.
 
+If you close the creation dialog or switch nodes, refresh the session list
+before retrying. The server may still create the session.
+
 Open an exited session and click **Resume** when available to continue it. Resume
 keeps the original Agent and project association, using an available original
 working or project directory. Before resuming a session started elsewhere, make
@@ -262,6 +265,20 @@ ahub-cli session list --url http://127.0.0.1:4174
 This additional HTTP listener is disabled by default and binds to `127.0.0.1`;
 use `--local-host <host>` to change its listen address.
 Other local users and processes can access it; do not forward external proxy traffic to it.
+
+## Use multiple nodes
+
+Install the same Agent Hub release on each machine. Start each Node with
+`agent-hub --node-only` and enable `--hosting` on Nodes that serve published
+content. To try this on one machine, run these commands in separate terminals:
+
+```sh
+agent-hub --node-only --host 127.0.0.1 --port 4174
+agent-hub --node mac=http://127.0.0.1:4174
+```
+
+Add one `--node id=origin` per Node in display order. Open the Hub and select a
+Node. Run copied tmux commands on the indicated Node.
 
 ## Troubleshooting
 

@@ -3,11 +3,13 @@ import { useTranslation } from "react-i18next";
 
 import { api } from "../api/client";
 import { formatDate, t } from "../i18n";
+import { nodePagePath } from "../node-path";
 import { catalogGroups } from "../state/catalog-groups";
 import type { useHubNavigation } from "../state/use-hub-navigation";
 import type { useSessionList } from "../state/use-session-list";
 import { ErrorState } from "./ErrorState";
 import { InternalLink } from "./InternalLink";
+import { NodeOverviewLink } from "./NodeOverview";
 import { Settings } from "./Settings";
 import { SidebarToggle } from "./SidebarToggle";
 import { StatusBadge } from "./StatusBadge";
@@ -31,10 +33,14 @@ export function HubSidebar({
   const language = i18n.resolvedLanguage;
   const [hosting, setHosting] = useState(false);
   useEffect(() => {
+    const controller = new AbortController();
     void api
-      .capabilities()
-      .then((data) => setHosting(data.hosting === true))
+      .capabilities(controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) setHosting(data.hosting === true);
+      })
       .catch(() => {});
+    return () => controller.abort();
   }, []);
   const {
     sessionId,
@@ -63,12 +69,13 @@ export function HubSidebar({
   return (
     <aside id="hub-sidebar" ref={sidebar} className="hub-sidebar" aria-label={t("sessionList")}>
       <header className="hub-brand">
-        <InternalLink href="/" onNavigate={() => navigate(null)}>
+        <InternalLink href={nodePagePath("/")} onNavigate={() => navigate(null)}>
           <img className="brand-logo" src="/favicon.svg" alt="" width="29" height="29" />
           Agent Hub
         </InternalLink>
         {onCollapse ? <SidebarToggle collapsed={false} onToggle={onCollapse} /> : null}
       </header>
+      {!sessionId ? <NodeOverviewLink /> : null}
       <div className="catalog-filters">
         {(catalog.list?.agents?.length ?? 0) > 1 ? (
           <label className="agent-filter">
@@ -157,7 +164,7 @@ export function HubSidebar({
                     return (
                       <li key={session.id}>
                         <InternalLink
-                          href={`/sessions/${session.id}`}
+                          href={nodePagePath(`/sessions/${session.id}`)}
                           aria-current={sessionId === session.id ? "page" : undefined}
                           title={session.title}
                           onNavigate={() => navigate(session.id)}
@@ -192,7 +199,7 @@ export function HubSidebar({
       <footer className="hub-sidebar-footer">
         <Settings agents={catalog.list?.agents ?? []} />
         {hosting ? (
-          <a href="/artifacts" target="_blank" rel="noopener noreferrer">
+          <a href={nodePagePath("/artifacts")} target="_blank" rel="noopener noreferrer">
             {t("publishedPages")}
           </a>
         ) : null}

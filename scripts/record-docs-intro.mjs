@@ -176,10 +176,10 @@ async function record(
       .getByText(new RegExp(label("Loading sessions…").replace("…", "")))
       .waitFor({ state: "hidden" });
     await capture(1100);
-    await demo
+    const createTrigger = demo
       .getByRole("button", { name: label("New session"), exact: true })
-      .first()
-      .click();
+      .first();
+    await createTrigger.press("Enter");
     await demo.waitForFunction(
       () => document.querySelector("select[required]")?.value === "default",
     );
@@ -201,9 +201,16 @@ async function record(
     const directory = demo.getByRole("combobox", { name: label("Project directory") });
     await directory.selectOption("/projects/atlas-dashboard");
     await capture(1100);
-    await demo.getByRole("button", { name: label("Create session"), exact: true }).click();
+    await createTrigger.evaluate((button) => {
+      button.addEventListener("focus", () => button.setAttribute("data-focus-restored", ""), {
+        once: true,
+      });
+    });
+    await demo.getByRole("button", { name: label("Create session"), exact: true }).press("Enter");
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     await composer.waitFor();
+    if ((await createTrigger.getAttribute("data-focus-restored")) === null)
+      throw new Error("Creating a session did not restore focus to the dialog trigger");
     await demo.waitForFunction(
       () =>
         document

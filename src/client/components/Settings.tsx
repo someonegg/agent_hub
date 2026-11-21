@@ -7,7 +7,7 @@ import { isLanguage, languageOptions } from "../i18n";
 import { updatePreferences, usePreferences } from "../state/preferences";
 import { PermissionModeSelect } from "./PermissionModeSelect";
 
-export function Settings({ agents }: { agents: readonly SessionAgent[] }) {
+export function Settings({ agents }: { agents?: readonly SessionAgent[] }) {
   const { t } = useTranslation("settings");
   const preferences = usePreferences();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -61,38 +61,40 @@ export function Settings({ agents }: { agents: readonly SessionAgent[] }) {
               <option value="warm">{t("paper")}</option>
             </select>
           </label>
-          <fieldset className="settings-launch" aria-label={t("launch")}>
-            <label>
-              {t("agent")}
-              <select
-                value={preferences.defaultAgent}
-                onChange={(event) => updatePreferences({ defaultAgent: event.target.value })}
-              >
-                <option value="">{t("auto")}</option>
-                {preferences.defaultAgent &&
-                !agents.some((agent) => agent.nickname === preferences.defaultAgent) ? (
-                  <option value={preferences.defaultAgent}>{t("unavailable")}</option>
-                ) : null}
-                {agents.map((agent) => (
-                  <option key={agent.nickname} value={agent.nickname}>
-                    {agent.nickname} · {agent.runtimeName}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <PermissionModeSelect
-              value={preferences.permissionMode}
-              onChange={(permissionMode) => updatePreferences({ permissionMode })}
-            />
-            <label className="check-row">
-              <input
-                type="checkbox"
-                checked={preferences.worktree}
-                onChange={(event) => updatePreferences({ worktree: event.target.checked })}
+          {agents && (
+            <fieldset className="settings-launch" aria-label={t("launch")}>
+              <label>
+                {t("agent")}
+                <select
+                  value={preferences.defaultAgent}
+                  onChange={(event) => updatePreferences({ defaultAgent: event.target.value })}
+                >
+                  <option value="">{t("auto")}</option>
+                  {preferences.defaultAgent &&
+                  !agents.some((agent) => agent.nickname === preferences.defaultAgent) ? (
+                    <option value={preferences.defaultAgent}>{t("unavailable")}</option>
+                  ) : null}
+                  {agents.map((agent) => (
+                    <option key={agent.nickname} value={agent.nickname}>
+                      {agent.nickname} · {agent.runtimeName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <PermissionModeSelect
+                value={preferences.permissionMode}
+                onChange={(permissionMode) => updatePreferences({ permissionMode })}
               />
-              {t("worktree")}
-            </label>
-          </fieldset>
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  checked={preferences.worktree}
+                  onChange={(event) => updatePreferences({ worktree: event.target.checked })}
+                />
+                {t("worktree")}
+              </label>
+            </fieldset>
+          )}
           <label className="check-row">
             <input
               type="checkbox"

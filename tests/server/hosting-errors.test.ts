@@ -76,7 +76,8 @@ it("logs stream errors and destroys the response without writing JSON", async ()
   } as IncomingMessage;
   expect(await router(request, response)).toBe(true);
   const error = new Error("stream failure");
-  stream.emit("error", error);
+  stream.destroy(error);
+  await vi.waitFor(() => expect(logger.error).toHaveBeenCalledTimes(1));
   expect(response.destroyed).toBe(true);
   expect(end).not.toHaveBeenCalled();
   expect(logger.error).toHaveBeenCalledExactlyOnceWith("HTTP request failed", {
@@ -85,6 +86,30 @@ it("logs stream errors and destroys the response without writing JSON", async ()
     path: request.url,
     error,
   });
+});
+
+it("closes the published file stream when the client disconnects", async () => {
+  const { store, artifact } = await publishedArtifact();
+  const stream = new PassThrough();
+  vi.mocked(createReadStream).mockReturnValueOnce(
+    stream as unknown as ReturnType<typeof createReadStream>,
+  );
+  const response = new PassThrough() as unknown as ServerResponse;
+  response.setHeader = vi.fn();
+  response.removeHeader = vi.fn();
+  const logger = { error: vi.fn() };
+  const router = hostingRoutes(store.root, { logger });
+  const request = {
+    method: "GET",
+    url: `/web/${artifact.id}/${artifact.snapshotId}/`,
+  } as IncomingMessage;
+
+  expect(await router(request, response)).toBe(true);
+  const closed = new Promise<void>((resolve) => stream.once("close", resolve));
+  response.destroy();
+  await closed;
+  expect(stream.destroyed).toBe(true);
+  expect(logger.error).not.toHaveBeenCalled();
 });
 
 it("logs failures after headers and never sends a second response", () => {

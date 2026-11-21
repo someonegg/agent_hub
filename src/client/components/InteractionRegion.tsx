@@ -10,6 +10,7 @@ import type {
 } from "../../shared/api-contract";
 
 import { t } from "../i18n";
+import { nodePagePath } from "../node-path";
 import { useSessionComposerPreference } from "../state/composer-preferences";
 import { useSessionDraft } from "../state/session-drafts";
 import { InteractionComposer } from "./InteractionComposer";
@@ -247,7 +248,9 @@ export function InteractionRegion({
             {interaction?.supported && interaction.state === "superseded" ? (
               interaction.supersededBySessionId ? (
                 <InternalLink
-                  href={`/sessions/${encodeURIComponent(interaction.supersededBySessionId)}`}
+                  href={nodePagePath(
+                    `/sessions/${encodeURIComponent(interaction.supersededBySessionId)}`,
+                  )}
                   onNavigate={
                     onNavigate ? () => onNavigate(interaction.supersededBySessionId!) : undefined
                   }

@@ -28,7 +28,17 @@ export interface AgentConfig {
   command?: string;
 }
 
+export interface NodeTarget {
+  id: string;
+  url: URL;
+}
+
+export type ServerMode =
+  | { kind: "node" }
+  | { kind: "hub"; nodes: NodeTarget[]; clientIdentity?: { cert: string; key: string } };
+
 export interface ServerConfig {
+  mode?: ServerMode;
   agents: AgentConfig[];
   host: string;
   port: number;
@@ -90,6 +100,10 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       "claude-ready-script": { type: "string" },
       "home-dir": { type: "string" },
       hosting: { type: "boolean" },
+      node: { type: "string", multiple: true },
+      "node-only": { type: "boolean" },
+      "node-client-cert": { type: "string" },
+      "node-client-key": { type: "string" },
     },
   });
 
@@ -97,44 +111,44 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
   if (values.version) return { kind: "version" };
 
   const host = nonEmptyOption("host", values.host) ?? LOOPBACK_HOST;
-  const names = new Set<string>();
-  const paths = new Set<string>();
-  let entries = tokens.flatMap((token) =>
-    token.kind === "option" && (token.name === "codex-agent" || token.name === "claude-agent")
-      ? [{ option: token.name, value: token.value! }]
-      : [],
-  );
-  if (entries.length === 0) {
-    entries = [
-      { option: "codex-agent", value: "codex=~/.codex" },
-      { option: "claude-agent", value: "claude=~/.claude" },
-    ];
-    try {
-      statSync(resolve(homedir(), ".codex"));
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code === "ENOENT") entries.reverse();
-      else if (code !== "EACCES" && code !== "EPERM") throw error;
-    }
+  const nodes = parseNodes(values.node ?? []);
+  if (nodes.length && values["node-only"])
+    throw new Error("--node and --node-only are mutually exclusive");
+  const cert = nonEmptyOption("node-client-cert", values["node-client-cert"]);
+  const key = nonEmptyOption("node-client-key", values["node-client-key"]);
+  if (Boolean(cert) !== Boolean(key) || ((cert || key) && !nodes.length)) {
+    throw new Error(
+      "--node-client-cert and --node-client-key must be provided together with --node",
+    );
   }
-  const agents: AgentConfig[] = entries.map(({ option, value }) => ({
-    ...parseAgent(value, option, names, paths),
-    ...(option === "claude-agent" ? { adapter: "claude" as const } : {}),
-  }));
-  for (const value of values["agent-command"] ?? []) {
-    const separator = value.indexOf("=");
-    const nickname = value.slice(0, separator).trim();
-    const executable = value.slice(separator + 1).trim();
-    if (separator < 0 || !nickname || !executable) {
-      throw new Error("--agent-command requires nickname=executable with non-empty fields");
-    }
-    const agent = agents.find((agent) => agent.nickname === nickname);
-    if (!agent) throw new Error(`Unknown agent nickname for --agent-command: ${nickname}`);
-    if (agent.command !== undefined) throw new Error(`Duplicate agent command: ${nickname}`);
-    agent.command = executable.includes("/")
-      ? resolvePathOption("agent-command", executable)
-      : executable;
-  }
+  const mode: ServerMode | undefined = nodes.length
+    ? {
+        kind: "hub",
+        nodes,
+        ...(cert && key
+          ? {
+              clientIdentity: {
+                cert: resolvePathOption("node-client-cert", cert),
+                key: resolvePathOption("node-client-key", key),
+              },
+            }
+          : {}),
+      }
+    : values["node-only"]
+      ? { kind: "node" }
+      : undefined;
+  const agents =
+    mode?.kind === "hub"
+      ? []
+      : parseAgents(
+          tokens.flatMap((token) =>
+            token.kind === "option" &&
+            (token.name === "codex-agent" || token.name === "claude-agent")
+              ? [{ option: token.name, value: token.value! }]
+              : [],
+          ),
+          values["agent-command"] ?? [],
+        );
   const certificatePath = nonEmptyOption("ssl-cert", values["ssl-cert"]);
   const privateKeyPath = nonEmptyOption("ssl-key", values["ssl-key"]);
   const certificateAuthorityPath = nonEmptyOption("ssl-ca", values["ssl-ca"]);
@@ -162,6 +176,7 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
   return {
     kind: "run",
     config: {
+      ...(mode ? { mode } : {}),
       host,
       localHost: nonEmptyOption("local-host", values["local-host"]) ?? LOOPBACK_HOST,
       ...(values["claude-ready-script"] !== undefined
@@ -180,8 +195,10 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       clientDirectory: fileURLToPath(new URL("../../client/", import.meta.url)),
       tls,
       interactionEnabled: true,
-      uploadDirectory: resolve(resolveHomeDirectory(values["home-dir"]), "uploads"),
-      ...(values.hosting
+      ...(mode?.kind !== "hub"
+        ? { uploadDirectory: resolve(resolveHomeDirectory(values["home-dir"]), "uploads") }
+        : {}),
+      ...(values.hosting && mode?.kind !== "hub"
         ? { hostingDirectory: resolve(resolveHomeDirectory(values["home-dir"]), "hosting") }
         : {}),
       ...(values["tmux-socket"] !== undefined
@@ -191,10 +208,78 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
   };
 }
 
+function parseNodes(values: readonly string[]): NodeTarget[] {
+  const ids = new Set<string>();
+  return values.map((value) => {
+    const separator = value.indexOf("=");
+    const id = value.slice(0, separator);
+    const address = value.slice(separator + 1);
+    if (separator < 0 || !/^[a-z0-9-]+$/.test(id)) {
+      throw new Error(
+        "--node requires a lowercase node ID and address in id=http(s)://host format",
+      );
+    }
+    const url = URL.parse(address);
+    if (!url || !/^https?:\/\/[^/@?#\s\\]+\/?$/i.test(address)) {
+      throw new Error(`Invalid upstream address for node ${id}; expected an HTTP(S) origin`);
+    }
+    if (ids.has(id)) throw new Error(`Duplicate node ID: ${id}`);
+    ids.add(id);
+    return { id, url };
+  });
+}
+
+function parseAgents(
+  explicit: { option: "codex-agent" | "claude-agent"; value: string }[],
+  commands: string[],
+): AgentConfig[] {
+  const names = new Set<string>();
+  const paths = new Set<string>();
+  let entries = explicit;
+  if (entries.length === 0) {
+    entries = [
+      { option: "codex-agent", value: "codex=~/.codex" },
+      { option: "claude-agent", value: "claude=~/.claude" },
+    ];
+    try {
+      statSync(resolve(homedir(), ".codex"));
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT") entries.reverse();
+      else if (code !== "EACCES" && code !== "EPERM") throw error;
+    }
+  }
+  const agents: AgentConfig[] = entries.map(({ option, value }) => ({
+    ...parseAgent(value, option, names, paths),
+    ...(option === "claude-agent" ? { adapter: "claude" as const } : {}),
+  }));
+  for (const value of commands) {
+    const separator = value.indexOf("=");
+    const nickname = value.slice(0, separator).trim();
+    const executable = value.slice(separator + 1).trim();
+    if (separator < 0 || !nickname || !executable) {
+      throw new Error("--agent-command requires nickname=executable with non-empty fields");
+    }
+    const agent = agents.find((agent) => agent.nickname === nickname);
+    if (!agent) throw new Error(`Unknown agent nickname for --agent-command: ${nickname}`);
+    if (agent.command !== undefined) throw new Error(`Duplicate agent command: ${nickname}`);
+    agent.command = executable.includes("/")
+      ? resolvePathOption("agent-command", executable)
+      : executable;
+  }
+  return agents;
+}
+
 export function commandLineHelp(): string {
   return `Usage: agent-hub [options]
 
 Options:
+  --node-only          Run a standalone Node without the Web UI
+  --node <id=url>     Run a multi-node Hub; repeat for multiple Nodes
+  --node-client-cert <path>
+                       PEM client certificate for HTTPS Nodes
+  --node-client-key <path>
+                       PEM client key for HTTPS Nodes
   --hosting            Enable trusted same-origin static web hosting
   --home-dir <path>    Hub data root (default: ~/.agent-hub; uploads/ and hosting/)
   --codex-agent <nickname=path>

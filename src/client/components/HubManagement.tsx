@@ -7,6 +7,8 @@ import type { PermissionMode } from "../../shared/permission-mode";
 
 import { api } from "../api/client";
 import { t } from "../i18n";
+import { currentNode, nodePagePath } from "../node-path";
+import { browserStorage } from "../state/browser-storage";
 import { usePreferences } from "../state/preferences";
 import { useHubOperation } from "../state/use-hub-operation";
 import { AttachCommand } from "./AttachCommand";
@@ -136,9 +138,7 @@ interface CreateSessionProps {
   project: string;
   projects: readonly { project: string }[];
   onCreated: (op: HubOperation) => void;
-  open?: boolean;
-  onClose?: () => void;
-  onRecovered?: () => void;
+  onClose: () => void;
 }
 
 export function CreateSession({
@@ -147,22 +147,15 @@ export function CreateSession({
   project,
   projects,
   onCreated,
-  open = true,
   onClose,
-  onRecovered,
 }: CreateSessionProps) {
   useTranslation();
   const preferences = usePreferences();
   const dialog = useRef<HTMLDialogElement>(null);
-  const recovery = useRef<boolean | null>(null);
-  if (recovery.current === null) {
-    try {
-      recovery.current = sessionStorage.getItem("ahub.operation.create") !== null;
-    } catch {
-      recovery.current = false;
-    }
-  }
-  const [directory, setDirectory] = useState(project);
+  const node = currentNode();
+  const projectKey = "ahub.create-project";
+  const launchDirectory = project || (node && browserStorage.getItem(projectKey)) || "";
+  const [directory, setDirectory] = useState(launchDirectory);
   const initialAgent =
     selectedAgent ||
     agents.find((agent) => agent.nickname === preferences.defaultAgent)?.nickname ||
@@ -170,40 +163,44 @@ export function CreateSession({
     "";
   const [agent, setAgent] = useState(initialAgent);
   useEffect(() => {
-    if (open) {
-      dialog.current?.showModal?.();
-      dialog.current?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
-    } else dialog.current?.close?.();
-  }, [open]);
-  const launchDefaults = useRef({ ...preferences, agent: initialAgent, directory: project });
-  launchDefaults.current = { ...preferences, agent: initialAgent, directory: project };
-  const [worktree, setWorktree] = useState(false);
-  const [permissionMode, setPermissionMode] = useState<PermissionMode>("default");
-  useEffect(() => {
-    if (open) {
-      setDirectory(launchDefaults.current.directory);
-      setAgent(launchDefaults.current.agent);
-      setWorktree(launchDefaults.current.worktree);
-      setPermissionMode(launchDefaults.current.permissionMode);
-    }
-  }, [open]);
+    dialog.current?.showModal?.();
+    dialog.current?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
+  }, []);
+  const [worktree, setWorktree] = useState(preferences.worktree);
+  const [permissionMode, setPermissionMode] = useState(preferences.permissionMode);
   const request = useRef<{ fingerprint: string; id: string } | null>(null);
-  const controller = useHubOperation("create", onCreated);
-  useEffect(() => {
-    if (!recovery.current || (controller.operation === null && controller.error === null)) return;
-    recovery.current = false;
-    if (controller.operation?.status !== "succeeded") onRecovered?.();
-  }, [controller.operation, controller.error, onRecovered]);
-  useEffect(() => {
-    if (controller.operation && controller.operation.status !== "pending") request.current = null;
-  }, [controller.operation]);
+  const controller = useHubOperation(
+    "create",
+    (operation) => {
+      dialog.current?.close();
+      onCreated(operation);
+    },
+    {
+      lifetime: "mount",
+      onTerminal: () => {
+        request.current = null;
+      },
+    },
+  );
+  function close() {
+    dialog.current?.close();
+    onClose();
+  }
   return (
-    <dialog ref={dialog} className="create-session" aria-label={t("newSession")} onCancel={onClose}>
+    <dialog
+      ref={dialog}
+      className="create-session"
+      aria-label={t("newSession")}
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
+    >
       <button
         type="button"
         className="dialog-close"
         aria-label={t("closeNewSession")}
-        onClick={onClose}
+        onClick={close}
       >
         ×
       </button>
@@ -212,17 +209,18 @@ export function CreateSession({
         onSubmit={(event) => {
           event.preventDefault();
           const fingerprint = JSON.stringify([agent, directory, worktree, permissionMode]);
-          if (request.current?.fingerprint !== fingerprint)
-            request.current = { fingerprint, id: newRequestId() };
-          void controller.start(() =>
-            api.createSession({
+          void controller.start(async () => {
+            if (request.current?.fingerprint !== fingerprint) {
+              request.current = { fingerprint, id: newRequestId() };
+            }
+            return api.createSession({
               ...(agent ? { agent } : {}),
               projectDirectory: directory,
               worktree,
               permissionMode,
-              requestId: request.current!.id,
-            }),
-          );
+              requestId: request.current.id,
+            });
+          });
         }}
       >
         {agents.length > 1 ? (
@@ -247,11 +245,13 @@ export function CreateSession({
           </label>
         ) : null}
         <ProjectDirectory
-          key={String(open)}
           value={directory}
           projects={projects}
           disabled={controller.busy}
-          onChange={setDirectory}
+          onChange={(directory) => {
+            setDirectory(directory);
+            if (node) browserStorage.setItem(projectKey, directory, node);
+          }}
         />
         <PermissionModeSelect
           value={permissionMode}
@@ -322,7 +322,7 @@ function StandaloneManageSession({
   const controller = useHubOperation(session.id, (operation) => {
     if (operation.type === "delete") {
       if (onDeleted) onDeleted();
-      else window.location.assign("/");
+      else window.location.assign(nodePagePath("/"));
     } else onChanged();
   });
   return (

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { HubOperation, InteractionResponse } from "../../src/shared/api-contract";
 
 import { api, ApiClientError } from "../../src/client/api/client";
+import { AttachCommand } from "../../src/client/components/AttachCommand";
 import { CreateSession, ManageSession } from "../../src/client/components/HubManagement";
 import { browserStorage } from "../../src/client/state/browser-storage";
 import { setSessionComposerExpanded } from "../../src/client/state/composer-preferences";
@@ -64,6 +65,27 @@ it("expands the resumed target after recovering an operation from sessionStorage
   expect(browserStorage.getItem(`ahub.composer-expanded.${SESSION_ID}`)).toBe("true");
 });
 describe("hub management", () => {
+  it("shows the node separately from the copied tmux command", async () => {
+    const originalUrl = window.location.href;
+    const command = "tmux attach-session -t test";
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    window.history.replaceState(null, "", "/nodes/local/");
+    try {
+      const { container } = render(<AttachCommand command={command} />);
+      expect(screen.getByText("Run on node local")).toBeVisible();
+      expect(container.querySelector("pre")?.textContent).toBe(command);
+      fireEvent.click(screen.getByRole("button", { name: "Copy command" }));
+      await flush();
+      expect(writeText).toHaveBeenCalledExactlyOnceWith(command);
+    } finally {
+      window.history.replaceState(null, "", originalUrl);
+      if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
+
   it("uses current interaction state for ordered access and exit actions", async () => {
     const command = "tmux attach-session -t test";
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -137,7 +159,9 @@ describe("hub management", () => {
       .mockResolvedValue({ ...pending, type: "archive", phase: "waiting_exit" });
     const session = { ...baseSession, sourceId: "native", itemCount: 0 };
     render(<ManageSession session={session} onChanged={vi.fn()} />);
-    render(<CreateSession project="/project" projects={[]} onCreated={vi.fn()} />);
+    render(
+      <CreateSession onClose={vi.fn()} project="/project" projects={[]} onCreated={vi.fn()} />,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Session management" }));
     expect(document.querySelector(".session-action-menu")?.textContent).toBe(
       "Archive sessionDelete session",
@@ -163,7 +187,9 @@ describe("hub management", () => {
       .mockRejectedValueOnce(new Error("network failure"))
       .mockResolvedValueOnce({ ...pending, status: "unknown" })
       .mockResolvedValueOnce(pending);
-    render(<CreateSession project="/project" projects={[]} onCreated={vi.fn()} />);
+    render(
+      <CreateSession onClose={vi.fn()} project="/project" projects={[]} onCreated={vi.fn()} />,
+    );
     for (let i = 0; i < 4; i++) {
       fireEvent.click(screen.getByRole("button", { name: "Create session" }));
       await flush();
@@ -182,7 +208,14 @@ describe("hub management", () => {
       sessionId: SESSION_ID,
     });
     const onCreated = vi.fn();
-    render(<CreateSession project="/project with spaces" projects={[]} onCreated={onCreated} />);
+    render(
+      <CreateSession
+        onClose={vi.fn()}
+        project="/project with spaces"
+        projects={[]}
+        onCreated={onCreated}
+      />,
+    );
     fireEvent.click(screen.getByRole("checkbox", { name: "Enable worktree" }));
     fireEvent.change(screen.getByRole("combobox", { name: "Permission mode" }), {
       target: { value: "auto" },
@@ -204,20 +237,15 @@ describe("hub management", () => {
     });
     expect(onCreated).toHaveBeenCalledWith(expect.objectContaining({ sessionId: SESSION_ID }));
   });
-  it("restores pending tracking and clears the recovery marker for unknown results", async () => {
+  it("ignores legacy creation recovery markers", async () => {
     sessionStorage.setItem("ahub.operation.create", pending.operationId);
-    const get = vi
-      .spyOn(api, "operation")
-      .mockResolvedValue({ ...pending, status: "unknown", error: "Timed out" });
-    const view = render(<CreateSession project="/project" projects={[]} onCreated={vi.fn()} />);
+    const get = vi.spyOn(api, "operation");
+    render(
+      <CreateSession onClose={vi.fn()} project="/project" projects={[]} onCreated={vi.fn()} />,
+    );
     await flush();
-    expect(screen.getByRole("status")).toHaveTextContent("unknown");
-    expect(screen.queryByRole("button", { name: "Check result" })).not.toBeInTheDocument();
-    expect(sessionStorage.getItem("ahub.operation.create")).toBeNull();
-    view.unmount();
-    render(<CreateSession project="/project" projects={[]} onCreated={vi.fn()} />);
-    await flush();
-    expect(get).toHaveBeenCalledOnce();
+    expect(get).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Create session" })).toBeEnabled();
   });
   it("offers archive without a binding and refreshes after observed completion", async () => {
     vi.useFakeTimers();
@@ -323,7 +351,7 @@ it("hides attach until the server supplies it and stops polling after a terminal
       status: "unknown",
       attachCommand: "tmux attach-session -t test",
     });
-  render(<CreateSession project="/project" projects={[]} onCreated={vi.fn()} />);
+  render(<CreateSession onClose={vi.fn()} project="/project" projects={[]} onCreated={vi.fn()} />);
   fireEvent.click(screen.getByRole("button", { name: "Create session" }));
   await flush();
   expect(screen.getByText("Starting agent")).toBeInTheDocument();
@@ -343,21 +371,6 @@ it("hides attach until the server supplies it and stops polling after a terminal
   });
   expect(get).toHaveBeenCalledTimes(2);
   expect(screen.getByRole("button", { name: "Create session" })).toBeEnabled();
-});
-
-it("clears expired recovery markers on 404 while keeping retry for transient query failures", async () => {
-  sessionStorage.setItem("ahub.operation.create", pending.operationId);
-  const get = vi
-    .spyOn(api, "operation")
-    .mockRejectedValueOnce(new Error("network failure"))
-    .mockRejectedValueOnce(new ApiClientError(404, "management_error", "Operation not found"));
-  render(<CreateSession project="/project" projects={[]} onCreated={vi.fn()} />);
-  await flush();
-  expect(sessionStorage.getItem("ahub.operation.create")).toBe(pending.operationId);
-  fireEvent.click(screen.getByRole("button", { name: "Retry status check" }));
-  await flush();
-  expect(get).toHaveBeenCalledTimes(2);
-  expect(sessionStorage.getItem("ahub.operation.create")).toBeNull();
 });
 
 it("serializes manual queries and ignores a response after scope changes", async () => {
@@ -448,42 +461,35 @@ it("keeps failed initial recovery locked until a 404 confirms removal", async ()
   expect(submit).toHaveBeenCalledOnce();
 });
 
-it("automatically retries initial recovery, shows the error once, and stops at a terminal result", async () => {
+it("tracks creation without storage and ignores an aborted query after unmount", async () => {
   vi.useFakeTimers();
-  vi.spyOn(Math, "random").mockReturnValue(0.5);
-  sessionStorage.setItem("ahub.operation.create", pending.operationId);
-  const get = vi
-    .spyOn(api, "operation")
-    .mockRejectedValueOnce(new Error("offline during recovery"))
-    .mockRejectedValueOnce(new Error("still offline"))
-    .mockResolvedValueOnce({ ...pending, status: "succeeded" });
-  const recovered = vi.fn();
-  const created = vi.fn();
-  render(
-    <CreateSession
-      project="/project"
-      projects={[]}
-      open={false}
-      onRecovered={recovered}
-      onCreated={created}
-    />,
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new Error("Storage disabled");
+  });
+  vi.spyOn(api, "createSession").mockResolvedValue(pending);
+  let resolve!: (operation: HubOperation) => void;
+  const get = vi.spyOn(api, "operation").mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    }),
   );
+  const onCreated = vi.fn();
+  const view = render(
+    <CreateSession onClose={vi.fn()} project="/project" projects={[]} onCreated={onCreated} />,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Create session" }));
   await flush();
-  expect(screen.getByRole("alert", { hidden: true })).toHaveTextContent("offline during recovery");
-  expect(recovered).toHaveBeenCalledOnce();
+  expect(write).not.toHaveBeenCalledWith("ahub.operation.create", expect.anything());
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1000);
   });
-  expect(recovered).toHaveBeenCalledOnce();
-  await act(async () => {
-    await vi.advanceTimersByTimeAsync(2000);
-  });
-  expect(created).toHaveBeenCalledOnce();
-  expect(sessionStorage.getItem("ahub.operation.create")).toBeNull();
-  await act(async () => {
-    await vi.advanceTimersByTimeAsync(60000);
-  });
-  expect(get).toHaveBeenCalledTimes(3);
+  const signal = get.mock.calls[0]?.[1];
+  expect(signal?.aborted).toBe(false);
+  view.unmount();
+  expect(signal?.aborted).toBe(true);
+  resolve({ ...pending, status: "succeeded", sessionId: SESSION_ID });
+  await flush();
+  expect(onCreated).not.toHaveBeenCalled();
 });
 
 it("keeps nonretryable query failures locked with a manual query and does not retry submissions", async () => {
@@ -683,8 +689,7 @@ it("initializes creation options only when opening the dialog", () => {
   ];
   act(() => updatePreferences({ defaultAgent: "default", permissionMode: "default" }));
   const props = { agents, project: "/project", projects: [], onCreated: vi.fn() };
-  const view = render(<CreateSession {...props} open={false} />);
-  view.rerender(<CreateSession {...props} open />);
+  const view = render(<CreateSession onClose={vi.fn()} {...props} />);
   expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("default");
   expect(screen.getByLabelText("Session agent")).toHaveValue("default");
   fireEvent.change(screen.getByLabelText("Session agent"), { target: { value: "work" } });
@@ -695,13 +700,13 @@ it("initializes creation options only when opening the dialog", () => {
   });
   act(() => updatePreferences({ defaultAgent: "other", worktree: true, permissionMode: "auto" }));
   act(() => updatePreferences({ worktree: false, permissionMode: "default" }));
-  view.rerender(<CreateSession {...props} project="/updated" open />);
+  view.rerender(<CreateSession onClose={vi.fn()} {...props} project="/updated" />);
   expect(screen.getByLabelText("Project directory")).toHaveValue("/manual");
   expect(screen.getByRole("checkbox", { name: "Enable worktree" })).toBeChecked();
   expect(screen.getByRole("combobox", { name: "Permission mode" })).toHaveValue("auto");
   expect(screen.getByLabelText("Session agent")).toHaveValue("work");
-  view.rerender(<CreateSession {...props} open={false} />);
-  view.rerender(<CreateSession {...props} open />);
+  view.unmount();
+  render(<CreateSession onClose={vi.fn()} {...props} />);
   expect(screen.getByLabelText("Session agent")).toHaveValue("other");
   expect(screen.getByLabelText("Project directory")).toHaveValue("/project");
   expect(screen.getByRole("checkbox", { name: "Enable worktree" })).not.toBeChecked();

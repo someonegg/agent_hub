@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ApiClientError } from "../../src/client/api/client";
 import { AttachCommand } from "../../src/client/components/AttachCommand";
@@ -14,8 +14,14 @@ import { LocalizedError } from "../../src/client/i18n/localized-error";
 import { en, settingsZhTW, zh, zhTW } from "../../src/client/i18n/messages";
 import { partitionMessages } from "../../src/client/i18n/namespaces";
 import { updatePreferences } from "../../src/client/state/preferences";
+import { mockLocalStorage } from "./mock-local-storage";
+
+beforeEach(() => {
+  mockLocalStorage();
+});
 
 afterEach(() => {
+  mockLocalStorage();
   act(() =>
     updatePreferences({
       language: "en",

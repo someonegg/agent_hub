@@ -1,4 +1,9 @@
 export const messages = {
+  nodes: "Nodes",
+  nodeUnavailable: "Node unavailable",
+  nodeNoSessions: "No sessions",
+  runOnNode: "Run on node {{node}}",
+
   collapseSidebar: "Collapse sidebar",
   expandSidebar: "Expand sidebar",
   task: "Task",
