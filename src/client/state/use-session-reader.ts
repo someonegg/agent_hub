@@ -10,8 +10,9 @@ import {
   nextRetryMs,
   waitForRetry,
 } from "./retry-policy";
+import type { SessionCache } from "./session-cache";
 
-type Operation = "open" | "page" | "poll" | "reload" | null;
+type Operation = "open" | "resume" | "page" | "poll" | "reload" | null;
 interface ActiveRequest {
   controller: AbortController;
   operation: Exclude<Operation, null>;
@@ -31,8 +32,11 @@ const initial: ReadState = {
   missing: false,
 };
 
-export function useSessionReader(sessionId: string) {
-  const [state, setState] = useState(initial);
+export function useSessionReader(sessionId: string, cache?: SessionCache) {
+  const [state, setState] = useState(() => ({
+    ...initial,
+    page: cache?.messages(sessionId) ?? null,
+  }));
   const current = useRef(state);
   current.current = state;
   const active = useRef<ActiveRequest | null>(null);
@@ -78,6 +82,7 @@ export function useSessionReader(sessionId: string) {
                     ? page.items
                     : [...(page?.items ?? []), ...result.items];
               }
+              cache?.storeMessages(sessionId, nextPage);
             }
             setState((s) => ({
               ...s,
@@ -95,6 +100,7 @@ export function useSessionReader(sessionId: string) {
               reason.code === "after_out_of_range" &&
               !recovered
             ) {
+              cache?.storeMessages(sessionId, null);
               page = null;
               recovered = true;
               continue;
@@ -106,32 +112,37 @@ export function useSessionReader(sessionId: string) {
           }
         }
       } catch (reason) {
-        if (!controller.signal.aborted)
+        if (!controller.signal.aborted) {
+          const missing = reason instanceof ApiClientError && reason.code === "session_not_found";
+          if (missing) cache?.storeMessages(sessionId, null);
           setState((s) => ({
-            ...s,
+            page: missing ? null : s.page,
             operation: null,
             error: messageFor(reason),
             retrying: false,
-            missing: reason instanceof ApiClientError && reason.code === "session_not_found",
+            missing,
           }));
+        }
         return false;
       } finally {
         if (active.current === request) active.current = null;
       }
     },
-    [sessionId],
+    [cache, sessionId],
   );
 
   useEffect(() => {
     suspended.current = null;
-    setState(initial);
-    if (!document.hidden) void read("open");
+    const page = cache?.messages(sessionId, true) ?? null;
+    current.current = { ...initial, page };
+    setState(current.current);
+    void read(page ? "resume" : "open");
     return () => {
       active.current?.controller.abort();
       active.current = null;
       suspended.current = null;
     };
-  }, [read]);
+  }, [cache, read, sessionId]);
 
   useEffect(() => {
     const visibility = () => {
@@ -165,12 +176,14 @@ export function useSessionReader(sessionId: string) {
   const refreshLatest = useCallback(() => {
     active.current?.controller.abort();
     active.current = null;
+    cache?.storeMessages(sessionId, null);
     return read("reload");
-  }, [read]);
+  }, [cache, read, sessionId]);
   return {
     context: state.page,
     operation: state.operation,
-    readerLoading: state.operation !== null && state.operation !== "poll",
+    readerLoading:
+      state.operation !== null && state.operation !== "poll" && state.operation !== "resume",
     readerError: state.error,
     readerRetrying: state.retrying,
     missing: state.missing,

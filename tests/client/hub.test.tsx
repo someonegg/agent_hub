@@ -551,3 +551,58 @@ it("opens the first node and restores upload history after switching nodes", asy
   expect(location.pathname).toBe(`/nodes/remote/sessions/${SESSION_ID}/uploads`);
   expect(screen.getByRole("heading", { name: "Upload history" })).toBeVisible();
 });
+
+it("restores a node's catalog and messages while syncing from their saved cursors", async () => {
+  vi.spyOn(client, "listNodes").mockResolvedValue({ nodes: [{ id: "local" }, { id: "remote" }] });
+  const suffix = `/sessions/${SESSION_ID}`;
+  window.history.replaceState(null, "", `/nodes/local${suffix}`);
+  const remoteList = { ...listBody, revision: "r".repeat(43) };
+  const isLocal = () => location.pathname.startsWith("/nodes/local/");
+  const sessionRequests = vi
+    .mocked(api.sessions)
+    .mockReset()
+    .mockImplementation(async (query) => {
+      if (query.after) return new Promise(() => {});
+      return isLocal() ? listBody : remoteList;
+    });
+  const messageRequests = vi
+    .mocked(api.messages)
+    .mockReset()
+    .mockImplementation(async (_id, query) => {
+      if (query.after) return new Promise(() => {});
+      const local = isLocal();
+      return {
+        ...firstPage,
+        nextAfter: local ? 7 : 9,
+        hasMore: false,
+        session: {
+          ...baseSession,
+          status: "archived",
+          title: local ? "Local trace" : "Remote trace",
+        },
+      };
+    });
+
+  render(<App multi />);
+  await flush();
+  expect(screen.getByRole("heading", { name: "Local trace" })).toBeInTheDocument();
+
+  sessionRequests.mockClear();
+  messageRequests.mockClear();
+  act(() => navigateNode(`/nodes/remote${suffix}`));
+  await flush();
+  expect(screen.getByRole("heading", { name: "Remote trace" })).toBeInTheDocument();
+  expect(sessionRequests.mock.calls[0]?.[0]).toEqual({ after: undefined });
+  expect(messageRequests.mock.calls[0]?.[1]).toMatchObject({ after: 0 });
+
+  sessionRequests.mockClear();
+  messageRequests.mockClear();
+  act(() => navigateNode(`/nodes/local${suffix}`));
+  expect(screen.getByRole("heading", { name: "Local trace" })).toBeInTheDocument();
+  expect(sessionRequests.mock.calls[0]?.[0]).toEqual({ after: listBody.revision });
+  expect(messageRequests.mock.calls[0]?.[1]).toMatchObject({
+    after: 7,
+    stateRevision: firstPage.stateRevision,
+    wait: false,
+  });
+});
