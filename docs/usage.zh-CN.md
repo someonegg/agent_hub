@@ -13,6 +13,7 @@ agent-hub
 
 默认从 `~/.codex` 读取 Codex 会话、从 `~/.claude` 读取 Claude Code 会话，且仅监听本机。
 其他设备访问前，请先配置[远程访问](#从其他设备访问)。
+要通过同一个 Hub 管理多台机器上的会话，参阅[使用多个节点](#使用多个节点)。
 
 ## 阅读会话
 
@@ -227,14 +228,30 @@ ahub-cli session list --url http://127.0.0.1:4174
 
 ## 使用多个节点
 
-在各台机器上安装同一版本，用 `agent-hub --node-only` 启动各节点。托管发布内容的节点需加上 `--hosting`。在本机试用时，分别在两个终端运行：
+在各台机器上安装同一版本，用 `agent-hub --node-only` 启动各节点。
+托管发布内容的节点需加上 `--hosting`。
+
+以下内网示例中，两个节点分别监听各自的内网地址。
 
 ```sh
-agent-hub --node-only --host 127.0.0.1 --port 4174
-agent-hub --node mac=http://127.0.0.1:4174
+# Mac
+agent-hub --node-only --host 192.168.1.10 --port 4174
+
+# Linux
+agent-hub --node-only --host 192.168.1.11 --port 4174
 ```
 
-按显示顺序为每个节点添加一个 `--node id=origin`。Hub 默认打开第一个节点，使用顶部标签切换节点。在当前选中的节点上运行复制的 tmux 命令。
+在 Hub 所在的机器上运行：
+
+```sh
+agent-hub --node Mac=http://192.168.1.10:4174 --node Linux=http://192.168.1.11:4174
+```
+
+按显示顺序为每个节点添加一个 `--node id=origin`。Hub 默认打开第一个节点，使用顶部标签切换节点。
+在当前选中的节点上运行复制的 tmux 命令。
+
+请将示例 IP 替换为 Hub 可访问的地址。
+如需使用 HTTPS，参阅[节点 TLS 配置（英文）](technical-reference.md#tls)。
 
 ## 故障排查
 

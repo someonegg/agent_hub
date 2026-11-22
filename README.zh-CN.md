@@ -2,10 +2,10 @@
 
 [English](README.md) | 简体中文 | [繁體中文](README.zh-TW.md)
 
-面向 Codex 和 Claude Code 的本地网页中心，将清晰易读的会话记录与实时 CLI 交互结合起来。
+Agent Hub 是用于管理 Codex 和 Claude Code 会话的网页控制台，支持单机和多节点。
 按项目浏览会话、跟进最新回复，并从电脑或手机继续工作。
 
-![创建会话、发送提示并查看已回答的用户输入卡片](docs/images/zh-CN/ahub-intro.gif)
+![切换节点并操作 Agent Hub 会话](docs/images/zh-CN/ahub-intro.gif)
 
 <details>
 <summary>手机截图</summary>
@@ -35,12 +35,21 @@ agent-hub
 ```
 
 打开 <http://127.0.0.1:4173>。按 `Ctrl-C` 停止服务器。
-界面默认英文，在侧边栏底部打开 **Settings → Language → 简体中文 / 繁體中文** 即可切换；选择保存在当前浏览器。
+界面默认英文，在侧边栏底部打开 **Settings → Language → 简体中文 / 繁體中文** 即可切换。
+选择保存在当前浏览器。
 
 智能体、端口与可选网页／差异托管配置见[使用与配置](docs/usage.zh-CN.md)。
 
-升级时再次执行
-`npm install -g @someonegg/agent-hub@latest`。从源码运行请参阅[开发指南（英文）](docs/development.md)。
+升级时再次执行 `npm install -g @someonegg/agent-hub@latest`。
+从源码运行请参阅[开发指南（英文）](docs/development.md)。
+
+## 多节点模式
+
+在运行 Codex 或 Claude Code 的各台机器上用 `agent-hub --node-only` 启动节点。
+启动 Hub 时，为每个节点添加一个 `--node id=origin`。
+使用网页顶部的标签切换节点。
+
+启动命令和网络配置见[使用多个节点](docs/usage.zh-CN.md#使用多个节点)。
 
 ## 功能
 
@@ -79,7 +88,7 @@ agent-hub
 
 ## 安全
 
-Agent Hub 读取本地会话记录，通过 tmux 控制已连接的 CLI 会话。
+Agent Hub 在会话所在的机器上读取会话记录，并通过 tmux 控制已连接的 CLI 会话。
 模型访问与身份认证由所配置的 CLI 负责；Hub 不管理 API 密钥或 CLI 凭据。
 
 服务器默认仅监听回环地址，交互和管理功能没有应用层登录保护。对外开放前，请添加身份认证

@@ -2,11 +2,12 @@
 
 English | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
-A local web hub for Codex and Claude Code that pairs readable conversations with live CLI interaction.
-Browse sessions by project, follow responses in near real time, and keep working with
-either runtime from desktop or mobile.
+Agent Hub is a web hub for managing Codex and Claude Code sessions on one
+machine or across multiple nodes.
+Browse sessions by project, follow responses in near real time, and keep
+working from desktop or mobile.
 
-![Agent Hub: create a session, send a prompt, and review an answered User input card](docs/images/ahub-intro.gif)
+![Switch nodes and work in an Agent Hub session](docs/images/ahub-intro.gif)
 
 <details>
 <summary>Mobile screenshots</summary>
@@ -35,11 +36,23 @@ npm install -g @someonegg/agent-hub
 agent-hub
 ```
 
-Open <http://127.0.0.1:4173>. Open **Settings → Language** at the bottom of the sidebar to switch between English (the default), 简体中文, and 繁體中文. The choice is saved in this browser. Press `Ctrl-C` to stop the server.
-For agent configuration, ports, and optional page/diff hosting, see [Usage](docs/usage.md).
+Open <http://127.0.0.1:4173>. Use **Settings → Language** at the bottom of the
+sidebar to switch between English (the default), 简体中文, and 繁體中文. The
+browser saves your choice. Press `Ctrl-C` to stop the server.
+For agent configuration, ports, and optional page/diff hosting, see
+[Usage](docs/usage.md).
 
 To upgrade, run `npm install -g @someonegg/agent-hub@latest` again.
 For running from source, see [Development](docs/development.md).
+
+## Multi-node mode
+
+Run `agent-hub --node-only` on each machine that runs Codex or Claude Code.
+Start the Hub with one `--node id=origin` option per node. Switch nodes using the
+tabs at the top of the web interface.
+
+See [multi-node setup](docs/usage.md#use-multiple-nodes) for commands and network
+configuration.
 
 ## Features
 
@@ -81,9 +94,9 @@ For agent-assisted session workflows, use the bundled
 
 ## Security
 
-Agent Hub reads local session history and controls connected CLI sessions through
-tmux. The configured CLI handles model access and authentication; Hub does not
-manage API keys or CLI credentials.
+Agent Hub reads session history and controls connected CLI sessions through
+tmux on the machine where they run. The configured CLI handles model access,
+authentication, and credentials.
 
 The server binds to loopback by default. Interaction and management are enabled
 without application authentication. Before exposing it to a network, add
