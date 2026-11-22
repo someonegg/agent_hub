@@ -2,6 +2,8 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { tsImport } from "tsx/esm/api";
 
+import { docsLogPath } from "./docs-fixtures.mjs";
+
 const { en, zh, zhTW, settingsEn, settingsZh, settingsZhTW } = await tsImport(
   "../src/client/i18n/messages.ts",
   import.meta.url,
@@ -29,6 +31,7 @@ export function docsOptions(defaultOutput) {
 }
 
 const demoText = {
+  "View preview log": "查看预览日志",
   "Design the project dashboard": "设计项目仪表盘",
   "Improve the project dashboard": "改进项目仪表盘",
   "Suggest three improvements for this project dashboard.": "请为这个项目仪表盘提出三项改进建议。",
@@ -45,6 +48,7 @@ const demoText = {
     "### 三项重点改进\n\n1. **展示项目健康状况。** 将状态和待办事项放在顶部。\n2. **突出近期活动。** 展示最新变更和决策。\n3. **保持导航清晰。** 按项目组织会话，方便快速访问。",
 };
 const demoTextTW = {
+  "View preview log": "查看預覽日誌",
   "Design the project dashboard": "設計專案儀表板",
   "Improve the project dashboard": "改進專案儀表板",
   "Suggest three improvements for this project dashboard.": "請為這個專案儀表板提出三項改進建議。",
@@ -88,6 +92,10 @@ export function translateFixture(value, language) {
       Object.entries(value).map(([key, item]) => [key, translateFixture(item, language)]),
     );
   return value;
+}
+
+export function docsLogLink(language) {
+  return `[${translateFixture("View preview log", language)}](<${docsLogPath}>)`;
 }
 
 /** Inject only the explicit label helper and language into the serialized scenario. */
