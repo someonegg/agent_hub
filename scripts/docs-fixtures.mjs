@@ -87,8 +87,8 @@ export const docsItems = [
 ];
 
 // Playwright intercepts the current WebSocket protocol without a real Codex session.
-export async function mockDocsTerminal(context, timestamp) {
-  await context.routeWebSocket("**/api/v1/sessions/*/terminal-preview", (socket) => {
+export async function mockDocsTerminal(context, timestamp, apiPath = "/api/v1") {
+  await context.routeWebSocket(`**${apiPath}/sessions/*/terminal-preview`, (socket) => {
     socket.send(
       JSON.stringify({
         type: "snapshot",

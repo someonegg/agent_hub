@@ -31,6 +31,8 @@ export function docsOptions(defaultOutput) {
 }
 
 const demoText = {
+  "Review relay deployment": "检查中继服务部署",
+  "The relay is ready for a staging deployment.": "中继服务已准备好部署到预发布环境。",
   "View preview log": "查看预览日志",
   "Design the project dashboard": "设计项目仪表盘",
   "Improve the project dashboard": "改进项目仪表盘",
@@ -48,6 +50,8 @@ const demoText = {
     "### 三项重点改进\n\n1. **展示项目健康状况。** 将状态和待办事项放在顶部。\n2. **突出近期活动。** 展示最新变更和决策。\n3. **保持导航清晰。** 按项目组织会话，方便快速访问。",
 };
 const demoTextTW = {
+  "Review relay deployment": "檢查中繼服務部署",
+  "The relay is ready for a staging deployment.": "中繼服務已準備好部署到預備環境。",
   "View preview log": "查看預覽日誌",
   "Design the project dashboard": "設計專案儀表板",
   "Improve the project dashboard": "改進專案儀表板",

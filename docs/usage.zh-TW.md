@@ -13,6 +13,7 @@ agent-hub
 
 預設從 `~/.codex` 讀取 Codex 工作階段、從 `~/.claude` 讀取 Claude Code 工作階段，且僅監聽本機。
 其他裝置存取前，請先設定[遠端存取](#從其他裝置存取)。
+若要透過同一個 Hub 管理多台機器上的工作階段，請參閱[使用多個節點](#使用多個節點)。
 
 ## 閱讀工作階段
 
@@ -227,14 +228,30 @@ ahub-cli session list --url http://127.0.0.1:4174
 
 ## 使用多個節點
 
-在各台機器上安裝同一版本，以 `agent-hub --node-only` 啟動各節點。代管發佈內容的節點需加上 `--hosting`。在本機試用時，分別在兩個終端機執行：
+在各台機器上安裝同一版本，以 `agent-hub --node-only` 啟動各節點。
+代管發佈內容的節點需加上 `--hosting`。
+
+以下內網範例中，兩個節點分別監聽各自的內網位址。
 
 ```sh
-agent-hub --node-only --host 127.0.0.1 --port 4174
-agent-hub --node mac=http://127.0.0.1:4174
+# Mac
+agent-hub --node-only --host 192.168.1.10 --port 4174
+
+# Linux
+agent-hub --node-only --host 192.168.1.11 --port 4174
 ```
 
-按顯示順序為每個節點加入一個 `--node id=origin`。Hub 預設開啟第一個節點，使用頂部標籤切換節點。在目前選取的節點上執行複製的 tmux 指令。
+在 Hub 所在的機器上執行：
+
+```sh
+agent-hub --node Mac=http://192.168.1.10:4174 --node Linux=http://192.168.1.11:4174
+```
+
+按顯示順序為每個節點加入一個 `--node id=origin`。Hub 預設開啟第一個節點，使用頂部標籤切換節點。
+在目前選取的節點上執行複製的 tmux 指令。
+
+請將範例 IP 換成 Hub 可存取的位址。
+如需使用 HTTPS，請參閱[節點 TLS 設定（英文）](technical-reference.md#tls)。
 
 ## 疑難排解
 

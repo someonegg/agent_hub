@@ -13,7 +13,8 @@ to stop the server. Installation and requirements are in the [README](../README.
 
 By default, Hub reads Codex sessions from `~/.codex` and Claude Code sessions from
 `~/.claude`, and listens only on this machine. For another device, configure
-[remote access](#access-from-other-devices) first.
+[remote access](#access-from-other-devices) first. To manage sessions on multiple
+machines from one Hub, see [Use multiple nodes](#use-multiple-nodes).
 
 ## Read conversations
 
@@ -270,15 +271,31 @@ Other local users and processes can access it; do not forward external proxy tra
 
 Install the same Agent Hub release on each machine. Start each Node with
 `agent-hub --node-only` and enable `--hosting` on Nodes that serve published
-content. To try this on one machine, run these commands in separate terminals:
+content.
+
+In this LAN example, the nodes listen on their respective LAN addresses.
 
 ```sh
-agent-hub --node-only --host 127.0.0.1 --port 4174
-agent-hub --node mac=http://127.0.0.1:4174
+# Mac
+agent-hub --node-only --host 192.168.1.10 --port 4174
+
+# Linux
+agent-hub --node-only --host 192.168.1.11 --port 4174
+```
+
+Run this on the Hub machine:
+
+```sh
+agent-hub --node Mac=http://192.168.1.10:4174 --node Linux=http://192.168.1.11:4174
 ```
 
 Add one `--node id=origin` per Node in display order. The Hub opens the first
-Node. Use the tabs at the top to switch Nodes. Run copied tmux commands on the selected Node.
+Node. Use the tabs at the top to switch Nodes. Run copied tmux commands on the
+selected Node.
+
+Replace the example IPs with addresses the Hub can reach.
+For HTTPS, see
+[Node TLS configuration](technical-reference.md#tls).
 
 ## Troubleshooting
 

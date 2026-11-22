@@ -31,7 +31,7 @@ async function record(
     .context()
     .browser()
     .newContext({
-      viewport: { width: 1440, height: 1000 },
+      viewport: { width: 1280, height: 1100 },
       locale: language === "en" ? "en-US" : language,
       timezoneId: "UTC",
       deviceScaleFactor: 1,
@@ -42,7 +42,18 @@ async function record(
       localStorage.setItem("ahub.preferences.v1", JSON.stringify({ language: value }));
   }, language);
   const demo = await context.newPage();
-  await demo.route("**/api/v1/capabilities", (route) => route.fulfill({ json: { hosting: true } }));
+  // Serve the real client in Hub mode even when recording against Vite.
+  await context.route(/^https?:\/\/[^/]+\/(?:nodes\/mac\/sessions\/[^/]+)?$/, async (route) => {
+    if (!route.request().isNavigationRequest()) return route.fallback();
+    const response = await route.fetch({ url: new URL("/", origin).href });
+    const html = await response.text();
+    return route.fulfill({
+      response,
+      body: html.includes('name="ahub-multi-node"')
+        ? html
+        : html.replace("</head>", '<meta name="ahub-multi-node"></head>'),
+    });
+  });
   demo.setDefaultTimeout(10000);
   const errors = [];
   demo.on("pageerror", (error) => errors.push(error.message));
@@ -50,12 +61,35 @@ async function record(
   const reply = label(
     "### Three focused improvements\n\n1. **Show project health.** Put status and open tasks at the top.\n2. **Highlight recent activity.** Surface the latest changes and decisions.\n3. **Keep navigation clear.** Group sessions by project for quick access.",
   );
+  const macProject = "/projects/atlas-dashboard";
+  const linuxProject = "/srv/projects/relay-service";
+  const newSessionId = "docs-demo-intro-session-000001";
+  const newSessionPath = `/nodes/mac/sessions/${newSessionId}`;
+  const linuxTitle = label("Review relay deployment");
+  const linuxReply = label("The relay is ready for a staging deployment.");
+  const resumableSession = {
+    ...docsSession,
+    status: "normal",
+    resume: { allowed: true, reason: null },
+    agent: "default",
+  };
+  const linuxSession = {
+    ...resumableSession,
+    id: "docs-demo-linux-session-000001",
+    sourceId: "00000000-0000-4000-8000-000000000002",
+    title: linuxTitle,
+    workingDirectory: linuxProject,
+    projectDirectory: linuxProject,
+    messageCount: 1,
+  };
+  let sentMessages = 0;
   let created = false;
   let stage = 0;
   let resumable = false;
   const session = () => ({
     ...docsSession,
-    id: "docs-demo-intro-session-000001",
+    id: newSessionId,
+    sourceId: "00000000-0000-4000-8000-000000000003",
     title: label("Improve the project dashboard"),
     messageCount: stage,
     ...(resumable ? { status: "normal", resume: { allowed: true, reason: null } } : {}),
@@ -100,18 +134,58 @@ async function record(
     stateRevision: String(stage),
     hasMore: false,
   });
-  await context.route("**/api/v1/**", async (route) => {
+  const newSessionMessages = `/sessions/${newSessionId}/messages`;
+  await context.route(/^https?:\/\/[^/]+\/api\//, async (route) => {
     const url = new URL(route.request().url());
-    const path = url.pathname;
     const json = (body) => route.fulfill({ json: body });
-    if (path === "/api/v1/sessions") {
-      if (route.request().method() === "POST") {
+    if (url.pathname === "/api/nodes") return json({ nodes: [{ id: "mac" }, { id: "linux" }] });
+    const [, node, path] = /^\/api\/nodes\/(mac|linux)\/v1(\/.*)$/.exec(url.pathname) ?? [];
+    const method = route.request().method();
+    if (path === "/capabilities") return json({ hosting: true });
+    if (node === "linux" && method === "GET") {
+      if (path === "/sessions")
+        return json({
+          revision: "1",
+          agents: [{ nickname: "default", runtimeName: "Codex" }],
+          projects: [{ directory: linuxProject }],
+          sessions: [linuxSession],
+        });
+      if (path === `/sessions/${linuxSession.id}/messages`) {
+        if (url.searchParams.get("stateRevision") === "1") {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          return route.fulfill({ status: 204 });
+        }
+        return json({
+          session: linuxSession,
+          interaction: {
+            ...interaction,
+            state: "disconnected",
+            activity: null,
+            attachCommand: null,
+          },
+          nextAfter: 1,
+          stateRevision: "1",
+          hasMore: false,
+          items: [
+            {
+              id: "relay-reply",
+              ordinal: 1,
+              timestamp,
+              kind: "message",
+              role: "assistant",
+              phase: "response",
+              itemType: null,
+              markdown: linuxReply,
+            },
+          ],
+        });
+      }
+    }
+    if (node !== "mac") throw new Error(`Unexpected demo API: ${method} ${url.pathname}`);
+    if (path === "/sessions") {
+      if (method === "POST") {
         const body = route.request().postDataJSON();
-        if (
-          body.agent !== "default" ||
-          body.projectDirectory !== "/projects/atlas-dashboard" ||
-          body.worktree
-        ) {
+        if (body.agent !== "default" || body.projectDirectory !== macProject || body.worktree) {
           throw new Error("Unexpected create request");
         }
         created = true;
@@ -119,7 +193,7 @@ async function record(
           operationId: "demo-create",
           type: "create",
           status: "succeeded",
-          sessionId: "docs-demo-intro-session-000001",
+          sessionId: newSessionId,
           phase: null,
           attachCommand: null,
           createdAt: timestamp,
@@ -134,19 +208,13 @@ async function record(
           { nickname: "default", runtimeName: "Codex" },
           { nickname: "work", runtimeName: "Claude Code" },
         ],
-        projects: [{ directory: "/projects/atlas-dashboard" }],
+        projects: [{ directory: macProject }],
         sessions: created
-          ? [
-              {
-                ...session(),
-                agent: "default",
-                projectDirectory: "/projects/atlas-dashboard",
-              },
-            ]
-          : [],
+          ? [{ ...session(), agent: "default" }, resumableSession]
+          : [resumableSession],
       });
     }
-    if (path.endsWith("/messages") && route.request().method() === "GET") {
+    if (path === newSessionMessages && method === "GET") {
       if (url.searchParams.get("wait") === "true")
         await new Promise((resolve) => setTimeout(resolve, 200));
       if (url.searchParams.get("stateRevision") === String(stage))
@@ -156,13 +224,14 @@ async function record(
         items: items().filter((item) => item.ordinal > Number(url.searchParams.get("after") ?? 0)),
       });
     }
-    if (path.endsWith("/messages") && route.request().method() === "POST") {
+    if (path === newSessionMessages && method === "POST") {
       if (route.request().postDataJSON().message !== prompt) throw new Error("Unexpected prompt");
+      sentMessages += 1;
       return route.fulfill({ status: 204 });
     }
-    throw new Error(`Unexpected demo API: ${route.request().method()} ${path}`);
+    throw new Error(`Unexpected demo API: ${method} ${url.pathname}`);
   });
-  await mockDocsTerminal(context, timestamp);
+  await mockDocsTerminal(context, timestamp, "/api/nodes/mac/v1");
   let frame = 0;
   const capture = async (duration) => {
     await demo.evaluate(() => document.fonts.ready);
@@ -172,11 +241,34 @@ async function record(
   };
   try {
     await demo.goto(origin);
-    await demo.getByRole("heading", { name: label("Select a session from the sidebar") }).waitFor();
-    await demo
-      .getByText(new RegExp(label("Loading sessions…").replace("…", "")))
-      .waitFor({ state: "hidden" });
-    await capture(1100);
+    const nodeTab = (id) =>
+      demo.locator(".hub-node-tabs").getByRole("link", { name: id, exact: true });
+    const project = (directory) => demo.locator(`.hub-project[data-project="${directory}"]`);
+    const checkNode = async (id, path, directory) => {
+      await demo.waitForURL(new URL(path, origin).href);
+      await nodeTab(id).and(demo.locator('[aria-current="page"]')).waitFor();
+      await project(directory).waitFor();
+      const visible = await demo
+        .locator(".hub-project")
+        .evaluateAll((projects) => projects.map((entry) => entry.getAttribute("data-project")));
+      if (visible.length !== 1 || visible[0] !== directory)
+        throw new Error(`Unexpected project list on ${id}: ${visible.join(", ")}`);
+    };
+    await checkNode("mac", "/nodes/mac/", macProject);
+    await capture(1300);
+    await nodeTab("linux").click();
+    await checkNode("linux", "/nodes/linux/", linuxProject);
+    const linuxSessionLink = project(linuxProject).getByRole("link", { name: linuxTitle });
+    const linuxProjectToggle = project(linuxProject).locator("button[aria-expanded]");
+    if ((await linuxProjectToggle.getAttribute("aria-expanded")) === "false")
+      await linuxProjectToggle.click();
+    await linuxSessionLink.click();
+    await checkNode("linux", `/nodes/linux/sessions/${linuxSession.id}`, linuxProject);
+    await demo.getByText(linuxReply, { exact: true }).waitFor();
+    await capture(2100);
+    await nodeTab("mac").click();
+    await checkNode("mac", "/nodes/mac/", macProject);
+    await capture(1000);
     const createTrigger = demo
       .getByRole("button", { name: label("New session"), exact: true })
       .first();
@@ -200,7 +292,7 @@ async function record(
       throw new Error("Agent options must include the runtime name");
     await capture(900);
     const directory = demo.getByRole("combobox", { name: label("Project directory") });
-    await directory.selectOption("/projects/atlas-dashboard");
+    await directory.selectOption(macProject);
     await capture(1100);
     await createTrigger.evaluate((button) => {
       button.addEventListener("focus", () => button.setAttribute("data-focus-restored", ""), {
@@ -210,6 +302,8 @@ async function record(
     await demo.getByRole("button", { name: label("Create session"), exact: true }).press("Enter");
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     await composer.waitFor();
+    await checkNode("mac", newSessionPath, macProject);
+    if (!created) throw new Error("No session was created on mac");
     if ((await createTrigger.getAttribute("data-focus-restored")) === null)
       throw new Error("Creating a session did not restore focus to the dialog trigger");
     await demo.waitForFunction(
@@ -232,18 +326,29 @@ async function record(
     }
     await demo.getByRole("button", { name: label("Send"), exact: true }).click();
     await demo.waitForFunction(() => document.querySelector("textarea")?.value === "");
+    if (sentMessages !== 1) throw new Error("Expected one message sent to mac");
     await demo.locator(".message-preview").waitFor();
     await capture(900);
     stage = 1;
     await demo.locator(".message-preview").waitFor({ state: "hidden" });
-    await demo.getByText(label(prompt), { exact: true }).waitFor();
+    await demo.getByText(prompt, { exact: true }).waitFor();
     await capture(1100);
     stage = 2;
     await demo.getByRole("heading", { name: label("Three focused improvements") }).waitFor();
-    await demo.locator(".interaction-region").scrollIntoViewIfNeeded();
     await demo.locator(".user-input-status.answered").waitFor();
-    await demo.locator(".user-input-card").scrollIntoViewIfNeeded();
-    await demo.evaluate(() => document.querySelector(".message-scroll").scrollBy(0, -40));
+    await demo.locator('.composer-toggle[aria-expanded="true"]').click();
+    await composer.waitFor({ state: "hidden" });
+    const clipped = await demo.locator(".message-scroll").evaluate((scroll) => {
+      scroll.scrollTop = 0;
+      const viewport = scroll.getBoundingClientRect();
+      return ["#session-title", ".user-input-card", ".timeline > :last-child"].filter(
+        (selector) => {
+          const item = scroll.querySelector(selector).getBoundingClientRect();
+          return item.top < viewport.top - 1 || item.bottom > viewport.bottom + 1;
+        },
+      );
+    });
+    if (clipped.length) throw new Error(`Final conversation is clipped: ${clipped.join(", ")}`);
     await capture(6500);
     if (await demo.getByRole("alert").count()) throw new Error("Demo contains an error alert");
     if (errors.length) throw new Error(errors.join("\n"));
@@ -284,7 +389,7 @@ async function record(
     if (mobileOverflow) throw new Error("Horizontal overflow in mobile agent selection");
     await demo.getByRole("button", { name: label("Close new session"), exact: true }).click();
     resumable = true;
-    await demo.goto(origin + "/sessions/" + session().id);
+    await demo.goto(new URL(newSessionPath, origin).href);
     for (const width of [390, 1440]) {
       await demo.setViewportSize({ width, height: 1000 });
       await demo.getByRole("button", { name: label("Resume"), exact: true }).click();

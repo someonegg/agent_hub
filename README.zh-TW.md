@@ -2,10 +2,10 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | 繁體中文
 
-面向 Codex 和 Claude Code 的本地網頁中心，將清晰易讀的工作階段記錄與即時 CLI 互動結合起來。
+Agent Hub 是用於管理 Codex 和 Claude Code 工作階段的網頁控制台，支援單機和多節點。
 按專案瀏覽工作階段、跟進最新回覆，並從電腦或手機繼續工作。
 
-![建立工作階段、傳送提示並檢視已回答的使用者輸入卡片](docs/images/zh-TW/ahub-intro.gif)
+![切換節點並操作 Agent Hub 工作階段](docs/images/zh-TW/ahub-intro.gif)
 
 <details>
 <summary>手機截圖</summary>
@@ -35,12 +35,21 @@ agent-hub
 ```
 
 開啟 <http://127.0.0.1:4173>。按 `Ctrl-C` 停止伺服器。
-介面預設英文，在側邊欄底部開啟 **Settings → Language → 简体中文 / 繁體中文** 即可切換；選擇儲存在目前瀏覽器。
+介面預設英文，在側邊欄底部開啟 **Settings → Language → 简体中文 / 繁體中文** 即可切換。
+選擇儲存在目前瀏覽器。
 
 智慧體、連接埠與可選網頁／差異託管設定見[使用與設定](docs/usage.zh-TW.md)。
 
-升級時再次執行
-`npm install -g @someonegg/agent-hub@latest`。從原始碼執行請參閱[開發指南（英文）](docs/development.md)。
+升級時再次執行 `npm install -g @someonegg/agent-hub@latest`。
+從原始碼執行請參閱[開發指南（英文）](docs/development.md)。
+
+## 多節點模式
+
+在執行 Codex 或 Claude Code 的各台機器上以 `agent-hub --node-only` 啟動節點。
+啟動 Hub 時，為每個節點加入一個 `--node id=origin`。
+使用網頁頂部的標籤切換節點。
+
+啟動指令和網路設定見[使用多個節點](docs/usage.zh-TW.md#使用多個節點)。
 
 ## 功能
 
@@ -79,7 +88,7 @@ agent-hub
 
 ## 安全
 
-Agent Hub 讀取本機工作階段記錄，透過 tmux 控制已連線的 CLI 工作階段。
+Agent Hub 在工作階段所在的機器上讀取記錄，並透過 tmux 控制已連線的 CLI 工作階段。
 模型存取與身分認證由所設定的 CLI 負責；Hub 不管理 API 金鑰或 CLI 認證資料。
 
 伺服器預設僅監聽回送位址，互動和管理功能沒有應用層登入保護。對外開放前，請新增身分認證
