@@ -123,8 +123,25 @@ function SessionHub({ cache }: { cache: SessionCache }) {
           {sidebarCollapsed ? <SidebarToggle collapsed onToggle={toggleSidebar} /> : null}
           {sessionId ? (
             <>
-              <button className="hub-back" type="button" onClick={() => navigate(null)}>
-                {t("backToList")}
+              <button
+                className="hub-back"
+                type="button"
+                aria-label={t("backToList")}
+                onClick={() => navigate(null)}
+              >
+                <svg
+                  aria-hidden="true"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 12H3m7-7-7 7 7 7" />
+                </svg>
               </button>
               <span>{t("projects")}</span>
               <span aria-hidden="true">/</span>

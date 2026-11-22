@@ -250,7 +250,7 @@ async function record(
     const overflow = await demo.evaluate(() => document.documentElement.scrollWidth > innerWidth);
     if (overflow) throw new Error("Horizontal overflow in demo");
     await demo.setViewportSize({ width: 390, height: 844 });
-    await demo.getByRole("button", { name: label("← Back to list") }).click();
+    await demo.getByRole("button", { name: label("Back to list") }).click();
     await demo
       .getByRole("button", { name: label("New session"), exact: true })
       .first()

@@ -58,7 +58,6 @@ export function ArtifactsPage() {
   }, [loadProjects, runOperation]);
   return (
     <section className="artifacts-page">
-      <a href={nodePagePath("/")}>← Agent Hub</a>
       <header className="artifacts-heading">
         <div>
           <p className="eyebrow">{t("publishedSnapshots")}</p>

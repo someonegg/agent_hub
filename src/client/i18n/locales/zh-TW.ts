@@ -235,7 +235,7 @@ export const messages: Record<keyof typeof english, string> = {
   workingDirectory: "工作目錄 ·",
 
   tmuxAccessLabel: "連線 tmux",
-  backToList: "← 返回列表",
+  backToList: "返回列表",
   backToSession: "← 返回工作階段",
 
   filesChanged_other: "{{count, number}} 個檔案變更",
