@@ -145,12 +145,6 @@
   color: var(--ink-soft);
 }
 .hub-back {
-  margin: 1rem 1.5rem 0;
-  border: 0;
-  background: transparent;
-  color: var(--current);
-  cursor: pointer;
-  min-height: 44px;
   display: none;
 }
 .hub-empty {
@@ -304,13 +298,14 @@
     font-size: var(--text-small);
   }
   .hub-back {
-    display: block;
-    margin: 0;
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    padding: 0;
     border: 1px solid var(--mist);
-    border-radius: var(--radius-control);
-    padding: 6px 10px;
-    white-space: nowrap;
-    font-size: 0.875rem;
+    background: transparent;
+    color: var(--current);
+    cursor: pointer;
   }
   .hub-project a {
     padding-block: 14px;

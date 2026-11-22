@@ -237,7 +237,7 @@ export const messages = {
   workingDirectory: "Working Directory ·",
 
   tmuxAccessLabel: "tmux access",
-  backToList: "← Back to list",
+  backToList: "Back to list",
   backToSession: "← Back to session",
 
   filesChanged_other: "{{count, number}} files changed",
