@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import ReactMarkdown, { defaultUrlTransform, type ExtraProps } from "react-markdown";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
+import { defaultHandlers, type Handlers } from "mdast-util-to-hast";
 import { toString } from "mdast-util-to-string";
 import { gfm } from "micromark-extension-gfm";
 import rehypeKatex from "rehype-katex";
@@ -23,19 +24,47 @@ const PREVIEW_PARSE_OPTIONS = {
   extensions: [gfm()],
   mdastExtensions: [gfmFromMarkdown()],
 };
+// Keep the parsed destination available after ReactMarkdown filters and encodes hrefs.
+const linkTargets = new WeakMap<NonNullable<ExtraProps["node"]>, { url: string; label: string }>();
+const MARKDOWN_HANDLERS = {
+  link(...[state, node]: Parameters<typeof defaultHandlers.link>) {
+    const result = defaultHandlers.link(state, node);
+    linkTargets.set(result, { url: node.url, label: toString(node) });
+    return result;
+  },
+  linkReference(...[state, node]: Parameters<typeof defaultHandlers.linkReference>) {
+    const result = defaultHandlers.linkReference(state, node);
+    const definition = state.definitionById.get(node.identifier.toUpperCase());
+    if (definition && !Array.isArray(result) && result.type === "element") {
+      linkTargets.set(result, { url: definition.url, label: toString(node) });
+    }
+    return result;
+  },
+} satisfies Handlers;
 const MARKDOWN_COMPONENTS = {
-  a: ({ href, children }: ComponentProps<"a">) =>
-    href ? (
-      <a
-        href={/^\/(?:web|diffs)\//.test(href) ? nodePagePath(href) : href}
-        target="_blank"
-        rel="noreferrer noopener"
-      >
-        {children}
-      </a>
+  a: ({ href, children, node }: ComponentProps<"a"> & ExtraProps) => {
+    if (href) {
+      return (
+        <a
+          href={/^\/(?:web|diffs)\//.test(href) ? nodePagePath(href) : href}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          {children}
+        </a>
+      );
+    }
+    const target = node && linkTargets.get(node);
+    if (!target?.url || target.label === target.url) return <span>{children}</span>;
+    const address = <code className="markdown-link-target">{target.url}</code>;
+    return target.label ? (
+      <span>
+        {children}（{address}）
+      </span>
     ) : (
-      <span>{children}</span>
-    ),
+      address
+    );
+  },
   img: ({ alt }: ComponentProps<"img">) => (
     <span className="image-placeholder">{t("omittedImage", { alt: alt ? `: ${alt}` : "" })}</span>
   ),
@@ -183,6 +212,7 @@ const MarkdownContent = memo(function MarkdownContent({ markdown }: { markdown: 
   return (
     <ReactMarkdown
       remarkPlugins={REMARK_PLUGINS}
+      remarkRehypeOptions={{ handlers: MARKDOWN_HANDLERS }}
       rehypePlugins={REHYPE_PLUGINS}
       skipHtml
       urlTransform={safeUrlTransform}

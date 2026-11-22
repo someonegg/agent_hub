@@ -59,6 +59,8 @@ export const docsUserInput = [
   },
 ];
 
+export const docsLogPath = "/tmp/dashboard-preview/logs/project-health/preview  report.txt";
+
 export const docsItems = [
   {
     id: "prompt",

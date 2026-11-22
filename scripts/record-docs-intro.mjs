@@ -1,4 +1,4 @@
-import { docsOptions, captureSource, translateFixture } from "./docs-language.mjs";
+import { docsOptions, captureSource, docsLogLink, translateFixture } from "./docs-language.mjs";
 import {
   connectedInteraction,
   docsSession,
@@ -24,6 +24,7 @@ async function record(
   connectedInteraction,
   timestamp,
   docsUserInput,
+  previewLogLink,
   mockDocsTerminal,
 ) {
   const context = await page
@@ -80,7 +81,7 @@ async function record(
         role: "assistant",
         phase: "response",
         itemType: null,
-        markdown: reply,
+        markdown: `${reply}\n\n${previewLogLink}`,
       },
     ]
       .slice(0, stage)
@@ -307,9 +308,18 @@ async function record(
 }
 
 const recording = join(frames, "record.js");
+const recordArgs = [
+  frames,
+  origin,
+  translateFixture(docsSession, language),
+  connectedInteraction,
+  docsTimestamp,
+  translateFixture(docsUserInput, language),
+  docsLogLink(language),
+].map((value) => JSON.stringify(value));
 await writeFile(
   recording,
-  `(page) => (${captureSource(record, language)})(page, ${JSON.stringify(frames)}, ${JSON.stringify(origin)}, ${JSON.stringify(translateFixture(docsSession, language))}, ${JSON.stringify(connectedInteraction)}, ${JSON.stringify(docsTimestamp)}, ${JSON.stringify(translateFixture(docsUserInput, language))}, ${mockDocsTerminal.toString()})`,
+  `(page) => (${captureSource(record, language)})(page, ${recordArgs.join(", ")}, ${mockDocsTerminal.toString()})`,
 );
 const cli = (...args) =>
   execFileSync("playwright-cli", [`-s=${browserSession}`, ...args], { stdio: "inherit" });

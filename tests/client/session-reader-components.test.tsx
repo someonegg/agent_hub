@@ -98,6 +98,94 @@ describe("session reader components", () => {
     expect(safeUrlTransform("file:///tmp/secret")).toBe("");
   });
 
+  it.each([null, "plan"] as const)(
+    "preserves blocked Markdown destinations in %s content",
+    (itemType) => {
+      const { container } = render(
+        <MessageItem
+          planOpen
+          item={{
+            kind: "message",
+            id: "blocked-links",
+            ordinal: 1,
+            timestamp: null,
+            role: "assistant",
+            phase: "response",
+            itemType,
+            markdown: [
+              "[**View log**](</tmp/my  log.txt>)",
+              "[View report][report]",
+              "[Empty]()",
+              "[./same](./same)",
+              "[**./formatted**](./formatted)",
+              "[](./unlabeled)",
+              "[Relative](../notes)",
+              "[Blocked](file:///tmp/secret)",
+              "",
+              "[REPORT]: <./my  report.txt>",
+            ].join("\n\n"),
+          }}
+        />,
+      );
+      expect(container.querySelector("a")).toBeNull();
+      expect(
+        [...container.querySelectorAll(".markdown-link-target")].map((node) => node.textContent),
+      ).toEqual([
+        "/tmp/my  log.txt",
+        "./my  report.txt",
+        "./unlabeled",
+        "../notes",
+        "file:///tmp/secret",
+      ]);
+      expect(screen.getByText("View log").parentElement?.textContent).toBe(
+        "View log（/tmp/my  log.txt）",
+      );
+      expect(screen.getByText("View report", { exact: false }).textContent).toBe(
+        "View report（./my  report.txt）",
+      );
+      expect(screen.getByText("Empty").textContent).toBe("Empty");
+      expect(screen.getByText("./same").parentElement?.textContent).toBe("./same");
+      const formattedLabel = screen.getByText("./formatted", { selector: "strong" });
+      expect(formattedLabel.parentElement?.textContent).toBe("./formatted");
+      expect(screen.getByText("./unlabeled").parentElement?.textContent).toBe("./unlabeled");
+    },
+  );
+
+  it("keeps encoded HTTPS URLs and node-scoped artifact links clickable", () => {
+    const pathname = window.location.pathname;
+    window.history.replaceState(null, "", "/nodes/remote/sessions/demo");
+    try {
+      const web = `/web/${"a".repeat(32)}/`;
+      const diff = "/diffs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+      render(
+        <MessageItem
+          item={{
+            kind: "message",
+            id: "allowed-links",
+            ordinal: 1,
+            timestamp: null,
+            role: "assistant",
+            phase: "response",
+            itemType: null,
+            markdown: `[HTTPS](<https://example.com/my  log>) [Web](${web}) [Diff](${diff})`,
+          }}
+        />,
+      );
+      for (const [name, href] of [
+        ["HTTPS", "https://example.com/my%20%20log"],
+        ["Web", `/nodes/remote${web}`],
+        ["Diff", `/nodes/remote${diff}`],
+      ]) {
+        const link = screen.getByRole("link", { name });
+        expect(link).toHaveAttribute("href", href);
+        expect(link).toHaveAttribute("target", "_blank");
+        expect(link).toHaveAttribute("rel", "noreferrer noopener");
+      }
+    } finally {
+      window.history.replaceState(null, "", pathname);
+    }
+  });
+
   it("renders single-line double-dollar math inline and multiline math as display", () => {
     render(
       <MessageItem

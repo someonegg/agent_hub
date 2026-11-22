@@ -1,4 +1,4 @@
-import { docsOptions, captureSource, translateFixture } from "./docs-language.mjs";
+import { docsOptions, captureSource, docsLogLink, translateFixture } from "./docs-language.mjs";
 import { execFileSync } from "node:child_process";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -7,6 +7,7 @@ import { join } from "node:path";
 import {
   connectedInteraction,
   docsSession,
+  docsLogPath,
   docsTimestamp,
   docsItems,
   mockDocsTerminal,
@@ -24,6 +25,7 @@ async function capture(
   interaction,
   timestamp,
   items,
+  docsLogPath,
   mockDocsTerminal,
 ) {
   const resolveMobile = (view) => output.replace(/[^/]+$/, `ahub-mobile-${view}.png`);
@@ -939,10 +941,26 @@ async function capture(
     await settle();
     if ((await composerToggle.getAttribute("aria-expanded")) !== "false")
       throw new Error("Scrolling to the end must not expand the composer");
-    await demo
-      .locator(".user-input-card")
-      .evaluate((card) => card.scrollIntoView({ block: "center" }));
     await demo.screenshot({ path: resolveMobile("reader"), animations: "disabled" });
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await demo.evaluate(() => navigator.clipboard.writeText(""));
+    const address = demo.locator(".markdown-link-target").filter({ hasText: docsLogPath });
+    const lineCount = await address.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const rects = range.getClientRects();
+      const selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return rects.length;
+    });
+    if (lineCount < 2) throw new Error("Long Markdown destination did not wrap on mobile");
+    await demo.keyboard.press("ControlOrMeta+c");
+    await demo.waitForFunction(
+      async (expected) => (await navigator.clipboard.readText()) === expected,
+      docsLogPath,
+    );
+    await demo.evaluate(() => getSelection().removeAllRanges());
     await openComposer();
     await previewToggle.click();
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
@@ -1097,9 +1115,22 @@ async function capture(
 }
 
 const recording = join(directory, "capture.js");
+const previewLogLink = docsLogLink(language);
+const items = translateFixture(docsItems, language).map((item) =>
+  item.id === "reply" ? { ...item, markdown: `${item.markdown}\n\n${previewLogLink}` } : item,
+);
+const captureArgs = [
+  origin,
+  output,
+  translateFixture(docsSession, language),
+  connectedInteraction,
+  docsTimestamp,
+  items,
+  docsLogPath,
+].map((value) => JSON.stringify(value));
 await writeFile(
   recording,
-  `(page) => (${captureSource(capture, language)})(page, ${[origin, output, translateFixture(docsSession, language), connectedInteraction, docsTimestamp, translateFixture(docsItems, language)].map((value) => JSON.stringify(value)).join(", ")}, ${mockDocsTerminal.toString()})`,
+  `(page) => (${captureSource(capture, language)})(page, ${captureArgs.join(", ")}, ${mockDocsTerminal.toString()})`,
 );
 const cli = (...args) =>
   execFileSync("playwright-cli", [`-s=${browserSession}`, ...args], { stdio: "inherit" });

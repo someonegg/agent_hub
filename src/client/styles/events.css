@@ -60,6 +60,10 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.markdown-link-target {
+  white-space: pre-wrap;
+}
+
 .markdown-scroll-region {
   max-width: 100%;
   margin-block: 1em;
