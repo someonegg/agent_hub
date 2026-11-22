@@ -613,10 +613,11 @@ creation time, URL). CLI list reads metadata; delete is idempotent and preserves
 the source. Diffs have no project/session association or HTTP list endpoint.
 Damaged metadata is diagnosed/treated as missing; other filesystem errors propagate.
 
-`/diffs/<uuid>` serves the viewer. `GET /api/v1/diffs/:uuid` returns metadata and
-`raw`. `HEAD` checks existence without reading the raw diff, and `DELETE`
-returns `204`. Missing diffs and disabled hosting return `404`. Responses use
-`private, no-store`, Hub CSP, and text rendering; Markdown links open new tabs.
+`/diffs/<uuid>` serves the HTML viewer with the Hub CSP. The viewer renders diff
+content as text and opens Markdown links in new tabs. `GET /api/v1/diffs/:uuid`
+returns metadata and `raw` as JSON. `HEAD` checks existence without reading the
+raw diff, and `DELETE` returns `204`. Missing diffs and disabled hosting return
+`404`. Responses use `private, no-store`.
 The viewer supports Git unified diffs, renames, modes, binary markers, and C-quoted
 paths; unsupported/incomplete input warns and retains raw-text access.
 

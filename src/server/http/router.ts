@@ -15,6 +15,7 @@ export function sendJson(
 ): void {
   const json = JSON.stringify(body);
   response.statusCode = status;
+  response.removeHeader("Content-Security-Policy");
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.setHeader("Cache-Control", response.getHeader("Cache-Control") ?? "no-store");
   response.setHeader("Content-Length", Buffer.byteLength(json));

@@ -95,7 +95,7 @@ new file mode 100644
   expect(parseDiff("garbage").warning).toBe(true);
   expect(parseDiff("diff --git a/x b/x\n@@ -1,2 +1 @@\n-a\n+b").warning).toBe(true);
 });
-it("gates routes, preserves CSP and no-store, and returns 404 after deletion", async () => {
+it("gates routes, keeps CSP on the viewer, and returns 404 after deletion", async () => {
   const { root, source, store } = await fixture();
   const entry = await store.publish(source);
   const client = join(root, "client");
@@ -119,7 +119,9 @@ it("gates routes, preserves CSP and no-store, and returns 404 after deletion", a
     for (const path of [entry.url, `/api/v1/diffs/${entry.id}`]) {
       const response = await fetch(origin + path);
       expect(response.status).toBe(enabled ? 200 : 404);
-      expect(response.headers.get("content-security-policy")).toBeTruthy();
+      const policy = response.headers.get("content-security-policy");
+      if (path === entry.url) expect(policy).toBeTruthy();
+      else expect(policy).toBeNull();
       if (enabled) expect(response.headers.get("cache-control")).toBe("private, no-store");
     }
     if (enabled) {

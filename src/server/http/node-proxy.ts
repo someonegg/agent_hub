@@ -206,11 +206,18 @@ export function createNodeProxy(
           return;
         }
         const headers = endToEnd(incoming.headers);
+        const contentType = incoming.headers["content-type"]
+          ?.split(";", 1)[0]
+          ?.trim()
+          .toLowerCase();
         if (web) {
           // Published pages intentionally run in the Hub origin with the Node's hosting policy.
           response.removeHeader("Content-Security-Policy");
           if (incoming.headers.location?.startsWith("/web/"))
             headers.location = `/nodes/${node.id}${incoming.headers.location}`;
+        } else if (contentType === "application/json") {
+          response.removeHeader("Content-Security-Policy");
+          delete headers["content-security-policy"];
         }
         response.writeHead(incoming.statusCode ?? 502, headers);
         incoming.on("error", () => response.destroy());
