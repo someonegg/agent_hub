@@ -241,6 +241,11 @@ describe("secure HTTP foundation", () => {
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
     expect(response.headers.get("referrer-policy")).toBe("no-referrer");
     expect(response.headers.has("access-control-allow-origin")).toBe(false);
+    const api = await fetch(`${base}/api/unknown`);
+    expect(api.status).toBe(404);
+    expect(api.headers.get("content-type")).toContain("application/json");
+    expect(api.headers.get("content-security-policy")).toBeNull();
+    expect(api.headers.get("x-content-type-options")).toBe("nosniff");
     expect((await fetch(`${base}/unknown`)).status).toBe(404);
   });
 

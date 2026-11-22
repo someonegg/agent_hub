@@ -85,7 +85,8 @@ async function fixture(timeoutMs = 5000) {
       } else if (request.url?.startsWith("/web/")) {
         response.writeHead(302, { Location: "/web/page/snapshot/?view=1" }).end();
       } else {
-        response.setHeader("Content-Type", "application/json");
+        response.setHeader("Content-Type", "application/json; charset=utf-8");
+        response.setHeader("Content-Security-Policy", "connect-src ws://node.test");
         const chunks: Buffer[] = [];
         try {
           for await (const chunk of request) chunks.push(chunk);
@@ -263,6 +264,7 @@ it("isolates routes and preserves streams, upstream status, query, and response 
       headers: { Origin: url },
       body: "hello",
     });
+    expect(response.headers.get("content-security-policy")).toBeNull();
     expect(await response.json()).toEqual({
       id: "Remote",
       host: remoteHost,
