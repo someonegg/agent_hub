@@ -134,6 +134,7 @@ export function SessionReader({
           <div ref={reader} className="reader">
             <SessionHeader
               agentNickname={agentNickname}
+              attachCommand={interaction?.attachCommand}
               management={management}
               session={context.session}
             />

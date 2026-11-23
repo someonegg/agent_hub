@@ -309,7 +309,7 @@ async function capture(
     const labels = await menu.locator("button").allTextContents();
     if (
       labels.join("|") !==
-      ["Tmux access", "Archive session", "Delete session", "Exit session"].map(label).join("|")
+      ["Archive session", "Delete session", "Exit session"].map(label).join("|")
     )
       throw new Error("Unexpected session menu order");
     const bounds = await menu.boundingBox();
@@ -321,9 +321,35 @@ async function capture(
       bounds.y + bounds.height > viewport.height
     )
       throw new Error("Session menu clipped");
-    await demo.getByRole("button", { name: label("Tmux access"), exact: true }).click();
-    await demo.getByRole("dialog", { name: label("tmux access"), exact: true }).waitFor();
-    await demo.getByRole("button", { name: label("Close tmux access"), exact: true }).click();
+    await menu.locator("button").first().press("Escape");
+    const info = demo.locator(".session-information");
+    const summary = info.locator("summary");
+    await summary.click();
+    await info.getByText(interaction.attachCommand, { exact: true }).waitFor();
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const copy = info.getByRole("button", { name: label("Copy command"), exact: true });
+    const copyBounds = await copy.boundingBox();
+    if (
+      !copyBounds ||
+      copyBounds.width > 28 ||
+      copyBounds.height > 28 ||
+      (await copy.innerText()).trim()
+    )
+      throw new Error("Copy command should be a compact icon button");
+    await copy.click();
+    await demo.waitForFunction(
+      async (expected) => (await navigator.clipboard.readText()) === expected,
+      interaction.attachCommand,
+    );
+    const copied = info.getByText(label("Copied"), { exact: true });
+    await copied.waitFor();
+    await summary.click();
+    await info.locator(".attach-command").waitFor({ state: "detached" });
+    await summary.click();
+    await copy.waitFor();
+    if (await copied.count())
+      throw new Error("Copy feedback persisted after reopening session information");
+    await summary.click();
   };
   const errors = [];
   demo.on("pageerror", (error) => errors.push(error.message));
@@ -683,7 +709,11 @@ async function capture(
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     await composer.fill("Keep this draft while browsing uploads");
     await stageAttachment();
-    await demo.getByRole("link", { name: label("Upload history"), exact: true }).click();
+    const info = demo.locator(".session-information");
+    if ((await info.getAttribute("open")) === null) await info.locator("summary").click();
+    if (await info.evaluate((element) => element.scrollWidth > element.clientWidth))
+      throw new Error("Session information horizontal overflow");
+    await info.getByRole("link", { name: label("Upload history"), exact: true }).click();
     await demo.getByRole("heading", { name: label("Upload history"), exact: true }).waitFor();
     const historyImage = demo.getByRole("img", { name: label("dashboard.png"), exact: true });
     await historyImage.evaluate((element) => element.decode());

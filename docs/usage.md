@@ -49,7 +49,7 @@ Use the session's **…** menu to:
 - **Delete:** permanently remove session history after confirmation.
 
 Creating and resuming use tmux. If login or permission confirmation blocks startup,
-use **… → Tmux access** or the displayed attach command to finish in a terminal.
+use **Session information → Tmux access** or the displayed attach command to finish in a terminal.
 Do not rename Hub's tmux sessions or change their window/pane structure.
 See [tmux requirements](technical-reference.md#tmux-interaction) for details.
 
@@ -80,7 +80,7 @@ Each file can be up to **20 MiB**.
 Images retain their original content, including EXIF metadata. Camera behavior
 depends on the browser; HEIC/HEIF support depends on the runtime.
 
-Open **Upload history** from the session header to preview, download, or delete
+Open **Session information → Upload history** to preview, download, or delete
 files, including unsent uploads. Removing an attachment from a draft does not
 delete its uploaded file; deleting it from history also removes it from the draft.
 
@@ -302,7 +302,7 @@ For HTTPS, see
 - **No sessions:** check that each configured Agent contains `sessions/` (Codex)
   or `projects/` (Claude). Check the server output for unreadable or skipped files.
 - **Port in use:** choose another port, such as `agent-hub --port 4180`.
-- **Cannot send input:** complete CLI prompts via **Tmux access**, wait if busy,
+- **Cannot send input:** complete CLI prompts via **Session information → Tmux access**, wait if busy,
   or use **Resume** if available. Archived sessions are read-only; session logs
   alone do not provide a live terminal connection.
 - **Create/resume status unclear:** inspect tmux and refresh the session list before

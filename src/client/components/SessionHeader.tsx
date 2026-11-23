@@ -1,20 +1,28 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { SessionDetail } from "../../shared/domain";
 
 import { formatDate, t } from "../i18n";
+import { AttachCommand } from "./AttachCommand";
 import { StatusBadge } from "./StatusBadge";
 import { UploadHistoryLink } from "./UploadHistoryLink";
 
 interface SessionHeaderProps {
   agentNickname?: string;
+  attachCommand?: string | null;
   management?: ReactNode;
   session: SessionDetail;
 }
 
-export function SessionHeader({ agentNickname, management, session }: SessionHeaderProps) {
+export function SessionHeader({
+  agentNickname,
+  attachCommand,
+  management,
+  session,
+}: SessionHeaderProps) {
   useTranslation();
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const updatedAt = formatTimestamp(session.updatedAt);
 
   return (
@@ -39,11 +47,13 @@ export function SessionHeader({ agentNickname, management, session }: SessionHea
           ) : null}
           <span>·</span>
           <span>{updatedAt}</span>
-          <span>·</span>
-          <UploadHistoryLink sessionId={session.id} className="session-uploads-link" />
         </div>
         <div className="reader-controls">
-          <details className="session-information" key={session.id}>
+          <details
+            className="session-information"
+            key={session.id}
+            onToggle={(event) => setOpenSessionId(event.currentTarget.open ? session.id : null)}
+          >
             <summary>{t("sessionInformation")}</summary>
             <div className="session-information-content">
               {session.taskName ? (
@@ -60,6 +70,12 @@ export function SessionHeader({ agentNickname, management, session }: SessionHea
               <p className="session-origin">{sessionOriginLabel(session.origin)}</p>
               <p className="session-source-id">
                 {t("originalSessionID")} <code>{session.sourceId}</code>
+              </p>
+              {attachCommand && openSessionId === session.id ? (
+                <AttachCommand key={attachCommand} command={attachCommand} />
+              ) : null}
+              <p>
+                <UploadHistoryLink sessionId={session.id} className="session-uploads-link" />
               </p>
             </div>
           </details>

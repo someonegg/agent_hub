@@ -40,7 +40,6 @@ export const messages: Record<keyof typeof english, string> = {
   closeImagePreview: "关闭图片预览",
   closeNewSession: "关闭新建会话",
   closeResumeSession: "关闭恢复会话",
-  closeTmuxAccess: "关闭 tmux 连接",
 
   confirmDelete: "确认删除",
   deletingHistory: "正在删除历史",
@@ -234,7 +233,6 @@ export const messages: Record<keyof typeof english, string> = {
   working: "工作中",
   workingDirectory: "工作目录 ·",
 
-  tmuxAccessLabel: "连接 tmux",
   backToList: "返回列表",
   backToSession: "← 返回会话",
 
