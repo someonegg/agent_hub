@@ -185,6 +185,10 @@ Resume availability is `session.resume: { allowed, reason }`.
 
 ## Runtime binding and ownership
 
+On create and resume, Agent Hub reads `.ahub-env` from the agent's configuration
+directory and passes literal values through tmux. Missing, unreadable, or malformed
+files are ignored in full. Agent Hub's configuration and binding variables take precedence.
+
 ### Binding format and ownership
 
 Both adapters bind using `printf` and shell environment expansion without tmux

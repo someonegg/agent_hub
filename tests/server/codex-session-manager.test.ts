@@ -114,3 +114,38 @@ appendFileSync(${JSON.stringify(output)}, JSON.stringify(call) + "\\n");
     { args: ["delete", nativeId, "--force"], home: "/custom home" },
   ]);
 });
+
+it("reloads the home .ahub-env on launch and ignores a malformed file in full", async () => {
+  const directory = await createTempDirectory("codex-env-");
+  const file = join(directory, ".ahub-env");
+  const tmux = new TmuxLauncher();
+  const launch = vi
+    .spyOn(tmux, "launch")
+    .mockResolvedValue({ socketPath: "/tmp/test", sessionName: "test" });
+  const manager = new CodexSessionManager(directory, tmux);
+  const options = {
+    operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
+    workingDirectory: "/project",
+    worktree: false,
+    permissionMode: "default" as const,
+  };
+
+  await writeFile(join(directory, ".env"), "IGNORED=legacy\n");
+  await manager.launch(options);
+  expect(launch.mock.lastCall?.[3]).toEqual({ CODEX_HOME: directory });
+
+  await writeFile(
+    file,
+    '# comment\r\nexport TEST = "a # b=$OTHER;" # comment\r\nCODEX_HOME=/other\r\nEMPTY=\r\n',
+  );
+  await manager.launch(options);
+  expect(launch.mock.lastCall?.[3]).toEqual({
+    CODEX_HOME: directory,
+    TEST: "a # b=$OTHER;",
+    EMPTY: "",
+  });
+
+  await writeFile(file, 'TEST=valid\nBROKEN =  "unterminated\n');
+  await manager.launch(options);
+  expect(launch.mock.lastCall?.[3]).toEqual({ CODEX_HOME: directory });
+});

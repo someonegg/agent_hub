@@ -3,6 +3,7 @@ import { promisify } from "node:util";
 
 import { TmuxLauncher } from "../../interaction/tmux-launcher.js";
 import type { SessionLaunchOptions, SessionManager } from "../../management/session-manager.js";
+import { readLaunchEnvironment } from "../shared/launch-environment.js";
 import { exitSteps, resolveDirectory } from "../shared/session-management.js";
 import { codexBindingCommand } from "./interaction-parser.js";
 
@@ -29,23 +30,24 @@ export class CodexSessionManager implements SessionManager {
   }: SessionLaunchOptions) {
     if (resumeNativeId !== undefined && !this.isValidNativeId(resumeNativeId))
       throw new Error("Invalid resume identity");
-    return this.tmux.launch(
-      operationId,
-      workingDirectory,
-      [
-        this.command,
-        ...(resumeNativeId ? ["resume", resumeNativeId] : []),
-        "--no-daemon",
-        "--no-alt-screen",
-        ...(worktree ? ["--worktree"] : []),
-        ...(permissionMode === "auto"
-          ? ["--approve-for-me"]
-          : permissionMode === "yolo"
-            ? ["--yolo"]
-            : []),
-        codexBindingCommand(operationId, projectDirectory, taskName ?? null),
-      ],
-      { CODEX_HOME: this.configDirectory },
+    const command = [
+      this.command,
+      ...(resumeNativeId ? ["resume", resumeNativeId] : []),
+      "--no-daemon",
+      "--no-alt-screen",
+      ...(worktree ? ["--worktree"] : []),
+      ...(permissionMode === "auto"
+        ? ["--approve-for-me"]
+        : permissionMode === "yolo"
+          ? ["--yolo"]
+          : []),
+      codexBindingCommand(operationId, projectDirectory, taskName ?? null),
+    ];
+    return readLaunchEnvironment(this.configDirectory).then((environment) =>
+      this.tmux.launch(operationId, workingDirectory, command, {
+        ...environment,
+        CODEX_HOME: this.configDirectory,
+      }),
     );
   }
   exitSteps = exitSteps;

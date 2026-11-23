@@ -179,3 +179,13 @@ it("quotes a lone executable for tmux's single-command shell behavior", async ()
   ]);
   expect(execute.mock.calls[0]![1].at(-1)).toBe("exec '/tools/custom agent'");
 });
+
+it("escapes trailing semicolons in env arguments and keeps values out of launch errors", async () => {
+  execute.mockImplementationOnce(fails(new Error("Command failed: tmux -e TEST=secret")));
+  await expect(
+    new TmuxLauncher().launch("00000000-0000-0000-0000-000000000007", "/project", ["codex"], {
+      TEST: "secret;",
+    }),
+  ).rejects.toThrow(/^tmux new-session failed$/);
+  expect(execute.mock.calls[0]![1]).toContain("TEST=secret\\;");
+});
