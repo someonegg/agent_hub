@@ -94,6 +94,7 @@
     min-height: 44px;
   }
   .terminal-keypad {
+    right: 26px;
     grid-template-rows: repeat(2, 44px);
   }
 }

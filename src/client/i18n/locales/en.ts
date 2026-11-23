@@ -39,7 +39,6 @@ export const messages = {
   closeImagePreview: "Close image preview",
   closeNewSession: "Close new session",
   closeResumeSession: "Close resume session",
-  closeTmuxAccess: "Close tmux access",
 
   confirmDelete: "Confirm delete",
   deletingHistory: "Deleting history",
@@ -236,7 +235,6 @@ export const messages = {
   working: "Working",
   workingDirectory: "Working Directory ·",
 
-  tmuxAccessLabel: "tmux access",
   backToList: "Back to list",
   backToSession: "← Back to session",
 

@@ -543,6 +543,7 @@ it("opens the first node and restores upload history after switching nodes", asy
   fireEvent.click(screen.getByRole("button", { name: /^reader, 1 sessions$/ }));
   fireEvent.click(screen.getByRole("link", { name: /^Reader work/ }));
   await flush();
+  fireEvent.click(screen.getByText("Session information"));
   fireEvent.click(screen.getByRole("link", { name: "Upload history" }));
   expect(location.pathname).toBe(`/nodes/Remote/sessions/${SESSION_ID}/uploads`);
   fireEvent.click(within(tabs).getByRole("link", { name: "local" }));

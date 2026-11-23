@@ -15,7 +15,6 @@ import { AttachCommand } from "./AttachCommand";
 import { PermissionModeSelect } from "./PermissionModeSelect";
 import { ProjectDirectory } from "./ProjectDirectory";
 import { RequestError } from "./RequestError";
-import { TmuxAccessDialog } from "./TmuxAccessDialog";
 
 const OPERATION_LABELS = {
   create: "operationCreate",
@@ -352,11 +351,6 @@ function ManageSessionControls({
   onStart?: () => void;
 }) {
   useTranslation();
-  const [accessOpen, setAccessOpen] = useState(false);
-  const attachCommand = interaction?.attachCommand;
-  useEffect(() => {
-    if (!attachCommand) setAccessOpen(false);
-  }, [attachCommand]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const deleteDialog = useRef<HTMLDialogElement>(null);
@@ -399,17 +393,6 @@ function ManageSessionControls({
       </button>
       {menuOpen ? (
         <div className="session-action-menu" id={menuId}>
-          {attachCommand ? (
-            <button
-              type="button"
-              onClick={() => {
-                closeMenu();
-                setAccessOpen(true);
-              }}
-            >
-              {t("tmuxAccess")}
-            </button>
-          ) : null}
           {management?.archive !== false && session.status !== "archived" ? (
             <button
               type="button"
@@ -447,9 +430,6 @@ function ManageSessionControls({
             </button>
           ) : null}
         </div>
-      ) : null}
-      {accessOpen && attachCommand ? (
-        <TmuxAccessDialog command={attachCommand} onClose={() => setAccessOpen(false)} />
       ) : null}
       <dialog
         ref={deleteDialog}
