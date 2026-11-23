@@ -14,6 +14,7 @@ import {
   BINDING_PROMPT_WAIT_MS,
   ClaudeSessionManager,
 } from "../../src/server/adapters/claude/session-manager.js";
+import * as launchEnvironment from "../../src/server/adapters/shared/launch-environment.js";
 import { interruptSteps } from "../../src/server/adapters/shared/session-management.js";
 import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
@@ -91,7 +92,9 @@ it.each(
   async (resume, permissionMode, command) => {
     const tmux = new TmuxLauncher();
     const launch = vi.spyOn(tmux, "launch").mockRejectedValue(new Error("Stop before bootstrap"));
-    const manager = new ClaudeSessionManager("/claude agent", tmux, undefined, command);
+    const directory = await createTempDirectory("claude-env-");
+    await writeFile(join(directory, ".ahub-env"), 'CLAUDE_ENV_TEST="hello world"\n');
+    const manager = new ClaudeSessionManager(directory, tmux, undefined, command);
     const nativeId = "11111111-2222-4333-8444-555555555555";
     await expect(
       manager.launch({
@@ -111,7 +114,7 @@ it.each(
         ...(resume ? ["--resume", nativeId] : ["--worktree"]),
         ...(permissionMode === "auto" ? ["--permission-mode", "auto"] : []),
       ],
-      { CLAUDE_CONFIG_DIR: "/claude agent" },
+      { CLAUDE_CONFIG_DIR: directory, CLAUDE_ENV_TEST: "hello world" },
     );
   },
 );
@@ -145,6 +148,7 @@ const launchOptions = {
 const readyScreen = { content: "Welcome\n\n❯\u00a0\nStatus", cursorX: 2, cursorY: 2 };
 
 function mockClaudeLaunch() {
+  vi.spyOn(launchEnvironment, "readLaunchEnvironment").mockResolvedValue({});
   const tmux = new TmuxLauncher();
   vi.spyOn(tmux, "launch").mockResolvedValue(target);
   const capture = vi

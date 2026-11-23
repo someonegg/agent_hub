@@ -8,6 +8,7 @@ import {
   type SessionLaunchOptions,
   type SessionManager,
 } from "../../management/session-manager.js";
+import { readLaunchEnvironment } from "../shared/launch-environment.js";
 import { exitSteps, resolveDirectory } from "../shared/session-management.js";
 import { claudeBindingCommand, validClaudeId } from "./interaction.js";
 import { claudePromptPosition } from "./prompt-readiness.js";
@@ -42,7 +43,10 @@ export class ClaudeSessionManager implements SessionManager {
             ? ["--dangerously-skip-permissions"]
             : []),
       ],
-      { CLAUDE_CONFIG_DIR: this.configDirectory },
+      {
+        ...(await readLaunchEnvironment(this.configDirectory)),
+        CLAUDE_CONFIG_DIR: this.configDirectory,
+      },
     );
     try {
       const deadline = Date.now() + BINDING_PROMPT_WAIT_MS;

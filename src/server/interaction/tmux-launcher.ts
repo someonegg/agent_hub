@@ -52,7 +52,8 @@ export class TmuxLauncher {
           "-s",
           sessionName,
           ...Object.entries({ ...environment, AHUB_TMUX_SESSION_NAME: sessionName }).flatMap(
-            ([name, value]) => ["-e", `${name}=${value}`],
+            // A trailing semicolon in tmux argv separates commands unless escaped.
+            ([name, value]) => ["-e", `${name}=${value.replace(/;$/, "\\;")}`],
           ),
           "-x",
           "120",
@@ -74,7 +75,8 @@ export class TmuxLauncher {
           ("signal" in error && error.signal != null));
       throw new SessionLaunchError(
         uncertain ? "unknown" : "not_started",
-        error instanceof Error ? error.message : String(error),
+        // execFile includes the command arguments (and environment values) in its error.
+        "tmux new-session failed",
         uncertain ? fallbackAttach : null,
       );
     }
