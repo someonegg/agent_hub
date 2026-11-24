@@ -1,7 +1,8 @@
 # Session JSONL processing
 
-The [Codex](../src/server/adapters/codex/) and
-[Claude Code](../src/server/adapters/claude/) adapters decode complete JSONL lines
+The [Codex](../src/server/adapters/codex/),
+[Claude Code](../src/server/adapters/claude/), and
+[Antigravity](../src/server/adapters/agy/) adapters decode complete JSONL lines
 and publish only conversation messages and user input. Metadata,
 pane bindings, and runtime facts are extracted independently of conversation
 publication. See the [technical reference](technical-reference.md#conversation-reads)
@@ -18,7 +19,7 @@ physical lines.
 Message text is capped at 1,000,000 UTF-16 code units. Truncation avoids splitting
 surrogate pairs.
 
-Both adapters retain at most 50 diagnostics per session, with decoder diagnostics
+Each adapter retains at most 50 diagnostics per session, with decoder diagnostics
 taking priority over separately retained normalizer diagnostics. Final source
 diagnostics are also capped at 50 while valid files continue to be processed. Identity
 conflicts remain explicit state even when diagnostics are full. Diagnostics
@@ -40,6 +41,20 @@ records retain their original ordinals.
 
 Ordinals retain raw adapter positions, including gaps; visible messages are never
 renumbered.
+
+## Antigravity
+
+The adapter reads `transcript_full.jsonl` because the compact transcript truncates
+content. It accepts a new file when the first explicit user input is a valid
+Agent Hub binding within the first 64 KiB. The decision is cached by path across
+rewrites and replacements until a refresh observes the file missing or Agent Hub
+restarts. Files below 64 KiB that have no explicit user input are rechecked when
+their size or mtime changes.
+
+User messages use the text inside `<USER_REQUEST>` when present. The first
+visible user message supplies the title. Assistant messages come from
+`PLANNER_RESPONSE` content and use phase `update` with tool calls or `response`
+otherwise. Thinking, `SYSTEM_MESSAGE`, and tool records are skipped.
 
 ## Claude Code
 

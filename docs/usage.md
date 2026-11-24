@@ -11,8 +11,9 @@ agent-hub
 Open <http://127.0.0.1:4173> or the URL printed by the server. Press `Ctrl-C`
 to stop the server. Installation and requirements are in the [README](../README.md#quick-start).
 
-By default, Hub reads Codex sessions from `~/.codex` and Claude Code sessions from
-`~/.claude`, and listens only on this machine. For another device, configure
+By default, Hub reads Codex (`~/.codex`) and Claude Code (`~/.claude`) sessions,
+plus Antigravity CLI (`~/.gemini/antigravity-cli`) when present, and listens only on
+this machine. For another device, configure
 [remote access](#access-from-other-devices) first. To manage sessions on multiple
 machines from one Hub, see [Use multiple nodes](#use-multiple-nodes).
 
@@ -198,15 +199,18 @@ for the full list.
 ### Multiple agents
 
 You can configure multiple Codex or Claude Code configuration directories, each with a unique nickname.
-Each directory contains `sessions/` for Codex or `projects/` for Claude Code:
+Each directory contains `sessions/` for Codex or `projects/` for Claude Code. Antigravity CLI (`agy`)
+is added automatically when `~/.gemini/antigravity-cli` exists, or explicitly with
+`--agy-agent agy` (one only; only Agent Hub-created sessions are shown):
 
 ```sh
 agent-hub \
   --codex-agent 'work=~/.codex-work' \
-  --claude-agent 'claude=~/.claude'
+  --claude-agent 'claude=~/.claude' \
+  --agy-agent agy
 ```
 
-Repeat or combine these options as needed. Explicit agents replace **both**
+Repeat or combine these options as needed. Explicit agents replace **all**
 defaults; the first is the default for creation.
 Use the sidebar Agent filter to narrow sessions. For web creation, an active Agent
 filter or valid default Agent preference takes priority over the first Agent.

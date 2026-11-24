@@ -28,7 +28,7 @@ export type ServerTlsConfig =
 export interface AgentConfig {
   nickname: string;
   path: string;
-  adapter?: "codex" | "claude";
+  adapter?: "codex" | "claude" | "agy";
   command?: string;
 }
 
@@ -89,6 +89,7 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       "agent-command": { type: "string", multiple: true },
       "codex-agent": { type: "string", multiple: true },
       "claude-agent": { type: "string", multiple: true },
+      "agy-agent": { type: "string", multiple: true },
       host: { type: "string" },
       port: { type: "string" },
       "local-port": { type: "string" },
@@ -145,7 +146,9 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       : parseAgents(
           tokens.flatMap((token) =>
             token.kind === "option" &&
-            (token.name === "codex-agent" || token.name === "claude-agent")
+            (token.name === "codex-agent" ||
+              token.name === "claude-agent" ||
+              token.name === "agy-agent")
               ? [{ option: token.name, value: token.value! }]
               : [],
           ),
@@ -223,13 +226,19 @@ function parseNodes(values: readonly string[]): NodeTarget[] {
   });
 }
 
+type AgentOption = "codex-agent" | "claude-agent" | "agy-agent";
+const AGY_DEFAULT_PATH = "~/.gemini/antigravity-cli";
+
 function parseAgents(
-  explicit: { option: "codex-agent" | "claude-agent"; value: string }[],
+  explicit: { option: AgentOption; value: string }[],
   commands: string[],
 ): AgentConfig[] {
   const names = new Set<string>();
   const paths = new Set<string>();
   let entries = explicit;
+  if (entries.filter(({ option }) => option === "agy-agent").length > 1) {
+    throw new Error("Only one --agy-agent is supported");
+  }
   if (entries.length === 0) {
     entries = [
       { option: "codex-agent", value: "codex=~/.codex" },
@@ -242,11 +251,31 @@ function parseAgents(
       if (code === "ENOENT") entries.reverse();
       else if (code !== "EACCES" && code !== "EPERM") throw error;
     }
+    try {
+      if (statSync(resolvePathOption("agy-agent", AGY_DEFAULT_PATH)).isDirectory()) {
+        entries.push({ option: "agy-agent", value: "agy" });
+      }
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== "ENOENT" && code !== "ENOTDIR" && code !== "EACCES" && code !== "EPERM")
+        throw error;
+    }
   }
-  const agents: AgentConfig[] = entries.map(({ option, value }) => ({
-    ...parseAgent(value, option, names, paths),
-    ...(option === "claude-agent" ? { adapter: "claude" as const } : {}),
-  }));
+  const agents: AgentConfig[] = entries.map(({ option, value }) => {
+    if (option === "agy-agent") {
+      if (value.includes("=") || !value.trim()) {
+        throw new Error("--agy-agent requires a non-empty nickname only");
+      }
+      return {
+        ...parseAgent(`${value}=${AGY_DEFAULT_PATH}`, option, names, paths),
+        adapter: "agy",
+      };
+    }
+    return {
+      ...parseAgent(value, option, names, paths),
+      ...(option === "claude-agent" ? { adapter: "claude" as const } : {}),
+    };
+  });
   for (const value of commands) {
     const separator = value.indexOf("=");
     const nickname = value.slice(0, separator).trim();
@@ -280,12 +309,15 @@ Options:
                        Codex agent; repeat for multiple agents
   --claude-agent <nickname=path>
                        Claude Code agent; repeat for multiple agents
+  --agy-agent <nickname>
+                       Antigravity CLI agent at ~/.gemini/antigravity-cli (at most one)
   --agent-command <nickname=executable>
                        Override an agent executable; repeat for multiple agents.
                        Filename uses PATH; paths resolve from the Hub working directory.
                        No shell parsing; use a wrapper script for fixed arguments.
-  Default agents: codex=~/.codex, claude=~/.claude (Claude first if ~/.codex is absent).
-  Any explicit agent replaces both defaults; argument order determines the default agent.
+  Default agents: codex=~/.codex, claude=~/.claude (Claude first if ~/.codex is absent),
+  plus agy=~/.gemini/antigravity-cli when that directory exists.
+  Any explicit agent replaces the defaults; argument order determines the default agent.
   --host <host>        Listen host (default: 127.0.0.1)
   --port <port>        Listen port, or 0 for a free port (default: 4173)
   --local-port <port>  Additional HTTP listener (disabled by default)

@@ -11,7 +11,7 @@ agent-hub
 開啟 <http://127.0.0.1:4173> 或伺服器輸出的位址，按 `Ctrl-C` 停止伺服器。
 安裝與執行要求見 [README](../README.zh-TW.md#快速開始)。
 
-預設從 `~/.codex` 讀取 Codex 工作階段、從 `~/.claude` 讀取 Claude Code 工作階段，且僅監聽本機。
+預設從 `~/.codex` 讀取 Codex 工作階段、從 `~/.claude` 讀取 Claude Code 工作階段（若存在 `~/.gemini/antigravity-cli`，同時讀取 Antigravity CLI 工作階段），且僅監聽本機。
 其他裝置存取前，請先設定[遠端存取](#從其他裝置存取)。
 若要透過同一個 Hub 管理多台機器上的工作階段，請參閱[使用多個節點](#使用多個節點)。
 
@@ -163,15 +163,16 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 ### 多個智慧體
 
 可設定多個 Codex 或 Claude Code 設定目錄，每個目錄使用唯一暱稱。
-Codex 目錄包含 `sessions/`，Claude Code 目錄包含 `projects/`：
+Codex 目錄包含 `sessions/`，Claude Code 目錄包含 `projects/`。若存在 `~/.gemini/antigravity-cli`，會自動加入 Antigravity CLI（`agy`）；也可用 `--agy-agent agy` 明確設定（僅限一個，且只顯示由 Agent Hub 建立的工作階段）：
 
 ```sh
 agent-hub \
   --codex-agent 'work=~/.codex-work' \
-  --claude-agent 'claude=~/.claude'
+  --claude-agent 'claude=~/.claude' \
+  --agy-agent agy
 ```
 
-可重複或混合傳入這些選項。明確設定會替換**兩個預設智慧體**，建立預設使用第一項。
+可重複或混合傳入這些選項。明確設定會替換**所有預設智慧體**，建立預設使用第一項。
 透過側邊欄智慧體篩選器縮小範圍。網頁建立時，有效的智慧體篩選或預設智慧體偏好優先於第一項。
 完整規則見 [智慧體路由（英文）](technical-reference.md#agent-identity-and-routing)。
 

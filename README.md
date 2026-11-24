@@ -2,8 +2,8 @@
 
 English | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
-Agent Hub is a web hub for managing Codex and Claude Code sessions on one
-machine or across multiple nodes.
+Agent Hub is a web hub for managing Codex, Claude Code, and Antigravity CLI (`agy`)
+sessions on one machine or across multiple nodes.
 Browse sessions by project, follow responses in near real time, and keep
 working from desktop or mobile.
 
@@ -23,11 +23,12 @@ working from desktop or mobile.
 Runtime requirements:
 
 - macOS or Linux with Node.js >=22.13 and npm
-- A locally configured Codex or Claude Code CLI
+- At least one locally configured CLI from the list above
 - tmux for creating, resuming, and interacting with sessions
 
-Hub reads `~/.codex` and `~/.claude` by default. You can use either runtime or both;
-see [Agent configuration](docs/usage.md#multiple-agents) for custom directories.
+Hub reads `~/.codex` and `~/.claude` by default.
+It also detects `agy` when `~/.gemini/antigravity-cli` exists and displays sessions
+created through Hub. See [Agent configuration](docs/usage.md#multiple-agents).
 
 Install globally and start Hub:
 
@@ -47,7 +48,7 @@ For running from source, see [Development](docs/development.md).
 
 ## Multi-node mode
 
-Run `agent-hub --node-only` on each machine that runs Codex or Claude Code.
+Run `agent-hub --node-only` on each machine that runs a supported CLI.
 Start the Hub with one `--node id=origin` option per node. Switch nodes using the
 tabs at the top of the web interface.
 

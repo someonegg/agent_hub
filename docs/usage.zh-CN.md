@@ -11,7 +11,7 @@ agent-hub
 打开 <http://127.0.0.1:4173> 或服务器打印的地址，按 `Ctrl-C` 停止服务器。
 安装与运行要求见 [README](../README.zh-CN.md#快速开始)。
 
-默认从 `~/.codex` 读取 Codex 会话、从 `~/.claude` 读取 Claude Code 会话，且仅监听本机。
+默认从 `~/.codex` 读取 Codex 会话、从 `~/.claude` 读取 Claude Code 会话（若存在 `~/.gemini/antigravity-cli`，同时读取 Antigravity CLI 会话），且仅监听本机。
 其他设备访问前，请先配置[远程访问](#从其他设备访问)。
 要通过同一个 Hub 管理多台机器上的会话，参阅[使用多个节点](#使用多个节点)。
 
@@ -163,15 +163,16 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 ### 多个智能体
 
 可配置多个 Codex 或 Claude Code 配置目录，每个目录使用唯一昵称。
-Codex 目录包含 `sessions/`，Claude Code 目录包含 `projects/`：
+Codex 目录包含 `sessions/`，Claude Code 目录包含 `projects/`。若存在 `~/.gemini/antigravity-cli`，会自动添加 Antigravity CLI（`agy`）；也可用 `--agy-agent agy` 显式配置（仅限一个，且只显示由 Agent Hub 创建的会话）：
 
 ```sh
 agent-hub \
   --codex-agent 'work=~/.codex-work' \
-  --claude-agent 'claude=~/.claude'
+  --claude-agent 'claude=~/.claude' \
+  --agy-agent agy
 ```
 
-可重复或混合传入这些选项。显式配置会替换**两个默认智能体**，创建默认使用第一项。
+可重复或混合传入这些选项。显式配置会替换**所有默认智能体**，创建默认使用第一项。
 通过侧边栏智能体筛选器缩小范围。网页创建时，有效的智能体筛选或默认智能体偏好优先于第一项。
 完整规则见 [智能体路由（英文）](technical-reference.md#agent-identity-and-routing)。
 
