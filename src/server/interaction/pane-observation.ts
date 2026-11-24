@@ -39,7 +39,7 @@ export async function observePaneBinding(
     target: null,
   });
   if (!attempt) return result("unbound");
-  if (!attempt.valid) return result(attempt.expired ? "exited" : "invalid");
+  if (!attempt.valid) return result("invalid");
   try {
     const target = await probe(attempt);
     const observation: RuntimeObservation = target

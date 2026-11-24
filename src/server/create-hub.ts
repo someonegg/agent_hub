@@ -1,8 +1,3 @@
-import {
-  ClaudeBindingIndex,
-  claudeSourceKey,
-  defaultClaudeBindingsDirectory,
-} from "./adapters/claude/binding-index.js";
 import { createClaudeSessionSource } from "./adapters/claude/claude-session-source.js";
 import { createClaudeSessionManager } from "./adapters/claude/session-manager.js";
 import { createCodexSessionSource } from "./adapters/codex/codex-session-source.js";
@@ -30,20 +25,16 @@ import type { UploadCleanup } from "./uploads/store.js";
 export async function createAhub({
   agents,
   socket,
-  bindingsDirectory = defaultClaudeBindingsDirectory(),
   interactionEnabled = true,
   uploads,
 }: {
   agents: readonly AgentConfig[];
   socket?: string;
-  bindingsDirectory?: string;
   interactionEnabled?: boolean;
   uploads?: UploadCleanup;
 }) {
   const paneBindings = new PaneBindingManager();
-  const adapters = await Promise.all(
-    agents.map((agent) => createAdapter(agent, bindingsDirectory, socket)),
-  );
+  const adapters = await Promise.all(agents.map((agent) => createAdapter(agent, socket)));
   const sources = adapters.map((adapter) => adapter.source);
   const managers = new SessionManagerRegistry(sources[0]!.descriptor.agent);
   for (const { source, manager } of adapters) managers.register(source.descriptor.agent, manager);
@@ -107,19 +98,13 @@ interface SessionAdapter {
   readonly manager: SessionManager;
 }
 
-async function createAdapter(
-  agent: AgentConfig,
-  bindingsDirectory: string,
-  socket?: string,
-): Promise<SessionAdapter> {
+async function createAdapter(agent: AgentConfig, socket?: string): Promise<SessionAdapter> {
   switch (agent.adapter ?? "codex") {
-    case "claude": {
-      const index = new ClaudeBindingIndex(bindingsDirectory, claudeSourceKey(agent.path));
+    case "claude":
       return {
-        source: await createClaudeSessionSource(agent.path, { agent: agent.nickname, index }),
-        manager: createClaudeSessionManager(agent.path, index, socket, agent.command),
+        source: await createClaudeSessionSource(agent.path, { agent: agent.nickname }),
+        manager: createClaudeSessionManager(agent.path, socket, agent.command),
       };
-    }
     case "codex":
       return {
         source: await createCodexSessionSource(agent.path, { agent: agent.nickname }),

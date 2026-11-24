@@ -71,11 +71,15 @@ Titles prefer the latest nonempty
 `Untitled session`, matching Codex. Explicit titles use the first nonempty trimmed
 line and an 80-character limit; user titles share Markdown heading extraction.
 
-`agent-name` does not supply a task name. Well-formed main-session binding user messages
-(including those with attached `<system-reminder>`, `<system-context>`, `<ide_opened_file>`, or
-`<ide_selection>` text blocks) supply project/task metadata and are omitted from the timeline and
-first-user title fallback; live pane claims additionally require a matching temporary runtime record
-for that source. Assistant replies appear as ordinary messages.
+`agent-name` does not supply a task name. Main-session `ahub-bind` messages are omitted from
+the timeline and first-user title fallback, including when accompanied by `<system-reminder>`,
+`<system-context>`, `<ide_opened_file>`, or `<ide_selection>` text blocks.
+[Valid bindings](technical-reference.md#binding-format-and-ownership) supply pane claims and
+any valid project or task metadata.
+
+The timeline also omits an immediate plain-text `OK` acknowledgment. Thinking-only records
+leave the acknowledgment pending even when they carry `end_turn`. API errors, tool uses, and
+other replies follow ordinary timeline rules.
 
 See the native [stop reasons](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons)
 for assistant phase inputs.

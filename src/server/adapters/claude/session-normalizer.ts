@@ -1,7 +1,7 @@
 import type { TimelineItem, UserInputQuestion } from "../../../shared/domain.js";
 import type { DomainDiagnostic } from "../../domain/session-domain.js";
 import { normalizeSessionTitle, truncateText } from "../../domain/session-text.js";
-import type { DecodedRecord } from "../shared/jsonl-decoder.js";
+import { type DecodedRecord, isObject as object } from "../shared/jsonl-decoder.js";
 import { MAX_MESSAGE_CHARS, MAX_SESSION_DIAGNOSTICS } from "../shared/limits.js";
 import { appendClaudeIdentity, type ClaudeIdentityState } from "./identity.js";
 import { parseClaudeBindingRecord, type ParsedClaudeBindingRecord } from "./interaction.js";
@@ -9,9 +9,12 @@ import { isClaudeContextInjectionBlock } from "./user-content.js";
 import { normalizeQuestionResponse, normalizeQuestions } from "./user-input-normalizer.js";
 
 type ObjectValue = Record<string, unknown>;
-export const object = (value: unknown): value is ObjectValue =>
-  value !== null && typeof value === "object" && !Array.isArray(value);
+export { object };
 const string = (value: unknown): string | null => (typeof value === "string" ? value : null);
+
+export interface ClaudeBindingReplyState {
+  readonly messageId: string | null;
+}
 
 export interface ClaudeState extends ClaudeIdentityState {
   readonly timeline: readonly TimelineItem[];
@@ -19,6 +22,7 @@ export interface ClaudeState extends ClaudeIdentityState {
   readonly questions: ReadonlyMap<string, readonly UserInputQuestion[]>;
   readonly decoderDiagnostics: readonly DomainDiagnostic[];
   readonly normalizerDiagnostics: readonly DomainDiagnostic[];
+  readonly pendingBindingReply: ClaudeBindingReplyState | null;
 }
 
 export type { ClaudeIdentityState } from "./identity.js";
@@ -50,6 +54,7 @@ export function createClaudeState(nativeId: string): ClaudeState {
     createdAt: null,
     updatedAt: null,
     identityConflict: false,
+    pendingBindingReply: null,
   };
 }
 
@@ -100,9 +105,12 @@ export function appendClaudeRecords(
     if (!appendClaudeIdentity(state, row, ordinal, retainDiagnostic)) continue;
     const binding = parseClaudeBindingRecord(record);
     if (binding) {
-      if (binding.parsed.projectDirectory !== undefined)
-        state.project = binding.parsed.projectDirectory;
-      if (binding.parsed.taskName !== undefined) state.taskName = binding.parsed.taskName;
+      const { attempt } = binding;
+      if (attempt.valid) {
+        state.project = attempt.projectDirectory ?? state.project;
+        state.taskName = attempt.taskName ?? state.taskName;
+      }
+      state.pendingBindingReply = { messageId: null };
       onBinding?.(binding);
       continue;
     }
@@ -121,14 +129,23 @@ export function appendClaudeRecords(
     const message = row.message;
     if (!object(message) || message.role !== row.type) continue;
     const role = row.type;
+    let blocks: unknown[] = [];
+    if (typeof message.content === "string") blocks = [{ type: "text", text: message.content }];
+    else if (Array.isArray(message.content)) blocks = message.content;
+    if (role === "user") {
+      if (state.pendingBindingReply !== null && !isPureContextInjectionBlocks(blocks)) {
+        state.pendingBindingReply = null;
+      }
+    } else if (state.pendingBindingReply !== null) {
+      const decision = evaluateBindingReplyRow(row, message, blocks, state.pendingBindingReply);
+      state.pendingBindingReply = decision.action === "continue" ? decision.next : null;
+      if (decision.action !== "release") continue;
+    }
     let phase: "update" | "response" | null = null;
     if (role === "assistant") {
       if (message.stop_reason === "tool_use") phase = "update";
       else if (message.stop_reason === "end_turn") phase = "response";
     }
-    let blocks: unknown[] = [];
-    if (typeof message.content === "string") blocks = [{ type: "text", text: message.content }];
-    else if (Array.isArray(message.content)) blocks = message.content;
     let text: string[] = [];
     const flush = () => {
       const markdown = truncateText(text.join("\n\n"), MAX_MESSAGE_CHARS).text;
@@ -204,4 +221,63 @@ export function appendClaudeRecords(
     normalizerDiagnostics: state.diagnostics,
     diagnostics: [...diagnostics, ...state.diagnostics].slice(0, MAX_SESSION_DIAGNOSTICS),
   };
+}
+
+function isPureContextInjectionBlocks(blocks: readonly unknown[]): boolean {
+  return (
+    blocks.length > 0 &&
+    blocks.every(
+      (block) =>
+        object(block) &&
+        block.type === "text" &&
+        typeof block.text === "string" &&
+        isClaudeContextInjectionBlock(block.text),
+    )
+  );
+}
+
+function evaluateBindingReplyRow(
+  row: ObjectValue,
+  message: ObjectValue,
+  blocks: readonly unknown[],
+  pending: ClaudeBindingReplyState,
+):
+  | { readonly action: "suppress" | "release" }
+  | { readonly action: "continue"; readonly next: ClaudeBindingReplyState } {
+  if (
+    row.isApiErrorMessage === true ||
+    message.model === "<synthetic>" ||
+    message.stop_reason === "tool_use"
+  ) {
+    return { action: "release" };
+  }
+  const rowMessageId = string(message.id);
+  const textParts: string[] = [];
+  for (const block of blocks) {
+    if (!object(block)) return { action: "release" };
+    if (block.type === "text" && typeof block.text === "string") {
+      textParts.push(block.text);
+      continue;
+    }
+    if (block.type === "thinking" || block.type === "redacted_thinking") continue;
+    return { action: "release" };
+  }
+  let text = textParts.join("\n\n").trim();
+  if (!text) {
+    // Thinking rows can carry end_turn before the text row of the same message.
+    const messageId = pending.messageId ?? rowMessageId;
+    return {
+      action: "continue",
+      next: messageId === pending.messageId ? pending : { messageId },
+    };
+  }
+  if (pending.messageId !== null && pending.messageId !== rowMessageId) {
+    return { action: "release" };
+  }
+  const unpunctuated = text.replace(/[.!]$/, "").trim();
+  const quote = unpunctuated.charAt(0);
+  if (unpunctuated.length >= 2 && ['"', "'", "`"].includes(quote) && unpunctuated.endsWith(quote)) {
+    text = unpunctuated.slice(1, -1).trim();
+  }
+  return /^ok[.!]?$/i.test(text) ? { action: "suppress" } : { action: "release" };
 }

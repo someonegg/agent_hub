@@ -198,20 +198,17 @@ and JSON task name or `null` (empty fields retain lines). Codex reads the marker
 from native user-message `<user_shell_command>` output. Invalid required V3 fields
 produce an invalid binding event. An invalid latest binding attempt never falls back.
 
-Claude uses an ordinary user message of the form
-`Ignore this message and reply with only "OK". [ahub-bind:{"id":"<id>","project":"...","task":"..."}]`
-(`project` and `task` are omitted when absent).
-Before submitting the message, Hub generates a random 32-character lowercase hexadecimal ID and
-atomically writes a read-only record at `<bindings-dir>/<id>.json`. The directory uses mode `0700`.
-It defaults to `$XDG_RUNTIME_DIR/agent-hub/bindings` on Linux when the variable is an absolute
-path and to `<tmpdir>/agent-hub-<uid>/bindings` otherwise. The record stores the source identity,
-operation kind, socket, session name, operation ID for create/resume, and native session ID for
-resume.
+Claude records an ordinary main-session user message on one JSONL line.
 
-Well-formed main-session binding messages supply project/task metadata independently of the runtime
-record. A usable record that matches the source and, for resume, the native session ID lets Hub
-recover pane ownership across Hub restarts. Without one, for example after an OS reboot clears
-the directory, Hub treats the pane as exited (`disconnected`, resumable).
+```text
+Ignore this message and reply with only "OK". [ahub-bind:{"socketPath":"/tmp/tmux.sock","sessionName":"ahub-<UUID>","operationId":"<UUID>","projectDirectory":"/project","taskName":"Task"}]
+```
+
+The socket path must be absolute and the session name must match the tmux target format.
+Create and resume include the operation UUID. Handoff sends the same message to the current
+target with `operationId` omitted. Invalid target or operation fields yield an invalid binding
+attempt. Project and task metadata are optional, and invalid values are ignored. Hub rebuilds
+pane claims from the transcript on restart.
 See [Claude JSONL filtering](session-jsonl-filtering.md#claude-code).
 
 A process-wide manager tracks each session’s latest binding attempt and valid claims
@@ -273,8 +270,8 @@ echo, not agent acceptance. Direct service callers opt into this confirmation ex
 `requireIdle: true` rejects non-idle input at transaction entry without waiting
 or retry; browser calls omit this restriction. Interrupt cannot require idle.
 Connection, ownership, and management occupancy checks still apply.
-Handoff sends the adapter binding message to the currently owned target. For Claude,
-the index is written before sending. HTTP `204` confirms delivery without terminal-echo
+Handoff sends the adapter binding message to the currently owned target.
+HTTP `204` confirms delivery without terminal-echo
 confirmation; the recorded JSONL message confirms ownership.
 
 ### Activity observation
@@ -379,7 +376,7 @@ overrides. Unbound sessions require the original process to have exited.
 
 Codex launches `ahub-<operationId>` with the runtime flags below and an initial
 native `! printf ...` binding command; its recorded output supplies the marker and
-project/task association. Claude uses the indexed prompt described below.
+project/task association. See [Claude launch binding](#claude-launch-binding) for Claude's initial prompt.
 Attach becomes available after 30 seconds using the known target or configured
 socket/deterministic session name, and survives timeout. Confirmed no-launch tmux
 errors produce `failed`; launch timeout, malformed success, and post-launch errors
@@ -432,13 +429,12 @@ Implementations: [Codex](../src/server/adapters/codex/session-manager.ts),
 ### Claude launch binding
 
 Claude creates `ahub-<operationId>` with a short placeholder command to keep the tmux server alive
-and obtain its canonical socket path without an empty-server exit race. Hub atomically publishes
-the binding index record for that target, then replaces the pane via `respawn-pane -k` with
-`claude` or `claude --resume <UUID>`, the launch options, and the binding message as one positional
-argument (worktree launches delimit options with `--` to keep the message positional). Index
-publication or confirmed pre-start `respawn-pane` errors kill the placeholder session and stop the
-launch. Binding confirmation requires the matching user message on disk and the usual target,
-project and ownership checks. The model can finish its reply independently.
+while Hub obtains its canonical socket path. Hub replaces the pane via `respawn-pane -k` with
+`claude` or `claude --resume <UUID>`, the launch options, and the binding message as the first
+positional argument. Worktree launches delimit options with `--` to keep the message positional.
+Confirmed pre-start respawn errors kill the placeholder session. The operation executor
+confirms the target, project, and pane ownership from the persisted binding and checks that
+resume claimed the original session. The model can finish its reply independently.
 
 ### Tracking and recovery
 

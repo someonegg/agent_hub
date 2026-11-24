@@ -46,14 +46,14 @@ export class TmuxLauncher {
   async launchWithTarget(
     id: string,
     directory: string,
-    prepare: (target: TmuxBinding) => Promise<readonly string[]>,
+    commandFor: (target: TmuxBinding) => readonly string[],
     environment: Readonly<Record<string, string>> = {},
   ): Promise<TmuxBinding> {
     const sessionName = this.#validateSession(id);
     const target = await this.#createSession(sessionName, directory, ["sleep", "60"]);
     let command: readonly string[];
     try {
-      command = await prepare(target);
+      command = commandFor(target);
     } catch (error) {
       await this.#cleanup(target);
       throw error;

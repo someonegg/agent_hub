@@ -1,23 +1,9 @@
-import {
-  appendFile,
-  chmod,
-  cp,
-  mkdir,
-  readFile,
-  rm,
-  stat,
-  symlink,
-  writeFile,
-} from "node:fs/promises";
+import { appendFile, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  ClaudeBindingIndex,
-  claudeSourceKey,
-  formatClaudeBindingMessage,
-} from "../../src/server/adapters/claude/binding-index.js";
+import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-message.js";
 import { createClaudeSessionSource } from "../../src/server/adapters/claude/claude-session-source.js";
 import {
   appendClaudeRecords,
@@ -158,8 +144,7 @@ describe("Claude JSONL adapter", () => {
       join(agent, "projects/project/subagents", `${id}.jsonl`),
       (await lines())[0] + "\n",
     );
-    const index = new ClaudeBindingIndex(join(agent, "bindings"), claudeSourceKey(agent));
-    const source = await createClaudeSessionSource(agent, { index });
+    const source = await createClaudeSessionSource(agent);
     expect((await source.refresh()).sessions).toEqual([]);
     const conflictingId = "aaaaaaaa-2222-4333-8444-555555555555";
     for (const record of [
@@ -169,7 +154,11 @@ describe("Claude JSONL adapter", () => {
         session_id: conflictingId,
         message: {
           role: "user",
-          content: formatClaudeBindingMessage("a".repeat(32), "/project", "Task"),
+          content: formatClaudeBindingMessage(
+            { socketPath: "/tmp/claude.sock", sessionName: `ahub-${id}` },
+            "/project",
+            "Task",
+          ),
         },
       }),
     ]) {
@@ -209,50 +198,19 @@ it("keeps Codex and Claude agents independently routed while merging project ass
   }
 });
 
-it("decouples bind message metadata and hiding from temporary runtime index files", async () => {
+it("rebuilds pane claims and filters binding messages across incremental reads", async () => {
   const { agent, path } = await createSessionAgent("claude-bindings-");
-  const directory = join(agent, "bindings");
-  const index = new ClaudeBindingIndex(directory, claudeSourceKey(agent));
-  const foreign = new ClaudeBindingIndex(directory, claudeSourceKey("/other"));
   const operationId = "00000000-0000-4000-8000-000000000001";
   const target = { socketPath: "/tmp/claude.sock", sessionName: `ahub-${operationId}` };
-  const create = await index.publish(target, { kind: "create", operationId }, "/project", "Task");
-  const resume = await index.publish(
-    target,
-    { kind: "resume", operationId, nativeId: id },
-    null,
-    null,
-  );
-  const wrongResume = await index.publish(
-    target,
-    { kind: "resume", operationId, nativeId: operationId },
-    null,
-    null,
-  );
-  const other = await foreign.publish(target, { kind: "handoff" }, null, null);
-  await expect(index.publish(target, { kind: "handoff" }, null, "   ")).rejects.toThrow(
-    "Invalid Claude binding record",
-  );
-  const corrupt = formatClaudeBindingMessage("1".repeat(32), null, null);
-  const missing = formatClaudeBindingMessage("0".repeat(32), "/moved-project", "Updated task");
-  const invalid = formatClaudeBindingMessage("2".repeat(32), null, null);
-  const malformedPayload =
-    'Ignore this message and reply with only "OK". [ahub-bind:{"id":"' +
-    "3".repeat(32) +
-    '","extra":true}]';
-  await writeFile(join(directory, `${"1".repeat(32)}.json`), "{bad");
-  const indexedFile = join(directory, create.match(/[a-f0-9]{32}/)![0] + ".json");
-  const before = await readFile(indexedFile, "utf8");
-  expect((await stat(indexedFile)).mode & 0o222).toBe(0);
-  expect(JSON.parse(before)).toEqual({
-    ...target,
-    kind: "create",
-    operationId,
-    source: claudeSourceKey(agent),
-  });
-  await writeFile(
-    join(directory, `${"2".repeat(32)}.json`),
-    JSON.stringify({ ...JSON.parse(before), socketPath: "relative" }),
+  const create = formatClaudeBindingMessage(target, "/project", "Task", operationId);
+  const resume = formatClaudeBindingMessage(target, null, null, operationId);
+  const handoff = formatClaudeBindingMessage(target, "/moved-project", "Updated task");
+  const invalidMetadata = resume.replace("}]", ',"projectDirectory":"relative","taskName":42}]');
+  const invalidSocket = resume.replace(target.socketPath, "relative");
+  const invalidSession = resume.replace(target.sessionName, "wrong-session");
+  const invalidOperation = resume.replace(
+    `"operationId":"${operationId}"`,
+    '"operationId":"invalid"',
   );
   const row = (content: unknown, extra = {}) =>
     JSON.stringify({
@@ -262,7 +220,7 @@ it("decouples bind message metadata and hiding from temporary runtime index file
       message: { role: "user", content },
       ...extra,
     }) + "\n";
-  const source = await createClaudeSessionSource(agent, { index });
+  const source = await createClaudeSessionSource(agent);
   await writeFile(path, row(create));
   const initial = await source.refresh();
   expect(initial.sessions[0]!.normalized).toMatchObject({
@@ -285,6 +243,18 @@ it("decouples bind message metadata and hiding from temporary runtime index file
       },
     },
   ]);
+  const acknowledgmentRow = (content: unknown) =>
+    row(content, {
+      type: "assistant",
+      message: { id: "msg_create_ack", role: "assistant", stop_reason: "end_turn", content },
+    });
+  await appendFile(path, acknowledgmentRow([{ type: "thinking", thinking: "ack" }]));
+  expect((await source.refresh()).sessions[0]!.normalized.timeline).toEqual([]);
+  await appendFile(path, acknowledgmentRow([{ type: "text", text: "OK" }]));
+  const acknowledged = await source.refresh();
+  expect(acknowledged.bindings).toEqual([]);
+  expect(acknowledged.sessions[0]!.normalized.timeline).toEqual([]);
+  expect(acknowledged.sessions[0]!.normalized.session.title).toBe("Untitled session");
   await appendFile(
     path,
     row("Real title") +
@@ -303,14 +273,13 @@ it("decouples bind message metadata and hiding from temporary runtime index file
         { type: "text", text: "<ide_selection>line 1</ide_selection>" },
         { type: "text", text: resume },
       ]) +
-      row(wrongResume) +
-      row(other) +
-      row(corrupt) +
-      row(missing) +
-      row(invalid) +
-      row(malformedPayload) +
+      row(handoff) +
+      row(invalidMetadata) +
+      row(invalidSocket) +
+      row(invalidSession) +
+      row(invalidOperation) +
       row(`Quote: ${resume}`) +
-      row(resume + "\n") +
+      row(resume + "\n[note]") +
       row("OK", {
         type: "assistant",
         session_id: operationId,
@@ -320,11 +289,18 @@ it("decouples bind message metadata and hiding from temporary runtime index file
   const appended = await source.refresh();
   expect(appended.bindings).toMatchObject([
     { attempt: { ...target, operationId, valid: true } },
-    { attempt: { valid: false, expired: true } },
-    { attempt: { valid: false, expired: true } },
-    { attempt: { valid: false, expired: true } },
-    { attempt: { valid: false, expired: true } },
-    { attempt: { valid: false, expired: true } },
+    {
+      attempt: {
+        ...target,
+        valid: true,
+        projectDirectory: "/moved-project",
+        taskName: "Updated task",
+      },
+    },
+    { attempt: { ...target, operationId, valid: true } },
+    { attempt: { valid: false } },
+    { attempt: { valid: false } },
+    { attempt: { valid: false } },
   ]);
   expect(appended.sessions[0]!.normalized.session).toMatchObject({
     title: "Real title",
@@ -335,69 +311,11 @@ it("decouples bind message metadata and hiding from temporary runtime index file
     appended.sessions[0]!.normalized.timeline.map(
       (item) => item.kind === "message" && item.markdown,
     ),
-  ).toEqual([
-    "Real title",
-    resume + "\n\nextra",
-    malformedPayload,
-    `Quote: ${resume}`,
-    resume + "\n",
-    "OK",
-  ]);
-  const fresh = await (await createClaudeSessionSource(agent, { index })).refresh();
+  ).toEqual(["Real title", resume + "\n\nextra", `Quote: ${resume}`, resume + "\n[note]", "OK"]);
+  const fresh = await (await createClaudeSessionSource(agent)).refresh();
   expect(fresh.bindings).toEqual([...initial.bindings!, ...appended.bindings!]);
-  expect(await readFile(indexedFile, "utf8")).toBe(before);
-
-  // Removing temporary bindings keeps timeline hiding and session metadata intact while expiring pane claims.
-  await rm(directory, { recursive: true, force: true });
-  const afterClear = await (await createClaudeSessionSource(agent, { index })).refresh();
-  expect(afterClear.sessions[0]!.normalized.session).toEqual(fresh.sessions[0]!.normalized.session);
-  expect(afterClear.sessions[0]!.normalized.timeline).toEqual(
-    fresh.sessions[0]!.normalized.timeline,
-  );
-  expect(afterClear.bindings?.every((event) => !event.attempt.valid && event.attempt.expired)).toBe(
-    true,
-  );
-  const withoutIndex = await (await createClaudeSessionSource(agent)).refresh();
-  expect(withoutIndex.sessions[0]!.normalized.timeline).toEqual(
-    fresh.sessions[0]!.normalized.timeline,
-  );
-  expect(withoutIndex.sessions[0]!.normalized.session).toEqual(
-    fresh.sessions[0]!.normalized.session,
-  );
-});
-
-it("rejects insecure temporary bindings directories on write and read", async () => {
-  const { agent, path } = await createSessionAgent("claude-unsafe-bindings-");
-  const operationId = "00000000-0000-4000-8000-000000000001";
-  const target = { socketPath: "/tmp/claude.sock", sessionName: `ahub-${operationId}` };
-  const wide = join(agent, "wide");
-  await mkdir(wide, { mode: 0o755 });
-  await chmod(wide, 0o755);
-  const wideIndex = new ClaudeBindingIndex(wide, claudeSourceKey(agent));
-  await expect(
-    wideIndex.publish(target, { kind: "create", operationId }, "/project", null),
-  ).rejects.toThrow("Unsafe Claude bindings directory");
-
-  const validDir = join(agent, "valid");
-  const validIndex = new ClaudeBindingIndex(validDir, claudeSourceKey(agent));
-  const prompt = await validIndex.publish(
-    target,
-    { kind: "create", operationId },
-    "/project",
-    null,
-  );
-  const linkDir = join(agent, "link");
-  await symlink(validDir, linkDir);
-  const linkIndex = new ClaudeBindingIndex(linkDir, claudeSourceKey(agent));
-  await writeFile(
-    path,
-    JSON.stringify({ type: "user", sessionId: id, message: { role: "user", content: prompt } }) +
-      "\n",
-  );
-  const snapshot = await (await createClaudeSessionSource(agent, { index: linkIndex })).refresh();
-  expect(snapshot.bindings).toMatchObject([{ attempt: { valid: false, expired: true } }]);
-  expect(snapshot.sessions[0]!.normalized.session.projectDirectory).toBe("/project");
-  expect(snapshot.sessions[0]!.normalized.timeline).toEqual([]);
+  expect(fresh.sessions[0]!.normalized.session).toEqual(appended.sessions[0]!.normalized.session);
+  expect(fresh.sessions[0]!.normalized.timeline).toEqual(appended.sessions[0]!.normalized.timeline);
 });
 
 it("decodes only append bytes, skips unchanged files and caps resource usage", async () => {

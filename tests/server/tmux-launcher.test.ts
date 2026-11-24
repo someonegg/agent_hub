@@ -189,7 +189,7 @@ it.each([undefined, "/configured/socket path"])(
   "creates a placeholder session before building and respawning a deferred command (%s)",
   async (socket) => {
     const tmux = new TmuxLauncher(socket);
-    const prepare = vi.fn(async (target) => {
+    const prepare = vi.fn((target) => {
       expect(target).toEqual({
         socketPath: "/actual/tmux.sock",
         sessionName: "ahub-00000000-0000-0000-0000-000000000007",
@@ -249,10 +249,10 @@ it.each([undefined, "/configured/socket path"])(
 it("cleans up the placeholder session when deferred preparation or respawn fails", async () => {
   const tmux = new TmuxLauncher();
   await expect(
-    tmux.launchWithTarget("00000000-0000-0000-0000-000000000007", "/project", async () => {
-      throw new Error("publish failed");
+    tmux.launchWithTarget("00000000-0000-0000-0000-000000000007", "/project", () => {
+      throw new Error("command failed");
     }),
-  ).rejects.toThrow("publish failed");
+  ).rejects.toThrow("command failed");
   expect(execute).toHaveBeenCalledTimes(2);
   expect(execute.mock.calls[1]![1]).toEqual([
     "-S",
@@ -268,14 +268,9 @@ it("cleans up the placeholder session when deferred preparation or respawn fails
     .mockImplementationOnce(fails(new Error("Command failed: tmux -e SECRET=value")))
     .mockImplementationOnce(succeeds(""));
   await expect(
-    tmux.launchWithTarget(
-      "00000000-0000-0000-0000-000000000007",
-      "/project",
-      async () => ["claude"],
-      {
-        SECRET: "value",
-      },
-    ),
+    tmux.launchWithTarget("00000000-0000-0000-0000-000000000007", "/project", () => ["claude"], {
+      SECRET: "value",
+    }),
   ).rejects.toMatchObject({
     outcome: "not_started",
     message: "tmux respawn-pane failed",
@@ -294,9 +289,7 @@ it("cleans up the placeholder session when deferred preparation or respawn fails
     .mockImplementationOnce(succeeds("/actual/tmux.sock"))
     .mockImplementationOnce(fails(Object.assign(new Error("timeout"), { killed: true })));
   await expect(
-    tmux.launchWithTarget("00000000-0000-0000-0000-000000000007", "/project", async () => [
-      "claude",
-    ]),
+    tmux.launchWithTarget("00000000-0000-0000-0000-000000000007", "/project", () => ["claude"]),
   ).rejects.toMatchObject({
     outcome: "unknown",
     message: "tmux respawn-pane failed",

@@ -42,7 +42,7 @@ function setup() {
     warningCount: 0,
     diagnostics: [],
   };
-  const bind = (id = "session", time = 1, state: "valid" | "invalid" | "expired" = "valid") =>
+  const bind = (id = "session", time = 1, state: "valid" | "invalid" = "valid") =>
     bindings.submit({
       sessionId: id,
       time,
@@ -51,9 +51,7 @@ function setup() {
       attempt:
         state === "valid"
           ? { valid: true, ordinal: time, ...pane }
-          : state === "expired"
-            ? { valid: false, expired: true, ordinal: time }
-            : { valid: false, ordinal: time },
+          : { valid: false, ordinal: time },
     });
   const evaluate = (value = session) => runtime.evaluate(value);
   return {
@@ -79,8 +77,6 @@ describe("session runtime evidence", () => {
     expect(await f.evaluate()).toMatchObject({ status: "normal", resume: { allowed: true } });
     f.resolveTarget.mockResolvedValue(pane);
     f.bind("replacement", 2);
-    expect(await f.evaluate()).toMatchObject({ status: "normal", resume: { allowed: true } });
-    f.bind("session", 3, "expired");
     expect(await f.evaluate()).toMatchObject({ status: "normal", resume: { allowed: true } });
     f.bind("session", 4, "invalid");
     expect(await f.evaluate()).toMatchObject({ status: "normal", resume: { allowed: false } });

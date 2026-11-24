@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { expect, it, vi } from "vitest";
 
-import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-index.js";
+import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-message.js";
 import { createAhub } from "../../src/server/create-hub.js";
 import { createApiRouter } from "../../src/server/http/api-router.js";
 import { TmuxInteractionService } from "../../src/server/interaction/tmux-service.js";
@@ -18,24 +18,13 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
   const directory = join(root, "project");
   const agent = join(root, "agent");
   const socket = join(root, `tmux-${process.getuid!()}`, "default");
-  const bindingsDirectory = join(root, "bindings");
-  const records = async () => {
-    const files = (await readdir(bindingsDirectory)).sort();
-    return Object.fromEntries(
-      await Promise.all(
-        files.map(
-          async (file) => [file, await readFile(join(bindingsDirectory, file), "utf8")] as const,
-        ),
-      ),
-    );
-  };
   const initialResolvers: (() => void)[] = [];
   const releaseInitial = () => {
     for (const resolve of initialResolvers.splice(0)) resolve();
   };
   let cleanupHub: { close(): void } | undefined;
   let cleanupApi: ReturnType<typeof createServer> | undefined;
-  let cleanupSendKeys: { mockRestore(): void } | undefined;
+  const spies: { mockRestore(): void }[] = [];
   try {
     vi.stubEnv("TMUX", undefined);
     vi.stubEnv("TMUX_TMPDIR", root);
@@ -162,13 +151,13 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
     );
     const options = {
       agents: [{ nickname: "claude", path: agent, adapter: "claude" as const }],
-      bindingsDirectory,
     };
     const hub = await createAhub(options);
     cleanupHub = hub;
     let activeHub = hub;
     const sendKeys = vi.spyOn(TmuxInteractionService.prototype, "sendKeys");
-    cleanupSendKeys = sendKeys;
+    const sendMessage = vi.spyOn(TmuxInteractionService.prototype, "sendMessage");
+    spies.push(sendKeys, sendMessage);
     const initialKill = vi.spyOn(hub.interaction, "killTarget");
     const { base } = await startHttpServer(createApiRouter(hub), () => hub.close());
     const until = async (predicate: () => Promise<boolean>, description: string) => {
@@ -201,11 +190,8 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
       }).operationId,
     );
     expect(sendKeys).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
     const sessionId = created.sessionId!;
-    const initialRecords = await records();
-    expect(Object.keys(initialRecords)).toHaveLength(1);
-    const initialFile = Object.keys(initialRecords)[0]!;
-    const initialId = initialFile.slice(0, -5);
     const projects = join(agent, "projects");
     const rawJsonl = async () => {
       const directories = await readdir(projects, { withFileTypes: true });
@@ -224,7 +210,14 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
       return (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
     };
     expect(await rawJsonl()).toContain(
-      JSON.stringify(formatClaudeBindingMessage(initialId, directory, null)),
+      JSON.stringify(
+        formatClaudeBindingMessage(
+          { socketPath: socket, sessionName: `ahub-${created.operationId}` },
+          directory,
+          null,
+          created.operationId,
+        ),
+      ),
     );
     expect(await hub.sessions.messages(sessionId, {})).toMatchObject({ items: [] });
     await until(async () => initialResolvers.length > 0, "initial model request");
@@ -237,7 +230,6 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
         ),
       "initial response after binding",
     );
-    expect(await records()).toEqual(initialRecords);
     const nativeId = (await hub.sessions.managementSnapshot()).byId.get(sessionId)!.sourceId;
     expect(nativeId).toMatch(/^[a-f0-9-]+$/);
     expect((await hub.sessions.list()).agents).toEqual([
@@ -293,15 +285,14 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
       state: "disconnected",
     });
     sendKeys.mockClear();
+    sendMessage.mockClear();
     const resumed = await succeeded(
       hub.operations.create({ resumeSessionId: sessionId, requestId: "claude-native-resume" })
         .operationId,
     );
     expect(resumed.sessionId).toBe(sessionId);
     expect(sendKeys).not.toHaveBeenCalled();
-    const resumeRecords = await records();
-    expect(Object.keys(resumeRecords)).toHaveLength(2);
-    expect(resumeRecords).toMatchObject(initialRecords);
+    expect(sendMessage).not.toHaveBeenCalled();
     const resumeTarget = await hub.interaction.resolveTarget(sessionId);
     expect(resumeTarget).toMatchObject({
       socketPath: socket,
@@ -309,8 +300,12 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
     });
     expect((await hub.sessions.managementSnapshot()).byId.get(sessionId)?.sourceId).toBe(nativeId);
     const transport = new TmuxInteractionService();
-    const resumeFile = Object.keys(resumeRecords).find((file) => !(file in initialRecords))!;
-    const resumeMarker = `"id":"${resumeFile.slice(0, -5)}"`;
+    expect(await rawJsonl()).toContain(
+      JSON.stringify(
+        formatClaudeBindingMessage(resumeTarget!, directory, null, resumed.operationId),
+      ),
+    );
+    const resumeMarker = "ahub-bind:";
     const capture = async () => (await transport.captureTerminal(resumeTarget!)).content;
     await until(async () => (await capture()).includes(resumeMarker), "resume prompt in pane");
     await hub.interaction.sendMessage(sessionId, "/clear");
@@ -318,27 +313,20 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
       async () => !(await capture()).includes(resumeMarker),
       "cleared Claude conversation",
     );
+    sendMessage.mockClear();
     const handoff = await fetch(`${base}/api/v1/sessions/${sessionId}/handoff-pane-binding`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: "{}",
     });
     expect(handoff.status).toBe(204);
-    const handoffRecords = await records();
-    expect(Object.keys(handoffRecords)).toHaveLength(3);
-    const handoffFile = Object.keys(handoffRecords).find((file) => !(file in resumeRecords))!;
-    expect(JSON.parse(handoffRecords[handoffFile]!)).toMatchObject({
-      ...resumeTarget,
-      kind: "handoff",
-    });
+    const handoffMessage = formatClaudeBindingMessage(resumeTarget!, directory, null);
+    expect(sendMessage).toHaveBeenCalledOnce();
+    expect(sendMessage).toHaveBeenCalledWith(resumeTarget, handoffMessage, expect.any(Function));
     await until(
-      async () =>
-        (await rawJsonl()).includes(
-          JSON.stringify(formatClaudeBindingMessage(handoffFile.slice(0, -5), directory, null)),
-        ),
+      async () => (await rawJsonl()).includes(JSON.stringify(handoffMessage)),
       "handoff JSONL",
     );
-    expect(await records()).toEqual(handoffRecords);
     expect(sendKeys).not.toHaveBeenCalled();
     await until(async () => {
       await hub.sessions.refresh();
@@ -400,7 +388,7 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
   } finally {
     cleanupHub?.close();
     releaseInitial();
-    cleanupSendKeys?.mockRestore();
+    for (const spy of spies) spy.mockRestore();
     vi.unstubAllEnvs();
     try {
       execFileSync("tmux", ["-S", socket, "kill-server"], { stdio: "ignore" });
