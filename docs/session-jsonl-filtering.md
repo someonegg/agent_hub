@@ -62,23 +62,19 @@ Identity checks prefer the transcript’s `sessionId` and fall back to `session_
 when it is absent. Claude can retain the earlier `session_id` after `/clear` in a
 resumed pane.
 
-Project association uses binding metadata recorded in the transcript, otherwise the first
-valid cwd; execution uses the latest valid cwd. See the
-[binding protocol](technical-reference.md#binding-format-and-ownership).
+Project association falls back to the first valid `cwd` when no binding supplies
+one; execution uses the latest valid `cwd` (see the
+[binding protocol](technical-reference.md#binding-format-and-ownership)).
 
-Titles prefer the latest nonempty
-`custom-title`, then `ai-title`, then first ordinary user text; otherwise the title is
-`Untitled session`, matching Codex. Explicit titles use the first nonempty trimmed
-line and an 80-character limit; user titles share Markdown heading extraction.
+Titles prefer the latest nonempty `custom-title`, then `ai-title`, then first
+ordinary user text; otherwise the title is `Untitled session`, matching Codex.
+Explicit titles use the first nonempty trimmed line (up to 80 characters); user
+titles share Markdown heading extraction.
 
-`agent-name` does not supply a task name. Main-session `ahub-bind` messages are omitted from
-the timeline and first-user title fallback, including when accompanied by `<system-reminder>`,
-`<system-context>`, `<ide_opened_file>`, or `<ide_selection>` text blocks.
-[Valid bindings](technical-reference.md#binding-format-and-ownership) supply pane claims and
-any valid project or task metadata.
-
-The timeline also omits an immediate plain-text `OK` acknowledgment. Thinking-only records
-leave the acknowledgment pending even when they carry `end_turn`. API errors, tool uses, and
+Main-session `ahub-bind` prompts (even with context-injection blocks) are
+omitted from the timeline and first-user title fallback, along with any
+immediate plain-text `OK` acknowledgment (including across preceding
+thinking-only rows even when they carry `end_turn`). API errors, tool uses, and
 other replies follow ordinary timeline rules.
 
 See the native [stop reasons](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons)

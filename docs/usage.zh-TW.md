@@ -28,18 +28,18 @@ agent-hub
 選擇 [智慧體](#多個智慧體) 和可選的啟動設定：
 
 - **Worktree：**在獨立 Git worktree 中啟動，隔離程式碼變更。
-- **權限模式：**預設沿用原生設定；Auto 使用原生自動審批；YOLO 略過核准提示，Codex 也會停用其沙盒。
+- **權限模式：**預設沿用原生設定；Auto 使用原生自動核准；YOLO 略過核准提示，Codex 也會停用其沙盒。
 
-關閉建立對話框或切換節點後，請先重新整理工作階段列表再重試。伺服器仍可能完成建立。
+關閉建立對話方塊或切換節點後，請先重新整理工作階段列表再重試。伺服器仍可能完成建立。
 
 開啟已退出的工作階段，在可用時點選**恢復**繼續。恢復保留原智慧體和專案歸屬，使用可用的原工作目錄或專案目錄。
 恢復從其他位置啟動的工作階段前，請確認原處理程序已經退出。
 
 透過工作階段的 **…** 選單執行：
 
-- **退出：**停止已連線終端，保留歷史。
-- **封存（僅 Codex）：**停止執行，將工作階段移到封存列表。
-- **刪除：**確認後永久刪除工作階段歷史。
+- **退出工作階段：**停止已連線終端，保留歷史。
+- **封存工作階段（僅 Codex）：**停止執行，將工作階段移到封存列表。
+- **刪除工作階段：**確認後永久刪除工作階段歷史。
 
 建立與恢復使用 tmux。啟動若被登入或權限確認阻擋，透過 **工作階段資訊 → 連線 tmux** 或顯示的連線命令在終端完成操作。
 不要重新命名 Hub 的 tmux 工作階段或修改其視窗、窗格結構。詳見 [tmux 要求（英文）](technical-reference.md#tmux-interaction)。
@@ -47,9 +47,9 @@ agent-hub
 ## 傳送提示與檔案
 
 綠色**執行中**標記表示終端已連線。透過輸入框傳送提示，預設 **Shift+Enter** 傳送、**Enter** 換行；
-在[設定](#瀏覽器設定)中開啟 **Enter 傳送**可反轉。
+在[設定](#瀏覽器設定)中開啟**按 Enter 傳送**可反轉。
 
-展開**終端預覽**檢視 CLI，點選**中斷**可中斷目前操作。
+展開**終端**檢視 CLI，點選**中斷**可中斷目前操作。
 **工作中**和**閒置**反映終端輸出，不表示任務是否完成。
 
 已傳送提示先顯示為**等待中**，隨後隨工作階段訊息更新；純 slash command 不顯示此預覽。
@@ -60,22 +60,18 @@ agent-hub
 
 ### 檔案上傳
 
-使用附件按鈕**拍照**、**選擇圖片**或**選擇檔案**，也可貼上圖片或拖放檔案。
-傳送前可預覽或移除附件，支援單獨傳送附件和多個檔案，不支援資料夾。**每個檔案最大 20 MiB**。
+使用附件按鈕（**拍照**、**選擇圖片**、**選擇檔案**），或直接貼上圖片、拖放檔案（支援多檔案，不支援資料夾，單一檔案最大 **20 MiB**）。
+傳送前可預覽或移除附件，可單獨傳送或搭配文字傳送。
 
-圖片保留原始內容，包括 EXIF 中繼資料。相機行為取決於瀏覽器；HEIC/HEIF 支援取決於執行引擎。
+開啟**工作階段資訊 → 上傳記錄**可預覽、下載或刪除已上傳檔案（包括未傳送的上傳）。
 
-開啟**工作階段資訊 → 上傳記錄**，預覽、下載或刪除檔案，包括未傳送的上傳檔案。
-從草稿移除附件不會刪除已上傳檔案；從上傳記錄刪除檔案也會將其從草稿移除。
-
-傳送附件時，Hub 會將檔案在伺服器上的絕對路徑加入提示，由智慧體讀取。
-檔案儲存在 [Hub 資料目錄](#設定伺服器)的 `uploads/` 下，智慧體必須能存取此目錄。
-刪除工作階段觸發背景清理，封存與退出保留檔案。儲存和清理細節見[上傳參考（英文）](technical-reference.md#file-uploads)，
-也可[檢視上傳記錄截圖](images/zh-TW/ahub-uploads.png)。
+傳送附件時，Hub 會將檔案在 [Hub 資料目錄](#設定伺服器) `uploads/` 下的絕對路徑加入提示，智慧體必須能存取此目錄。
+刪除工作階段會觸發背景清理，封存與退出保留檔案。詳見[上傳參考（英文）](technical-reference.md#file-uploads)，
+或[檢視上傳記錄截圖](images/zh-TW/ahub-uploads.png)。
 
 ## 瀏覽器設定
 
-在側邊欄底部開啟**設定**，選擇語言、主題、新工作階段預設智慧體，以及 Worktree、權限模式預設值。
+在側邊欄底部開啟**設定**，選擇語言、主題、新工作階段預設智慧體、Worktree 與權限模式預設值，以及**按 Enter 傳送**。
 修改自動儲存在目前瀏覽器。權限模式預設值也用於恢復工作階段，啟動對話方塊可覆寫預設值。
 
 介面初始為英文，切換語言立即生效，不翻譯工作階段或終端原文。
@@ -98,32 +94,21 @@ ahub-cli session inspect <id>
 ahub-cli session inspect <id> --follow
 ```
 
-使用 `list` 或 `create` 傳回的 Hub ID。
-`list` 傳回完整列表而不分頁，預設不含封存工作階段；傳入 `--all` 可包含封存工作階段。
-對於 `inspect`，將傳回的 `Next after` 值傳給
-`ahub-cli session inspect <id> --after <value>` 讀取下一頁訊息。
-`--follow` 持續觀察直到按 `Ctrl+C` 停止，不會因任務完成自動結束。
+傳入 `list` 或 `create` 傳回的 Hub ID。`list` 預設不含封存工作階段（加 `--all` 可包含）；
+`inspect` 透過 `--after <next-after>` 翻頁，`--follow` 持續觀察直到 `Ctrl+C`（不會因任務完成自動結束）。
 
-建立預設使用專案目錄和第一個已設定智慧體。用 `--cwd` 修改工作目錄而保留專案歸屬，
-用 `--agent <nickname>` 選擇智慧體，或用 `--worktree` 在獨立 worktree 中啟動。
-`resume <id>` 保留原智慧體。
+`create` 支援 `--agent`、`--cwd`（保留專案歸屬）、`--worktree`、`--task` 與 `--permission-mode <default|auto|yolo>`（或 `--yolo`）；
+`resume` 保留原智慧體並支援權限模式選項。輸入命令（`send`、`keys`）預設要求終端已連線且閒置，
+加 `--force` 可略過閒置檢查（同時允許 `send` 傳送 `/` 開頭的訊息）。
+其他操作包括 `terminal`、`interrupt`、`handoff`、`exit`、`archive`、`delete`；完整選項見 `ahub-cli session --help`。
 
-兩者均支援 `--permission-mode <default|auto|yolo>`。
-`--yolo` 是 `--permission-mode yolo` 的簡寫，兩者不能同時使用。
-
-用 `create --task <name>` 和 `list --task <name>` 跨專案分組工作階段。
-
-輸入預設要求終端已連線且閒置。用 `send <id> --stdin` 接收管線輸入，`terminal <id>` 檢視終端，
-`interrupt <id>` 中斷執行。`send` 或 `keys` 的 `--force` 允許在工作中傳送輸入，
-也允許 `send` 傳送以 `/` 開頭的訊息。終端切換工作階段後，用 `handoff <id>` 移交繫結。
-
-預設連線至 `http://127.0.0.1:4173`。用 `AGENT_HUB_URL` 或 `--url` 修改位址，
-用 `--timeout <seconds>` 調整逾時。使用私有 CA 時，啟動 CLI 前設定
-`NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem`。
+預設連線至 `http://127.0.0.1:4173`。用 `AGENT_HUB_URL` 或 `--url` 修改位址；
+在[多節點](#使用多個節點)情境下，應直接指向目標節點位址，而非多節點 Hub。
+用 `--timeout <seconds>` 調整逾時；使用私有 CA 時請設定 `NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem`。
 
 傳送成功不表示任務完成。逾時或結束代碼為 `2`（寫入結果不明）時，先用 `list`、`inspect` 或 `terminal` 核查再重試。
-停止用戶端不會取消已提交操作。生命週期命令（包括刪除）不會在 CLI 中再次要求確認。
-全部命令見 `ahub-cli session --help`，結果與逾時契約見 [CLI 參考（英文）](technical-reference.md#session-cli)。
+停止用戶端不會取消已提交操作，且生命週期命令（包括 `delete`）不要求二次確認。
+結果與逾時契約見 [CLI 參考（英文）](technical-reference.md#session-cli)。
 
 ## 發布網頁與差異
 
@@ -140,27 +125,22 @@ ahub-cli session inspect <id> --follow
 ahub-cli page publish ./demo --project /path/to/project --name demo --title "Design comparison"
 ```
 
-兩個目錄都必須存在。資源使用相對路徑；Hub 不建置網站，也不接受遠端上傳發布套件。
-託管網頁與 Hub 同源，以可信程式碼執行，因此只應發布可信內容。
+資源請使用相對路徑。託管網頁與 Hub 同源、以可信程式碼執行，只應發布可信內容。
+以相同專案和名稱再次發布即可原地更新並保留 URL（`--name` 預設取來源目錄名；worktree 請將原專案傳給 `--project`）。
 
-以相同專案和名稱再次發布即可更新並保留 URL。省略 `--name` 時使用來源目錄名。
-worktree 請將原專案傳給 `--project`。
-
-開啟**網頁**（`/artifacts`）瀏覽、複製連結或刪除網頁及其快照。
-CLI 也支援 `page list` 和 `page delete <id>`。移除來源目錄或 worktree 不會刪除已發布網頁。
+在**網頁**（`/artifacts`）瀏覽、複製連結或刪除網頁，也可使用 `ahub-cli page list` / `page delete <id>`。
 詳見[託管參考（英文）](technical-reference.md#optional-hosting)。
 
 ### 分享差異
 
-產生所需比較後發布：
+產生差異檔後發布：
 
 ```sh
 git diff HEAD > /tmp/review.diff
 ahub-cli diff publish /tmp/review.diff --title "Review changes"
 ```
 
-開啟傳回的 `/diffs/<uuid>` 位址。發布內容不會過期，用 `ahub-cli diff list` 尋找，
-審閱結束後用 `ahub-cli diff delete <uuid>` 刪除；原始檔保持不變。
+開啟傳回的 `/diffs/<uuid>` 位址。差異不會過期，透過 `ahub-cli diff list` 和 `ahub-cli diff delete <uuid>` 管理。
 參閱[差異參考（英文）](technical-reference.md#temporary-diffs)及
 [桌面](images/zh-TW/ahub-diff.png) / [手機](images/zh-TW/ahub-diff-mobile.png)預覽。
 
@@ -179,8 +159,6 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 | `--home-dir <path>`    | `~/.agent-hub` | Hub 資料目錄，包含 `uploads/` 和 `hosting/` |
 | `--hosting`            | 關閉           | 提供已發布網頁與差異存取                    |
 | `--tmux-socket <path>` | tmux 預設值    | 使用自訂 tmux socket                        |
-
-Agent Hub 預設使用 `~/.agent-hub`，不會自動遷移舊資料。
 
 ### 多個智慧體
 
@@ -215,7 +193,7 @@ agent-hub \
   --ssl-ca /path/to/client-ca.pem
 ```
 
-每臺裝置需安裝用戶端憑證及私鑰，並信任伺服器憑證。不指定 `--ssl-ca` 時，HTTPS 僅加密流量，不認證用戶端。
+每台裝置需安裝用戶端憑證及私鑰，並信任伺服器憑證。不指定 `--ssl-ca` 時，HTTPS 僅加密流量，不認證用戶端。
 更換憑證或私鑰後需重新啟動。
 
 如需本機 CLI 無用戶端憑證存取，啟動伺服器時另加 `--local-port 4174`，然後執行：
@@ -229,7 +207,7 @@ ahub-cli session list --url http://127.0.0.1:4174
 ## 使用多個節點
 
 在各台機器上安裝同一版本，以 `agent-hub --node-only` 啟動各節點。
-代管發佈內容的節點需加上 `--hosting`。
+託管發布內容的節點需加上 `--hosting`。
 
 以下內網範例中，兩個節點分別監聽各自的內網位址。
 
@@ -248,7 +226,8 @@ agent-hub --node Mac=http://192.168.1.10:4174 --node Linux=http://192.168.1.11:4
 ```
 
 按顯示順序為每個節點加入一個 `--node id=origin`。Hub 預設開啟第一個節點，使用頂部標籤切換節點。
-在目前選取的節點上執行複製的 tmux 指令。
+在目前選取的節點上執行複製的 tmux 命令。執行 `ahub-cli session`、`project` 或 `agent` 命令時，
+請透過 `--url` 或 `AGENT_HUB_URL` 直接連線目標節點位址，而非多節點 Hub。
 
 請將範例 IP 換成 Hub 可存取的位址。
 如需使用 HTTPS，請參閱[節點 TLS 設定（英文）](technical-reference.md#tls)。

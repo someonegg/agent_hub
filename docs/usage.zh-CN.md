@@ -37,9 +37,9 @@ agent-hub
 
 通过会话的 **…** 菜单执行：
 
-- **退出：**停止已连接终端，保留历史。
-- **归档（仅 Codex）：**停止运行，将会话移到归档列表。
-- **删除：**确认后永久删除会话历史。
+- **退出会话：**停止已连接终端，保留历史。
+- **归档会话（仅 Codex）：**停止运行，将会话移到归档列表。
+- **删除会话：**确认后永久删除会话历史。
 
 创建与恢复使用 tmux。启动若被登录或权限确认阻塞，通过 **会话信息 → 连接 tmux** 或显示的连接命令在终端完成操作。
 不要重命名 Hub 的 tmux 会话或修改其窗口、窗格结构。详见 [tmux 要求（英文）](technical-reference.md#tmux-interaction)。
@@ -47,9 +47,9 @@ agent-hub
 ## 发送提示与文件
 
 绿色**运行中**标记表示终端已连接。通过输入框发送提示，默认 **Shift+Enter** 发送、**Enter** 换行；
-在[设置](#浏览器设置)中开启 **Enter 发送**可反转。
+在[设置](#浏览器设置)中开启**按 Enter 发送**可反转。
 
-展开**终端预览**查看 CLI，点击**中断**可中断当前操作。
+展开**终端**查看 CLI，点击**中断**可中断当前操作。
 **工作中**和**空闲**反映终端输出，不表示任务是否完成。
 
 已发送提示先显示为**等待中**，随后随会话消息更新；纯 slash command 不显示此预览。
@@ -60,22 +60,18 @@ agent-hub
 
 ### 文件上传
 
-使用附件按钮**拍照**、**选择图片**或**选择文件**，也可粘贴图片或拖放文件。
-发送前可预览或移除附件，支持单独发送附件和多个文件，不支持文件夹。**每个文件最大 20 MiB**。
+使用附件按钮（**拍照**、**选择图片**、**选择文件**），或直接粘贴图片、拖放文件（支持多文件，不支持文件夹，单个文件最大 **20 MiB**）。
+发送前可预览或移除附件，可单独发送或配合文字发送。
 
-图片保留原始内容，包括 EXIF 元数据。相机行为取决于浏览器；HEIC/HEIF 支持取决于执行引擎。
+打开**会话信息 → 上传记录**可预览、下载或删除已上传文件（包括未发送的上传）。
 
-打开**会话信息 → 上传记录**，预览、下载或删除文件，包括未发送的上传文件。
-从草稿移除附件不会删除已上传文件；从上传记录删除文件也会将其从草稿移除。
-
-发送附件时，Hub 会将文件在服务器上的绝对路径加入提示，由智能体读取。
-文件保存在 [Hub 数据目录](#配置服务器)的 `uploads/` 下，智能体必须能访问此目录。
-删除会话触发后台清理，归档与退出保留文件。存储和清理细节见[上传参考（英文）](technical-reference.md#file-uploads)，
-也可[查看上传记录截图](images/zh-CN/ahub-uploads.png)。
+发送附件时，Hub 会将文件在 [Hub 数据目录](#配置服务器) `uploads/` 下的绝对路径加入提示，智能体必须能访问此目录。
+删除会话会触发后台清理，归档与退出保留文件。详见[上传参考（英文）](technical-reference.md#file-uploads)，
+或[查看上传记录截图](images/zh-CN/ahub-uploads.png)。
 
 ## 浏览器设置
 
-在侧边栏底部打开**设置**，选择语言、主题、新会话默认智能体，以及 Worktree、权限模式默认值。
+在侧边栏底部打开**设置**，选择语言、主题、新会话默认智能体、Worktree 与权限模式默认值，以及**按 Enter 发送**。
 修改自动保存在当前浏览器。权限模式默认值也用于恢复会话，启动对话框可覆盖默认值。
 
 界面初始为英文，切换语言立即生效，不翻译会话或终端原文。
@@ -98,32 +94,21 @@ ahub-cli session inspect <id>
 ahub-cli session inspect <id> --follow
 ```
 
-使用 `list` 或 `create` 返回的 Hub ID。
-`list` 返回完整列表而不分页，默认不含归档会话；传入 `--all` 可包含归档会话。
-对于 `inspect`，将返回的 `Next after` 值传给
-`ahub-cli session inspect <id> --after <value>` 读取下一页消息。
-`--follow` 持续观察直到按 `Ctrl+C` 停止，不会因任务完成自动结束。
+传入 `list` 或 `create` 返回的 Hub ID。`list` 默认不含归档会话（加 `--all` 可包含）；
+`inspect` 通过 `--after <next-after>` 翻页，`--follow` 持续观察直到 `Ctrl+C`（不会因任务完成自动结束）。
 
-创建默认使用项目目录和第一个已配置智能体。用 `--cwd` 修改工作目录而保留项目归属，
-用 `--agent <nickname>` 选择智能体，或用 `--worktree` 在独立 worktree 中启动。
-`resume <id>` 保留原智能体。
+`create` 支持 `--agent`、`--cwd`（保留项目归属）、`--worktree`、`--task` 与 `--permission-mode <default|auto|yolo>`（或 `--yolo`）；
+`resume` 保留原智能体并支持权限模式选项。输入命令（`send`、`keys`）默认要求终端已连接且空闲，
+加 `--force` 可跳过空闲检查（同时允许 `send` 发送 `/` 开头的消息）。
+其他操作包括 `terminal`、`interrupt`、`handoff`、`exit`、`archive`、`delete`；完整选项见 `ahub-cli session --help`。
 
-两者均支持 `--permission-mode <default|auto|yolo>`。
-`--yolo` 是 `--permission-mode yolo` 的简写，两者不能同时使用。
-
-用 `create --task <name>` 和 `list --task <name>` 跨项目分组会话。
-
-输入默认要求终端已连接且空闲。用 `send <id> --stdin` 接收管道输入，`terminal <id>` 查看终端，
-`interrupt <id>` 中断执行。`send` 或 `keys` 的 `--force` 允许在工作中发送输入，
-也允许 `send` 发送以 `/` 开头的消息。终端切换会话后，用 `handoff <id>` 移交绑定。
-
-默认连接 `http://127.0.0.1:4173`。用 `AGENT_HUB_URL` 或 `--url` 修改地址，
-用 `--timeout <seconds>` 调整超时。私有 CA 场景下，启动 CLI 前设置
-`NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem`。
+默认连接 `http://127.0.0.1:4173`。用 `AGENT_HUB_URL` 或 `--url` 修改地址；
+在[多节点](#使用多个节点)场景下，应直接指向目标节点地址，而不是多节点 Hub。
+用 `--timeout <seconds>` 调整超时；私有 CA 场景请设置 `NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem`。
 
 发送成功不表示任务完成。超时或退出码为 `2`（写入结果不明）时，先用 `list`、`inspect` 或 `terminal` 核查再重试。
-停止客户端不会取消已提交操作。生命周期命令（包括删除）不会在 CLI 中再次要求确认。
-全部命令见 `ahub-cli session --help`，结果与超时契约见 [CLI 参考（英文）](technical-reference.md#session-cli)。
+停止客户端不会取消已提交操作，且生命周期命令（包括 `delete`）不要求二次确认。
+结果与超时契约见 [CLI 参考（英文）](technical-reference.md#session-cli)。
 
 ## 发布网页与差异
 
@@ -140,27 +125,22 @@ ahub-cli session inspect <id> --follow
 ahub-cli page publish ./demo --project /path/to/project --name demo --title "Design comparison"
 ```
 
-两个目录都必须存在。资源使用相对路径；Hub 不构建网站，也不接受远程上传发布包。
-托管网页与 Hub 同源，以可信代码执行，因此只应发布可信内容。
+资源请使用相对路径。托管网页与 Hub 同源、以可信代码执行，只应发布可信内容。
+以相同项目和名称再次发布即可原地更新并保留 URL（`--name` 默认取来源目录名；worktree 请将原项目传给 `--project`）。
 
-以相同项目和名称再次发布即可更新并保留 URL。省略 `--name` 时使用来源目录名。
-worktree 请将原项目传给 `--project`。
-
-打开**网页**（`/artifacts`）浏览、复制链接或删除网页及其快照。
-CLI 也支持 `page list` 和 `page delete <id>`。移除来源目录或 worktree 不会删除已发布网页。
+在**网页**（`/artifacts`）浏览、复制链接或删除网页，也可使用 `ahub-cli page list` / `page delete <id>`。
 详见[托管参考（英文）](technical-reference.md#optional-hosting)。
 
 ### 分享差异
 
-生成所需比较后发布：
+生成差异文件后发布：
 
 ```sh
 git diff HEAD > /tmp/review.diff
 ahub-cli diff publish /tmp/review.diff --title "Review changes"
 ```
 
-打开返回的 `/diffs/<uuid>` 地址。发布内容不会过期，用 `ahub-cli diff list` 查找，
-审阅结束后用 `ahub-cli diff delete <uuid>` 删除；原始文件保持不变。
+打开返回的 `/diffs/<uuid>` 地址。差异不会过期，通过 `ahub-cli diff list` 和 `ahub-cli diff delete <uuid>` 管理。
 参阅[差异参考（英文）](technical-reference.md#temporary-diffs)及
 [桌面](images/zh-CN/ahub-diff.png) / [手机](images/zh-CN/ahub-diff-mobile.png)预览。
 
@@ -179,8 +159,6 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 | `--home-dir <path>`    | `~/.agent-hub` | Hub 数据目录，包含 `uploads/` 和 `hosting/` |
 | `--hosting`            | 关闭           | 提供已发布网页与差异访问                    |
 | `--tmux-socket <path>` | tmux 默认值    | 使用自定义 tmux socket                      |
-
-Agent Hub 默认使用 `~/.agent-hub`，不会自动迁移旧数据。
 
 ### 多个智能体
 
@@ -248,7 +226,8 @@ agent-hub --node Mac=http://192.168.1.10:4174 --node Linux=http://192.168.1.11:4
 ```
 
 按显示顺序为每个节点添加一个 `--node id=origin`。Hub 默认打开第一个节点，使用顶部标签切换节点。
-在当前选中的节点上运行复制的 tmux 命令。
+在当前选中的节点上运行复制的 tmux 命令。执行 `ahub-cli session`、`project` 或 `agent` 命令时，
+请通过 `--url` 或 `AGENT_HUB_URL` 直接连接目标节点地址，而非多节点 Hub。
 
 请将示例 IP 替换为 Hub 可访问的地址。
 如需使用 HTTPS，参阅[节点 TLS 配置（英文）](technical-reference.md#tls)。
