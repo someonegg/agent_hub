@@ -1,129 +1,157 @@
-import { execFileSync } from "node:child_process";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, it, vi } from "vitest";
 
 import {
-  claudeBindingAttempts,
-  claudeBindingCommand,
-  claudeInteraction,
-} from "../../src/server/adapters/claude/interaction.js";
-import * as readyScript from "../../src/server/adapters/claude/ready-script.js";
-import {
-  BINDING_PROMPT_WAIT_MS,
-  ClaudeSessionManager,
-} from "../../src/server/adapters/claude/session-manager.js";
-import * as launchEnvironment from "../../src/server/adapters/shared/launch-environment.js";
+  ClaudeBindingIndex,
+  claudeSourceKey,
+} from "../../src/server/adapters/claude/binding-index.js";
+import { claudeInteraction } from "../../src/server/adapters/claude/interaction.js";
+import { ClaudeSessionManager } from "../../src/server/adapters/claude/session-manager.js";
 import { interruptSteps } from "../../src/server/adapters/shared/session-management.js";
 import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
+import { SessionLaunchError } from "../../src/server/management/session-manager.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
 
-// Route promise-based sleeps through the clock controlled by vi.useFakeTimers().
-vi.mock("node:timers/promises", () => ({
-  setTimeout: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
-}));
+const operationId = "00000000-0000-4000-8000-000000000001";
+const nativeId = "11111111-2222-4333-8444-555555555555";
+const socket = "/tmp/claude-test.sock";
+const target = { socketPath: socket, sessionName: `ahub-${operationId}` };
+const launchOptions = {
+  operationId,
+  workingDirectory: "/launch-directory",
+  projectDirectory: "/project",
+  taskName: "Task",
+  worktree: false,
+  permissionMode: "default" as const,
+};
 
-it("validates identity and missing directories before starting Claude", async () => {
-  const tmux = new TmuxLauncher();
-  const launch = vi.spyOn(tmux, "launch");
-  const manager = new ClaudeSessionManager("/test/home", tmux);
+async function setup() {
+  const directory = await createTempDirectory("claude-manager-");
+  const bindings = join(directory, "bindings");
+  const index = new ClaudeBindingIndex(bindings, claudeSourceKey(directory));
+  const tmux = new TmuxLauncher(socket);
+  const manager = new ClaudeSessionManager(directory, tmux, index, "/custom bin/claude");
+  return { directory, bindings, index, tmux, manager };
+}
+
+it.each([
+  ["default", false, false],
+  ["default", true, false],
+  ["yolo", true, false],
+  ["auto", false, true],
+] as const)(
+  "publishes the binding before respawning Claude (mode=%s, worktree=%s, resume=%s)",
+  async (permissionMode, worktree, resume) => {
+    const { directory, bindings, tmux, manager } = await setup();
+    await writeFile(join(directory, ".ahub-env"), 'CLAUDE_ENV_TEST="hello world"\n');
+    const launch = vi
+      .spyOn(tmux, "launchWithTarget")
+      .mockImplementation(async (id, cwd, prepare, env) => {
+        await expect(access(bindings)).rejects.toMatchObject({ code: "ENOENT" });
+        const argv = await prepare(target);
+        const [file] = await readdir(bindings);
+        expect(file).toMatch(/^[a-f0-9]{32}\.json$/);
+        expect(JSON.parse(await readFile(join(bindings, file!), "utf8"))).toEqual({
+          ...target,
+          kind: resume ? "resume" : "create",
+          operationId,
+          ...(resume ? { nativeId } : {}),
+          source: claudeSourceKey(directory),
+        });
+        expect(id).toBe(operationId);
+        expect(cwd).toBe("/launch-directory");
+        expect(argv).toEqual([
+          "/custom bin/claude",
+          ...(resume ? ["--resume", nativeId] : []),
+          ...(worktree ? ["--worktree"] : []),
+          ...(permissionMode === "auto"
+            ? ["--permission-mode", "auto"]
+            : permissionMode === "yolo"
+              ? ["--dangerously-skip-permissions"]
+              : []),
+          ...(worktree ? ["--"] : []),
+          `Ignore this message and reply with only "OK". [ahub-bind:${JSON.stringify({
+            id: file!.slice(0, -5),
+            project: "/project",
+            task: "Task",
+          })}]`,
+        ]);
+        expect(env).toEqual({ CLAUDE_CONFIG_DIR: directory, CLAUDE_ENV_TEST: "hello world" });
+        return target;
+      });
+    await expect(
+      manager.launch({
+        ...launchOptions,
+        worktree,
+        permissionMode,
+        ...(resume ? { resumeNativeId: nativeId } : {}),
+      }),
+    ).resolves.toEqual(target);
+    expect(launch).toHaveBeenCalledOnce();
+  },
+);
+
+it("does not publish a record when session creation fails and propagates publication errors", async () => {
+  const { tmux, manager, bindings } = await setup();
+  const launch = vi.spyOn(tmux, "launchWithTarget");
+  launch.mockRejectedValueOnce(new Error("tmux new-session failed"));
+  await expect(manager.launch(launchOptions)).rejects.toThrow("tmux new-session failed");
+  await expect(access(bindings)).rejects.toMatchObject({ code: "ENOENT" });
+
+  await writeFile(bindings, "not a directory");
+  launch.mockImplementationOnce(async (_id, _cwd, prepare) => {
+    await prepare(target);
+    return target;
+  });
+  await expect(manager.launch(launchOptions)).rejects.toMatchObject({ code: "EEXIST" });
+  expect(launch).toHaveBeenCalledTimes(2);
+});
+
+it("discards temporary binding records only when respawn fails with not_started", async () => {
+  const { tmux, manager, bindings } = await setup();
+  const launch = vi.spyOn(tmux, "launchWithTarget");
+  launch.mockImplementationOnce(async (_id, _cwd, prepare) => {
+    await prepare(target);
+    throw new SessionLaunchError("not_started", "tmux respawn-pane failed", null);
+  });
+  await expect(manager.launch(launchOptions)).rejects.toThrow("tmux respawn-pane failed");
+  expect(await readdir(bindings)).toEqual([]);
+
+  launch.mockImplementationOnce(async (_id, _cwd, prepare) => {
+    await prepare(target);
+    throw new SessionLaunchError("unknown", "tmux respawn-pane failed", "tmux attach", target);
+  });
+  await expect(manager.launch(launchOptions)).rejects.toThrow("tmux respawn-pane failed");
+  expect(await readdir(bindings)).toHaveLength(1);
+});
+
+it("validates identity, binding metadata, and missing directories before starting Claude", async () => {
+  const { tmux, manager, directory } = await setup();
+  const launch = vi.spyOn(tmux, "launchWithTarget");
+  await expect(manager.launch({ ...launchOptions, resumeNativeId: "invalid" })).rejects.toThrow(
+    "Invalid resume identity",
+  );
   await expect(
-    manager.launch({
-      operationId: "00000000-0000-4000-8000-000000000001",
-      workingDirectory: "/test/project",
-      resumeNativeId: "not-a-claude-id",
-      worktree: false,
-      permissionMode: "default" as const,
-    }),
-  ).rejects.toThrow("Invalid resume identity");
+    manager.launch({ ...launchOptions, projectDirectory: "relative/project" }),
+  ).rejects.toThrow("Invalid Claude binding record");
+  await expect(manager.launch({ ...launchOptions, taskName: "   " })).rejects.toThrow(
+    "Invalid Claude binding record",
+  );
   expect(launch).not.toHaveBeenCalled();
-  const directory = await createTempDirectory("claude-directory-");
-  await expect(manager.resolveDirectory(directory + "/missing")).rejects.toMatchObject({
+  await expect(manager.resolveDirectory(join(directory, "missing"))).rejects.toMatchObject({
     code: "ENOENT",
   });
   await expect(manager.resolveDirectory("relative/path")).rejects.toThrow("absolute local path");
 });
 
-it("validates independent V3 binding metadata, preserving pane validity for invalid optional metadata", () => {
-  expect(claudeBindingCommand("", "/project with 'quotes'", "Task")).toContain("AHUB_TMUX_BIND_V3");
-  expect(() => claudeBindingCommand("bad-operation")).toThrow("Invalid operation ID");
-  expect(
-    claudeBindingAttempts(
-      "<bash-stdout>AHUB_TMUX_BIND_V3\n/tmp/tmux.sock\nahub-00000000-0000-0000-0000-000000000002\n\n/project\ninvalid-json</bash-stdout>",
-      1,
-    ),
-  ).toEqual([
-    {
-      ordinal: 1,
-      valid: true,
-      socketPath: "/tmp/tmux.sock",
-      sessionName: "ahub-00000000-0000-0000-0000-000000000002",
-      projectDirectory: "/project",
-    },
-  ]);
-  expect(
-    claudeBindingAttempts(
-      "<bash-stdout>AHUB_TMUX_BIND_V3\nrelative\nahub-00000000-0000-0000-0000-000000000002\n\n/project\nnull</bash-stdout>",
-      2,
-    ),
-  ).toEqual([{ ordinal: 2, valid: false }]);
-  expect(
-    claudeBindingAttempts(
-      "<bash-stderr>AHUB_TMUX_BIND_V3\n/tmp/tmux.sock\nahub-00000000-0000-0000-0000-000000000002\n\n/project\nnull</bash-stderr>",
-      3,
-    ),
-  ).toEqual([]);
-});
-
-it.each(
-  ([false, true] as const).flatMap((resume) =>
-    (["default", "auto"] as const).map(
-      (permissionMode) =>
-        [
-          resume,
-          permissionMode,
-          permissionMode === "auto" ? "/custom bin/claude" : undefined,
-        ] as const,
-    ),
-  ),
-)(
-  "routes explicit Claude agent and native launch flags (resume=%s, mode=%s, command=%s)",
-  async (resume, permissionMode, command) => {
-    const tmux = new TmuxLauncher();
-    const launch = vi.spyOn(tmux, "launch").mockRejectedValue(new Error("Stop before bootstrap"));
-    const directory = await createTempDirectory("claude-env-");
-    await writeFile(join(directory, ".ahub-env"), 'CLAUDE_ENV_TEST="hello world"\n');
-    const manager = new ClaudeSessionManager(directory, tmux, undefined, command);
-    const nativeId = "11111111-2222-4333-8444-555555555555";
-    await expect(
-      manager.launch({
-        operationId: "00000000-0000-4000-8000-000000000001",
-        workingDirectory: "/launch-directory",
-        projectDirectory: "/project",
-        worktree: !resume,
-        permissionMode,
-        ...(resume ? { resumeNativeId: nativeId } : {}),
-      }),
-    ).rejects.toThrow("Stop before bootstrap");
-    expect(launch).toHaveBeenCalledWith(
-      "00000000-0000-4000-8000-000000000001",
-      "/launch-directory",
-      [
-        command ?? "claude",
-        ...(resume ? ["--resume", nativeId] : ["--worktree"]),
-        ...(permissionMode === "auto" ? ["--permission-mode", "auto"] : []),
-      ],
-      { CLAUDE_CONFIG_DIR: directory, CLAUDE_ENV_TEST: "hello world" },
-    );
-  },
-);
-
-it("provides shared interrupt steps and two pairs of exit interrupts", () => {
-  expect(claudeInteraction(null, null).interruptSteps).toBe(interruptSteps);
+it("provides shared interrupt steps and two pairs of exit interrupts", async () => {
+  const { manager, index } = await setup();
+  expect(claudeInteraction(index, null, null).interruptSteps).toBe(interruptSteps);
   let elapsed = 0;
   expect(
-    new ClaudeSessionManager("/test/home").exitSteps().map((step) => ({
+    manager.exitSteps().map((step) => ({
       keys: step.keys,
       atMs: (elapsed += step.delayMs),
     })),
@@ -135,124 +163,8 @@ it("provides shared interrupt steps and two pairs of exit interrupts", () => {
   ]);
 });
 
-const target = {
-  socketPath: "/tmp/claude-test.sock",
-  sessionName: "ahub-00000000-0000-4000-8000-000000000002",
-};
-const launchOptions = {
-  operationId: "00000000-0000-4000-8000-000000000001",
-  workingDirectory: "/project",
-  worktree: false,
-  permissionMode: "default" as const,
-};
-const readyScreen = { content: "Welcome\n\n❯\u00a0\nStatus", cursorX: 2, cursorY: 2 };
-
-function mockClaudeLaunch() {
-  vi.spyOn(launchEnvironment, "readLaunchEnvironment").mockResolvedValue({});
-  const tmux = new TmuxLauncher();
-  vi.spyOn(tmux, "launch").mockResolvedValue(target);
-  const capture = vi
-    .spyOn(tmux.transport, "captureTerminalWithCursor")
-    .mockResolvedValue(readyScreen);
-  const send = vi.spyOn(tmux.transport, "sendMessage").mockResolvedValue();
-  return { manager: new ClaudeSessionManager("/home", tmux), tmux, capture, send };
-}
-
-it("accepts a single ready sample and sends the binding once", async () => {
-  const { manager, capture, send } = mockClaudeLaunch();
-  await expect(manager.launch(launchOptions)).resolves.toEqual(target);
-  expect(capture).toHaveBeenCalledTimes(1);
-  expect(send).toHaveBeenCalledExactlyOnceWith(
-    target,
-    claudeBindingCommand(launchOptions.operationId),
-  );
-});
-
-it("waits one second between samples", async () => {
-  vi.useFakeTimers();
-  const { manager, capture, send } = mockClaudeLaunch();
-  capture.mockResolvedValueOnce(null);
-  const launch = manager.launch(launchOptions);
-  await vi.advanceTimersByTimeAsync(999);
-  expect(capture).toHaveBeenCalledTimes(1);
-  expect(send).not.toHaveBeenCalled();
-  await vi.advanceTimersByTimeAsync(1);
-  await expect(launch).resolves.toEqual(target);
-  expect(capture).toHaveBeenCalledTimes(2);
-});
-
-it.each([
-  {
-    content: "Is this a project you trust?\n❯ No, exit\n  Yes, I trust this folder",
-    cursorX: 2,
-    cursorY: 1,
-  },
-  null,
-])("never sends on an unconfirmed screen: %j", async (screen) => {
-  vi.useFakeTimers();
-  const { manager, capture, send } = mockClaudeLaunch();
-  capture.mockResolvedValue(screen);
-  const result = manager.launch(launchOptions).then(
-    () => null,
-    (error: unknown) => error,
-  );
-  await vi.advanceTimersByTimeAsync(BINDING_PROMPT_WAIT_MS);
-  expect(await result).toMatchObject({
-    outcome: "unknown",
-    target,
-    attachCommand: expect.stringContaining("tmux"),
-    message: expect.stringContaining("readiness was not confirmed"),
-  });
-  expect(send).not.toHaveBeenCalled();
-});
-
-it("does not count a capture that finishes after the readiness deadline", async () => {
-  vi.useFakeTimers();
-  const { manager, capture, send } = mockClaudeLaunch();
-  capture.mockImplementation(async () => {
-    await new Promise((resolve) => setTimeout(resolve, BINDING_PROMPT_WAIT_MS));
-    return readyScreen;
-  });
-  const result = manager.launch(launchOptions).then(
-    () => null,
-    (error: unknown) => error,
-  );
-  await vi.advanceTimersByTimeAsync(BINDING_PROMPT_WAIT_MS + 100);
-  expect(await result).toMatchObject({ outcome: "unknown" });
-  expect(send).not.toHaveBeenCalled();
-});
-
-it.each(["capture", "send"])("preserves recovery information when %s fails", async (failure) => {
-  const tmux = new TmuxLauncher();
-  const target = {
-    socketPath: "/tmp/claude-test.sock",
-    sessionName: "ahub-00000000-0000-0000-0000-000000000002",
-  };
-  vi.spyOn(tmux, "launch").mockResolvedValue(target);
-  const capture = vi
-    .spyOn(tmux.transport, "captureTerminalWithCursor")
-    .mockResolvedValue(readyScreen);
-  const send = vi.spyOn(tmux.transport, "sendMessage").mockResolvedValue();
-  if (failure === "capture") capture.mockRejectedValue(new Error("capture failed"));
-  else send.mockRejectedValue(new Error("send failed"));
-  await expect(
-    new ClaudeSessionManager("/home", tmux).launch({
-      operationId: "00000000-0000-4000-8000-000000000001",
-      workingDirectory: "/project",
-      worktree: false,
-      permissionMode: "default" as const,
-    }),
-  ).rejects.toMatchObject({
-    outcome: "unknown",
-    target,
-    attachCommand: expect.any(String),
-    message: `${failure} failed`,
-  });
-  expect(send).toHaveBeenCalledTimes(failure === "capture" ? 0 : 1);
-});
-
 it("deletes Claude logs and subagents across projects while preserving other content", async () => {
-  const agent = await createTempDirectory("claude-delete-");
+  const { directory: agent, manager } = await setup();
   const id = "11111111-2222-4333-8444-555555555555";
   for (const project of ["one", "two"]) {
     const root = join(agent, "projects", project);
@@ -262,7 +174,6 @@ it("deletes Claude logs and subagents across projects while preserving other con
     await writeFile(join(root, id, "keep"), "keep");
     await writeFile(join(root, "other.jsonl"), "other");
   }
-  const manager = new ClaudeSessionManager(agent);
   await expect(manager.delete("../invalid")).rejects.toThrow("Invalid Claude");
   await manager.delete(id);
   await manager.delete(id);
@@ -273,56 +184,4 @@ it("deletes Claude logs and subagents across projects while preserving other con
     expect(await readFile(join(root, id, "keep"), "utf8")).toBe("keep");
     expect(await readFile(join(root, "other.jsonl"), "utf8")).toBe("other");
   }
-});
-
-it("emits V3 using launcher metadata without executing commands in Claude's shell", () => {
-  const sessionName = "ahub-00000000-0000-0000-0000-000000000001";
-  const command = claudeBindingCommand("", "/project", "Task");
-  expect(command).not.toContain("$(");
-  const output = execFileSync("bash", ["-c", command.slice(2)], {
-    encoding: "utf8",
-    env: { ...process.env, TMUX: "/tmp/test.sock,123,0", AHUB_TMUX_SESSION_NAME: sessionName },
-  });
-  expect(claudeBindingAttempts(`<bash-stdout>${output}</bash-stdout>`, 1)).toEqual([
-    {
-      ordinal: 1,
-      valid: true,
-      socketPath: "/tmp/test.sock",
-      sessionName,
-      projectDirectory: "/project",
-      taskName: "Task",
-    },
-  ]);
-});
-
-it("skips missing snapshots, preserves context, and resets it for each launch", async () => {
-  vi.useFakeTimers();
-  const check = vi
-    .spyOn(readyScript, "checkClaudeReadyScript")
-    .mockResolvedValueOnce({ ready: false, context: "next" })
-    .mockResolvedValueOnce({ ready: true, context: "done" })
-    .mockResolvedValueOnce({ ready: false, context: "next" })
-    .mockResolvedValueOnce({ ready: true, context: "done" });
-  const { tmux, capture, send } = mockClaudeLaunch();
-  const screen = { content: "Starting…", cursorX: 0, cursorY: 0 };
-  capture
-    .mockResolvedValue(screen)
-    .mockResolvedValueOnce(null)
-    .mockResolvedValueOnce(screen)
-    .mockResolvedValueOnce(null);
-  const manager = new ClaudeSessionManager("/home", tmux, "/ready");
-  const first = manager.launch(launchOptions);
-  await vi.advanceTimersByTimeAsync(3_000);
-  await expect(first).resolves.toEqual(target);
-  const second = manager.launch(launchOptions);
-  await vi.advanceTimersByTimeAsync(1_000);
-  await expect(second).resolves.toEqual(target);
-  expect(check.mock.calls.map(([, current, context]) => ({ current, context }))).toEqual([
-    { current: screen, context: "" },
-    { current: screen, context: "next" },
-    { current: screen, context: "" },
-    { current: screen, context: "next" },
-  ]);
-  expect(capture).toHaveBeenCalledTimes(6);
-  expect(send).toHaveBeenCalledTimes(2);
 });

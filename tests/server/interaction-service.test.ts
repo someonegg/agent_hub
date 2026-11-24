@@ -1,5 +1,13 @@
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import {
+  ClaudeBindingIndex,
+  claudeSourceKey,
+} from "../../src/server/adapters/claude/binding-index.js";
+import { claudeInteraction } from "../../src/server/adapters/claude/interaction.js";
 import {
   DEFAULT_KEY_BINDINGS as CODEX_INTERACTION_KEY_BINDINGS,
   interruptSteps as codexInterruptSteps,
@@ -12,6 +20,7 @@ import { SessionInteractionService } from "../../src/server/interaction/interact
 import { PaneBindingManager } from "../../src/server/interaction/pane-binding-manager.js";
 import { TmuxInteractionService } from "../../src/server/interaction/tmux-service.js";
 import { InteractionTransportError } from "../../src/server/interaction/transport.js";
+import { createTempDirectory } from "../helpers/temp-directories.js";
 
 let bindings: PaneBindingManager;
 const SESSION_NAME = "ahub-00000000-0000-0000-0000-000000000007";
@@ -695,4 +704,103 @@ it("checks idle both before transport and at actual input, while allowing interr
   } finally {
     vi.useRealTimers();
   }
+});
+
+it.each(["submitted", "superseded", "write failure"])(
+  "publishes the Claude handoff record before submission (%s)",
+  async (outcome) => {
+    const root = await createTempDirectory("claude-handoff-");
+    const directory = join(root, "bindings");
+    const index = new ClaudeBindingIndex(directory, claudeSourceKey(root));
+    const snapshot = boundSession();
+    const interaction = claudeInteraction(index, "/project", "Task");
+    const original = interaction.bindingCommand;
+    if (typeof original !== "function") throw new Error("Expected indexed handoff");
+    const service = new TestSessionInteractionService(
+      repository({
+        ...snapshot,
+        interaction: {
+          ...interaction,
+          bindingCommand: async (target) => {
+            const message = await original(target);
+            if (outcome === "superseded") {
+              bindings.submit({
+                sessionId: "replacement",
+                time: 1,
+                ordinal: 1,
+                position: 0,
+                attempt: { ordinal: 1, valid: true, ...target },
+              });
+            }
+            return message;
+          },
+        },
+      }),
+      true,
+      new TmuxInteractionService(),
+    );
+    const send = vi.spyOn(TmuxInteractionService.prototype, "sendMessage");
+    try {
+      send.mockImplementation(async (target, message, guard) => {
+        guard?.();
+        expect(target).toEqual(BINDING);
+        const files = await readdir(directory);
+        const id = message.match(/"id":"([a-f0-9]{32})"/)![1]!;
+        expect(files).toEqual([`${id}.json`]);
+        expect(message).toBe(
+          `Ignore this message and reply with only "OK". [ahub-bind:${JSON.stringify({
+            id,
+            project: "/project",
+            task: "Task",
+          })}]`,
+        );
+        expect(JSON.parse(await readFile(join(directory, files[0]!), "utf8"))).toEqual({
+          ...BINDING,
+          kind: "handoff",
+          source: claudeSourceKey(root),
+        });
+      });
+      if (outcome === "submitted") {
+        await service.handoffPaneBinding("session");
+        expect(send).toHaveBeenCalledOnce();
+      } else if (outcome === "superseded") {
+        await expect(service.handoffPaneBinding("session")).rejects.toMatchObject({
+          code: "interaction_not_connected",
+        });
+        expect(send).not.toHaveBeenCalled();
+        expect(await readdir(directory)).toEqual([]);
+      } else {
+        await writeFile(directory, "");
+        await expect(service.handoffPaneBinding("session")).rejects.toMatchObject({
+          code: "EEXIST",
+        });
+        expect(send).not.toHaveBeenCalled();
+      }
+    } finally {
+      send.mockRestore();
+    }
+  },
+);
+
+it("describes expired bindings identically to exited panes", async () => {
+  bindings.submit({
+    sessionId: "expired-session",
+    time: 1,
+    ordinal: 1,
+    position: 0,
+    attempt: { ordinal: 1, valid: false, expired: true },
+  });
+  const service = new TestSessionInteractionService(
+    repository(session()),
+    true,
+    new TmuxInteractionService(),
+  );
+  expect(await service.describe("expired-session")).toEqual({
+    supported: true,
+    tmux: null,
+    state: "disconnected",
+    activity: null,
+    supersededBySessionId: null,
+    attachCommand: null,
+  });
 });

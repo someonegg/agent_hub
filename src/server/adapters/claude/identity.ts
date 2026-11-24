@@ -25,8 +25,10 @@ export function appendClaudeIdentity(
   ordinal: number,
   retainDiagnostic: (diagnostic: DomainDiagnostic) => void,
 ): boolean {
-  const identities = [string(row.sessionId), string(row.session_id)].filter(Boolean);
-  if (identities.some((identity) => identity !== state.nativeId)) {
+  // After /clear in a resumed pane, Claude can retain the earlier session_id
+  // alongside the current transcript's sessionId.
+  const identity = string(row.sessionId) || string(row.session_id);
+  if (identity && identity !== state.nativeId) {
     state.identityConflict = true;
     retainDiagnostic({
       code: "conflicting_native_session_id",
@@ -48,3 +50,6 @@ export function appendClaudeIdentity(
   state.version = string(row.version) ?? state.version;
   return true;
 }
+
+export const validClaudeId = (id: string) =>
+  /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id);

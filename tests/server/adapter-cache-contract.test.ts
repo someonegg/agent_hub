@@ -3,6 +3,10 @@ import { join } from "node:path";
 
 import { expect, it } from "vitest";
 
+import {
+  ClaudeBindingIndex,
+  claudeSourceKey,
+} from "../../src/server/adapters/claude/binding-index.js";
 import { createClaudeSessionSource } from "../../src/server/adapters/claude/claude-session-source.js";
 import { createCodexSessionSource } from "../../src/server/adapters/codex/codex-session-source.js";
 import { PaneBindingManager } from "../../src/server/interaction/pane-binding-manager.js";
@@ -91,7 +95,8 @@ it.each(adapters)(
     const agent = await createTempDirectory("adapter-binding-publication-");
     const path = join(agent, adapter.file);
     await mkdir(join(path, ".."), { recursive: true });
-    const bind = (pane: string) =>
+    const index = new ClaudeBindingIndex(join(agent, "bindings"), claudeSourceKey(agent));
+    const bind = async (pane: string) =>
       adapter.name === "Codex"
         ? line({
             timestamp: "2026-11-04T00:00:00Z",
@@ -113,11 +118,16 @@ it.each(adapters)(
             sessionId: id,
             message: {
               role: "user",
-              content: `<bash-stdout>AHUB_TMUX_BIND_V3\n/tmp/contract.sock\n${pane}\n\n\n</bash-stdout>`,
+              content: await index.publish(
+                { socketPath: "/tmp/contract.sock", sessionName: pane },
+                { kind: "handoff" },
+                null,
+                null,
+              ),
             },
           });
     await writeFile(path, adapter.initial);
-    const source = await adapter.create(agent);
+    const source = await adapter.create(agent, { index });
     let fail = false;
     const other: SessionSource = {
       descriptor: {
@@ -141,10 +151,10 @@ it.each(adapters)(
     const initial = await store.refresh();
     const sessionId = [...initial.sessions.keys()][0]!;
     fail = true;
-    await appendFile(path, bind("ahub-00000000-0000-0000-0000-000000000001"));
+    await appendFile(path, await bind("ahub-00000000-0000-0000-0000-000000000001"));
     await expect(store.refresh()).rejects.toThrow("injected source failure");
     expect(bindings.latest(sessionId)).toBeNull();
-    await appendFile(path, bind("ahub-00000000-0000-0000-0000-000000000002"));
+    await appendFile(path, await bind("ahub-00000000-0000-0000-0000-000000000002"));
     await expect(store.refresh()).rejects.toThrow("injected source failure");
     expect(bindings.latest(sessionId)).toBeNull();
     fail = false;

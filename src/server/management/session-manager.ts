@@ -3,7 +3,7 @@ import { validProjectDirectory } from "../domain/project-directory.js";
 import type { DomainSession, TmuxKey } from "../domain/session-domain.js";
 import type { TmuxBinding } from "../interaction/transport.js";
 
-/** Time before startup needs terminal access, including adapter prompt readiness. */
+/** Time before startup needs terminal access. */
 export const LAUNCH_ATTACH_DELAY_MS = 30_000;
 
 export interface ManagementSnapshot {
@@ -35,7 +35,6 @@ export interface SessionLaunchOptions {
 }
 
 export interface SessionManager extends SessionExitCapability {
-  readonly interruptAfterBinding?: boolean;
   isValidNativeId(nativeId: string): boolean;
   resolveDirectory(directory: string): Promise<{ directory: string }>;
   launch(options: SessionLaunchOptions): Promise<TmuxBinding>;

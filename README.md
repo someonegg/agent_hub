@@ -79,7 +79,7 @@ See [file uploads](docs/usage.md#file-uploads) for storage, cleanup, and file li
 
 Expand **Terminal Preview** to follow the CLI and handle prompts with the on-screen
 controls. See [session interaction](docs/usage.md#send-prompts-and-files) for keyboard
-shortcuts, interruption, and Codex session handoff.
+shortcuts, interruption, and session handoff.
 
 ## Command-line management
 

@@ -1,11 +1,11 @@
 import type { TimelineItem, UserInputQuestion } from "../../../shared/domain.js";
 import type { DomainDiagnostic } from "../../domain/session-domain.js";
 import { normalizeSessionTitle, truncateText } from "../../domain/session-text.js";
-import { mergeBindingMetadata } from "../shared/binding-protocol.js";
 import type { DecodedRecord } from "../shared/jsonl-decoder.js";
 import { MAX_MESSAGE_CHARS, MAX_SESSION_DIAGNOSTICS } from "../shared/limits.js";
 import { appendClaudeIdentity, type ClaudeIdentityState } from "./identity.js";
-import { claudeRecordBindings } from "./interaction.js";
+import { parseClaudeBindingRecord, type ParsedClaudeBindingRecord } from "./interaction.js";
+import { isClaudeContextInjectionBlock } from "./user-content.js";
 import { normalizeQuestionResponse, normalizeQuestions } from "./user-input-normalizer.js";
 
 type ObjectValue = Record<string, unknown>;
@@ -57,7 +57,7 @@ export function appendClaudeRecords(
   previous: ClaudeState,
   records: readonly DecodedRecord[],
   diagnostics: readonly DomainDiagnostic[] = [],
-  bindings = records.flatMap(claudeRecordBindings),
+  onBinding?: (binding: ParsedClaudeBindingRecord) => void,
 ): ClaudeState {
   if (
     records.length === 0 &&
@@ -90,13 +90,22 @@ export function appendClaudeRecords(
     state.diagnostics.length = Math.min(state.diagnostics.length, MAX_SESSION_DIAGNOSTICS);
   };
 
-  for (const { ordinal, value: row } of records) {
+  for (const record of records) {
+    const { ordinal, value: row } = record;
     state.line = ordinal;
     if (!object(row) || row.isSidechain === true || row.parent_tool_use_id != null) continue;
     // API copies and progress/subagent notifications never supply conversation or bindings.
     if (!["user", "assistant", "custom-title", "ai-title", "system"].includes(String(row.type)))
       continue;
     if (!appendClaudeIdentity(state, row, ordinal, retainDiagnostic)) continue;
+    const binding = parseClaudeBindingRecord(record);
+    if (binding) {
+      if (binding.parsed.projectDirectory !== undefined)
+        state.project = binding.parsed.projectDirectory;
+      if (binding.parsed.taskName !== undefined) state.taskName = binding.parsed.taskName;
+      onBinding?.(binding);
+      continue;
+    }
     const timestamp = string(row.timestamp);
     if (row.type === "custom-title") {
       state.customTitle = normalizeSessionTitle(string(row.customTitle)) || state.customTitle;
@@ -137,9 +146,10 @@ export function appendClaudeRecords(
         const content = block.text;
         if (
           role === "user" &&
-          /^\s*(?:<bash-(?:input|stdout|stderr)>|<local-command-|<command-name>|<command-message>|<task-notification>|<subagent|<teammate-message|<system-reminder>|<system-context>|\[Request interrupted by user)/.test(
-            content,
-          )
+          (isClaudeContextInjectionBlock(content) ||
+            /^\s*(?:<bash-(?:input|stdout|stderr)>|<local-command-|<command-name>|<command-message>|<task-notification>|<subagent|<teammate-message|\[Request interrupted by user)/.test(
+              content,
+            ))
         ) {
           flush();
           continue;
@@ -186,16 +196,10 @@ export function appendClaudeRecords(
     }
     flush();
   }
-  const metadata = mergeBindingMetadata(
-    { projectDirectory: state.project, taskName: state.taskName },
-    bindings.map((event) => event.attempt),
-  );
   return {
     ...state,
     timeline: newItems.length ? [...previous.timeline, ...newItems] : previous.timeline,
     questions: pendingQuestions,
-    project: metadata.projectDirectory,
-    taskName: metadata.taskName,
     decoderDiagnostics: diagnostics,
     normalizerDiagnostics: state.diagnostics,
     diagnostics: [...diagnostics, ...state.diagnostics].slice(0, MAX_SESSION_DIAGNOSTICS),

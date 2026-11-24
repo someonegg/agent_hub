@@ -1,8 +1,7 @@
 import { lstat, readdir, rm, rmdir } from "node:fs/promises";
 import { join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
-import { attachCommand, TmuxLauncher } from "../../interaction/tmux-launcher.js";
+import { TmuxLauncher } from "../../interaction/tmux-launcher.js";
 import {
   SessionLaunchError,
   type SessionLaunchOptions,
@@ -10,89 +9,66 @@ import {
 } from "../../management/session-manager.js";
 import { readLaunchEnvironment } from "../shared/launch-environment.js";
 import { exitSteps, resolveDirectory } from "../shared/session-management.js";
-import { claudeBindingCommand, validClaudeId } from "./interaction.js";
-import { claudePromptPosition } from "./prompt-readiness.js";
-import { checkClaudeReadyScript } from "./ready-script.js";
-
-/** Never deliver bootstrap input unless the native prompt is confirmed ready. */
-export const BINDING_PROMPT_WAIT_MS = 15_000;
+import { type ClaudeBindingIndex, validateClaudeBindingMetadata } from "./binding-index.js";
+import { validClaudeId } from "./identity.js";
 
 export class ClaudeSessionManager implements SessionManager {
   constructor(
     private readonly configDirectory: string,
-    private readonly tmux = new TmuxLauncher(),
-    private readonly readyScript?: string,
+    private readonly tmux: TmuxLauncher,
+    private readonly index: ClaudeBindingIndex,
     private readonly command = "claude",
   ) {}
-  readonly interruptAfterBinding = true;
   isValidNativeId = validClaudeId;
   resolveDirectory = resolveDirectory;
   async launch(options: SessionLaunchOptions) {
     if (options.resumeNativeId !== undefined && !this.isValidNativeId(options.resumeNativeId))
       throw new Error("Invalid resume identity");
-    const target = await this.tmux.launch(
-      options.operationId,
-      options.workingDirectory,
-      [
-        this.command,
-        ...(options.resumeNativeId ? ["--resume", options.resumeNativeId] : []),
-        ...(options.worktree ? ["--worktree"] : []),
-        ...(options.permissionMode === "auto"
-          ? ["--permission-mode", "auto"]
-          : options.permissionMode === "yolo"
-            ? ["--dangerously-skip-permissions"]
-            : []),
-      ],
-      {
-        ...(await readLaunchEnvironment(this.configDirectory)),
-        CLAUDE_CONFIG_DIR: this.configDirectory,
-      },
-    );
+    validateClaudeBindingMetadata(options.projectDirectory ?? null, options.taskName ?? null);
+    const environment = {
+      ...(await readLaunchEnvironment(this.configDirectory)),
+      CLAUDE_CONFIG_DIR: this.configDirectory,
+    };
+    let publishedPrompt: string | null = null;
     try {
-      const deadline = Date.now() + BINDING_PROMPT_WAIT_MS;
-      let context = "";
-      let ready = false;
-      while (Date.now() < deadline) {
-        const snapshot = await this.tmux.transport.captureTerminalWithCursor(target);
-        if (Date.now() >= deadline) break;
-        if (snapshot) {
-          const result = this.readyScript
-            ? await checkClaudeReadyScript(
-                this.readyScript,
-                snapshot,
-                context,
-                deadline - Date.now(),
-              )
-            : { ready: claudePromptPosition(snapshot) !== null, context: "" };
-          if (Date.now() >= deadline) break;
-          context = result.context;
-          if (result.ready) {
-            ready = true;
-            break;
-          }
-        }
-        await delay(Math.min(1_000, Math.max(0, deadline - Date.now())));
-      }
-      if (!ready)
-        throw new Error(
-          "Claude Code prompt readiness was not confirmed before timeout. Attach to tmux to check the session.",
-        );
-      await this.tmux.transport.sendMessage(
-        target,
-        claudeBindingCommand(
-          options.operationId,
-          options.projectDirectory,
-          options.taskName ?? null,
-        ),
+      return await this.tmux.launchWithTarget(
+        options.operationId,
+        options.workingDirectory,
+        async (target) => {
+          const prompt = await this.index.publish(
+            target,
+            options.resumeNativeId
+              ? {
+                  kind: "resume",
+                  operationId: options.operationId,
+                  nativeId: options.resumeNativeId,
+                }
+              : { kind: "create", operationId: options.operationId },
+            options.projectDirectory ?? null,
+            options.taskName ?? null,
+          );
+          publishedPrompt = prompt;
+          const command = [this.command];
+          if (options.resumeNativeId) command.push("--resume", options.resumeNativeId);
+          if (options.worktree) command.push("--worktree");
+          if (options.permissionMode === "auto") command.push("--permission-mode", "auto");
+          if (options.permissionMode === "yolo") command.push("--dangerously-skip-permissions");
+          // --worktree accepts an optional name. Keep the prompt positional.
+          if (options.worktree) command.push("--");
+          command.push(prompt);
+          return command;
+        },
+        environment,
       );
-      return target;
     } catch (error) {
-      throw new SessionLaunchError(
-        "unknown",
-        error instanceof Error ? error.message : String(error),
-        attachCommand(target.socketPath, `ahub-${options.operationId}`),
-        target,
-      );
+      if (
+        publishedPrompt !== null &&
+        error instanceof SessionLaunchError &&
+        error.outcome === "not_started"
+      ) {
+        await this.index.discard(publishedPrompt).catch(() => {});
+      }
+      throw error;
     }
   }
   async delete(nativeId: string): Promise<void> {
@@ -133,8 +109,8 @@ export class ClaudeSessionManager implements SessionManager {
 }
 export const createClaudeSessionManager = (
   configDirectory: string,
+  index: ClaudeBindingIndex,
   socket?: string,
-  readyScript?: string,
   command?: string,
 ): SessionManager =>
-  new ClaudeSessionManager(configDirectory, new TmuxLauncher(socket), readyScript, command);
+  new ClaudeSessionManager(configDirectory, new TmuxLauncher(socket), index, command);

@@ -52,7 +52,6 @@ export interface ServerConfig {
   tls: ServerTlsConfig;
   interactionEnabled: boolean;
   tmuxSocket?: string;
-  claudeReadyScript?: string;
   uploadDirectory?: string;
   hostingDirectory?: string;
 }
@@ -101,7 +100,6 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       help: { type: "boolean" },
       version: { type: "boolean" },
       "tmux-socket": { type: "string" },
-      "claude-ready-script": { type: "string" },
       "home-dir": { type: "string" },
       hosting: { type: "boolean" },
       node: { type: "string", multiple: true },
@@ -177,20 +175,14 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
     tls = { enabled: false };
   }
 
+  const homeDirectory = resolveHomeDirectory(values["home-dir"]);
+
   return {
     kind: "run",
     config: {
       ...(mode ? { mode } : {}),
       host,
       localHost: nonEmptyOption("local-host", values["local-host"]) ?? LOOPBACK_HOST,
-      ...(values["claude-ready-script"] !== undefined
-        ? {
-            claudeReadyScript: resolvePathOption(
-              "claude-ready-script",
-              values["claude-ready-script"],
-            ),
-          }
-        : {}),
       port: parsePort(values.port),
       ...(values["local-port"] !== undefined
         ? { localPort: parsePort(values["local-port"], "local-port") }
@@ -199,11 +191,9 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       clientDirectory: fileURLToPath(new URL("../../client/", import.meta.url)),
       tls,
       interactionEnabled: true,
-      ...(mode?.kind !== "hub"
-        ? { uploadDirectory: resolve(resolveHomeDirectory(values["home-dir"]), "uploads") }
-        : {}),
+      ...(mode?.kind !== "hub" ? { uploadDirectory: resolve(homeDirectory, "uploads") } : {}),
       ...(values.hosting && mode?.kind !== "hub"
-        ? { hostingDirectory: resolve(resolveHomeDirectory(values["home-dir"]), "hosting") }
+        ? { hostingDirectory: resolve(homeDirectory, "hosting") }
         : {}),
       ...(values["tmux-socket"] !== undefined
         ? { tmuxSocket: resolvePathOption("tmux-socket", values["tmux-socket"]) }
@@ -304,8 +294,6 @@ Options:
   --ssl-cert <path>    PEM server certificate or certificate chain
   --ssl-key <path>     PEM server private key
   --ssl-ca <path>      PEM CA bundle; enables mandatory client certificates
-  --claude-ready-script <path>
-                       Executable Claude readiness checker (all agents)
   --tmux-socket <path> tmux socket (default: tmux default selection)
   --help               Show this help
   --version            Show the current version
