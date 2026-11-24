@@ -15,6 +15,25 @@ export type PreviewListener = (
   fail: (error: Error) => void,
 ) => PreviewSubscription;
 
+const OUTPUT_PAYLOAD = /^%output %\d+ (.*)$/;
+const EXTENDED_OUTPUT_PAYLOAD = /^%extended-output %\d+(?: (?!: )\S+)+ : (.*)$/;
+const INPUT_MODE_SEQUENCES =
+  /\\033\[(?:\?(?:1004|2004)(?:;(?:1004|2004))*[hl]|>4(?:;\d+)?m|(?:>\d*|<\d*|=\d+(?:;\d+)?)u)/g;
+const EMPTY_SYNC_OUTPUT = /\\033\[\?2026h\\033\[\?2026l/g;
+
+function hasVisualOutputPayload(line: string): boolean {
+  const payload = (OUTPUT_PAYLOAD.exec(line) ?? EXTENDED_OUTPUT_PAYLOAD.exec(line))?.[1];
+  if (payload === undefined) return true;
+  let remaining = payload.replace(INPUT_MODE_SEQUENCES, "");
+  // Removing an inner wrapper can leave an empty outer wrapper.
+  let previous: string;
+  do {
+    previous = remaining;
+    remaining = remaining.replace(EMPTY_SYNC_OUTPUT, "");
+  } while (remaining !== previous);
+  return remaining.length > 0;
+}
+
 /** One control client per socket/session; protocol payload is never interpreted as commands. */
 export function createTmuxPreviewListener(): PreviewListener {
   const connections = new Map<
@@ -91,9 +110,10 @@ export function createTmuxPreviewListener(): PreviewListener {
             failure(new Error("tmux control connection ended"));
             return;
           }
-          const output = /^%(?:output|extended-output) /.test(line);
-          if (output) for (const subscriber of subscribers) subscriber.change(true);
-          else if (
+          if (/^%(?:output|extended-output) /.test(line)) {
+            if (!hasVisualOutputPayload(line)) continue;
+            for (const subscriber of subscribers) subscriber.change(true);
+          } else if (
             /^%(?:layout-change|window-add|window-close|unlinked-window-close|sessions-changed|session-changed|session-window-changed|window-pane-changed|pane-mode-changed)\b/.test(
               line,
             )

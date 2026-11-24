@@ -53,6 +53,53 @@ it("shares socket/session clients, parses fragmented notifications, and closes t
   b.close();
   expect(process.kill).toHaveBeenCalledOnce();
 });
+it("ignores terminal input-mode changes and empty synchronized output", async () => {
+  const process = child();
+  spawn.mockReturnValue(process);
+  const listen = createTmuxPreviewListener();
+  const changes = vi.fn();
+  const subscription = listen(binding, changes, vi.fn());
+  process.stdout.write("%end 1 1 0\n");
+  await subscription.ready;
+
+  const ignored = [
+    "%output %1 \\033[?2004h\\033[>4;2m",
+    "%output %1 \\033[?2004l\\033[?1004h\\033[?1004l",
+    "%output %1 \\033[?2004;1004h\\033[?1004;2004l",
+    "%output %1 \\033[>4m\\033[>4;0m\\033[>1u\\033[>u\\033[<1u\\033[<u\\033[=1u\\033[=1;2u",
+    "%output %1 \\033[?2026h\\033[?2026l",
+    "%output %1 \\033[?2026h\\033[?2004h\\033[>4;2m\\033[?2026l",
+    "%output %1 \\033[?2026h\\033[?2026h\\033[?2026l\\033[?2026l",
+    "%output %1 ",
+    "%extended-output %1 12 : \\033[?2004h\\033[>4;2m",
+    "%extended-output %1 12 flag1 flag2 : \\033[?2026h\\033[?1004h\\033[?2026l",
+  ];
+  for (const line of ignored) {
+    process.stdout.write(`${line}\n`);
+    expect(changes, line).not.toHaveBeenCalled();
+  }
+
+  const reported = [
+    "%output %1 \\033[?2004hhello",
+    "%output %1 \\033[31m",
+    "%output %1 \\033[u",
+    "%output %1 \\033[?25h",
+    "%output %1 \\033[?25;2004h",
+    "%output %1 \\033[?2026h",
+    "%output %1 \\033[?2026l",
+    "%output %1 \\134033[?2004h",
+    "%output %1 \\033[?200",
+    "%output %1",
+    "%extended-output %1 12 : a : \\033[?2004h",
+    "%extended-output %1 12 malformed",
+  ];
+  for (const line of reported) {
+    changes.mockClear();
+    process.stdout.write(`${line}\n`);
+    expect(changes.mock.calls, line).toEqual([[true]]);
+  }
+  subscription.close();
+});
 it.each(["error", "close", "protocol", "timeout"])(
   "rejects startup and notifies subscribers on %s",
   async (kind) => {
