@@ -1,22 +1,21 @@
 import { lstat, readdir, rm, rmdir } from "node:fs/promises";
 import { join } from "node:path";
 
+import { TASK_NAME_ERROR, validTaskName } from "../../../shared/task-name.js";
 import { TmuxLauncher } from "../../interaction/tmux-launcher.js";
 import {
-  SessionLaunchError,
   type SessionLaunchOptions,
   type SessionManager,
 } from "../../management/session-manager.js";
 import { readLaunchEnvironment } from "../shared/launch-environment.js";
 import { exitSteps, resolveDirectory } from "../shared/session-management.js";
-import { type ClaudeBindingIndex, validateClaudeBindingMetadata } from "./binding-index.js";
+import { formatClaudeBindingMessage } from "./binding-message.js";
 import { validClaudeId } from "./identity.js";
 
 export class ClaudeSessionManager implements SessionManager {
   constructor(
     private readonly configDirectory: string,
     private readonly tmux: TmuxLauncher,
-    private readonly index: ClaudeBindingIndex,
     private readonly command = "claude",
   ) {}
   isValidNativeId = validClaudeId;
@@ -24,52 +23,34 @@ export class ClaudeSessionManager implements SessionManager {
   async launch(options: SessionLaunchOptions) {
     if (options.resumeNativeId !== undefined && !this.isValidNativeId(options.resumeNativeId))
       throw new Error("Invalid resume identity");
-    validateClaudeBindingMetadata(options.projectDirectory ?? null, options.taskName ?? null);
+    if (options.taskName !== undefined && !validTaskName(options.taskName))
+      throw new Error(TASK_NAME_ERROR);
     const environment = {
       ...(await readLaunchEnvironment(this.configDirectory)),
       CLAUDE_CONFIG_DIR: this.configDirectory,
     };
-    let publishedPrompt: string | null = null;
-    try {
-      return await this.tmux.launchWithTarget(
-        options.operationId,
-        options.workingDirectory,
-        async (target) => {
-          const prompt = await this.index.publish(
-            target,
-            options.resumeNativeId
-              ? {
-                  kind: "resume",
-                  operationId: options.operationId,
-                  nativeId: options.resumeNativeId,
-                }
-              : { kind: "create", operationId: options.operationId },
-            options.projectDirectory ?? null,
-            options.taskName ?? null,
-          );
-          publishedPrompt = prompt;
-          const command = [this.command];
-          if (options.resumeNativeId) command.push("--resume", options.resumeNativeId);
-          if (options.worktree) command.push("--worktree");
-          if (options.permissionMode === "auto") command.push("--permission-mode", "auto");
-          if (options.permissionMode === "yolo") command.push("--dangerously-skip-permissions");
-          // --worktree accepts an optional name. Keep the prompt positional.
-          if (options.worktree) command.push("--");
-          command.push(prompt);
-          return command;
-        },
-        environment,
-      );
-    } catch (error) {
-      if (
-        publishedPrompt !== null &&
-        error instanceof SessionLaunchError &&
-        error.outcome === "not_started"
-      ) {
-        await this.index.discard(publishedPrompt).catch(() => {});
-      }
-      throw error;
-    }
+    return this.tmux.launchWithTarget(
+      options.operationId,
+      options.workingDirectory,
+      (target) => {
+        const prompt = formatClaudeBindingMessage(
+          target,
+          options.projectDirectory ?? null,
+          options.taskName ?? null,
+          options.operationId,
+        );
+        const command = [this.command];
+        if (options.resumeNativeId) command.push("--resume", options.resumeNativeId);
+        if (options.worktree) command.push("--worktree");
+        if (options.permissionMode === "auto") command.push("--permission-mode", "auto");
+        if (options.permissionMode === "yolo") command.push("--dangerously-skip-permissions");
+        // --worktree accepts an optional name. Keep the prompt positional.
+        if (options.worktree) command.push("--");
+        command.push(prompt);
+        return command;
+      },
+      environment,
+    );
   }
   async delete(nativeId: string): Promise<void> {
     if (!this.isValidNativeId(nativeId)) throw new Error("Invalid Claude session identity");
@@ -109,8 +90,6 @@ export class ClaudeSessionManager implements SessionManager {
 }
 export const createClaudeSessionManager = (
   configDirectory: string,
-  index: ClaudeBindingIndex,
   socket?: string,
   command?: string,
-): SessionManager =>
-  new ClaudeSessionManager(configDirectory, new TmuxLauncher(socket), index, command);
+): SessionManager => new ClaudeSessionManager(configDirectory, new TmuxLauncher(socket), command);

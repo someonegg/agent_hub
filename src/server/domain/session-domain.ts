@@ -32,7 +32,6 @@ export type InteractionBindingAttempt =
   | {
       readonly ordinal: number;
       readonly valid: false;
-      readonly expired?: true;
     };
 
 /** Ordered evidence for a session's claim on an interaction pane. */
@@ -76,18 +75,13 @@ export interface InteractionKeyStep {
   readonly delayMs: number;
 }
 
-export interface PreparedBindingCommand {
-  readonly command: string;
-  discard?(): Promise<void>;
-}
-
 export type DomainAgentInteraction = {
   /** Adapter-owned steps, executed as one ordered transport operation. */
   interruptSteps(): readonly InteractionKeyStep[];
   readonly transport: "tmux";
   readonly bindingCommand:
     | string
-    | ((target: { socketPath: string; sessionName: string }) => Promise<PreparedBindingCommand>);
+    | ((target: { socketPath: string; sessionName: string }) => string);
   readonly keyBindings: InteractionKeyBindings;
 };
 

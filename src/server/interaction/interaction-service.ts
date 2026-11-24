@@ -262,19 +262,8 @@ export class SessionInteractionService {
     this.#assertAvailable(sessionId);
     const { binding, bindingCommand } = await this.#prepare(sessionId);
     this.#assertInputAllowed(sessionId, binding);
-    const prepared =
-      typeof bindingCommand === "string"
-        ? { command: bindingCommand }
-        : await bindingCommand(binding);
-    let message: string;
-    try {
-      message = normalizeMessage(prepared.command);
-      this.#assertInputAllowed(sessionId, binding);
-    } catch (error) {
-      await prepared.discard?.().catch(() => {});
-      throw error;
-    }
-    await this.#sendMessage(sessionId, binding, message);
+    const command = typeof bindingCommand === "string" ? bindingCommand : bindingCommand(binding);
+    await this.#sendMessage(sessionId, binding, normalizeMessage(command));
   }
 
   async sendKeys(

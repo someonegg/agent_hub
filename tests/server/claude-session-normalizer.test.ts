@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-index.js";
+import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-message.js";
 import {
   appendClaudeRecords,
   type ClaudeState,
@@ -8,15 +8,28 @@ import {
 } from "../../src/server/adapters/claude/session-normalizer.js";
 
 const id = "claude-session";
+const target = {
+  socketPath: "/tmp/claude.sock",
+  sessionName: "ahub-00000000-0000-4000-8000-000000000001",
+};
 const append = (state: ClaudeState, ...rows: Record<string, unknown>[]) =>
   appendClaudeRecords(
     state,
     rows.map((value, index) => ({ ordinal: state.line + index + 1, value })),
   );
-const message = (role: "user" | "assistant", content: unknown) => ({
+const message = (
+  role: "user" | "assistant",
+  content: unknown,
+  metadata: { id?: string; stop_reason?: string | null; model?: string } = {},
+) => ({
   type: role,
-  message: { role, content },
+  message: { role, content, ...metadata },
 });
+const bindingPrompt = message("user", formatClaudeBindingMessage(target, "/bound-project", null));
+const timelineContent = (state: ClaudeState) =>
+  state.timeline.map((item) =>
+    item.kind === "message" ? `${item.role}:${item.markdown}` : item.kind,
+  );
 const ask = (question: string) =>
   message("assistant", [
     { type: "tool_use", name: "AskUserQuestion", id: "ask", input: { questions: [{ question }] } },
@@ -73,7 +86,7 @@ describe("Claude incremental allocation", () => {
     const before = createClaudeState(id);
     const after = append(
       before,
-      message("user", formatClaudeBindingMessage("a".repeat(32), "/bound-project", "Bound task")),
+      message("user", formatClaudeBindingMessage(target, "/bound-project", "Bound task")),
     );
     expect(after.timeline).toBe(before.timeline);
     expect(after.questions).toBe(before.questions);
@@ -82,6 +95,130 @@ describe("Claude incremental allocation", () => {
       taskName: "Bound task",
       firstUser: null,
     });
+  });
+
+  it("hides immediate OK binding replies across thinking rows and incremental splits", () => {
+    for (const ack of [
+      "OK",
+      "OK.",
+      "OK!",
+      "ok",
+      '"OK"',
+      '"OK."',
+      '"OK".',
+      "'OK'",
+      "`OK`",
+      "\n  OK  \n",
+    ]) {
+      const before = createClaudeState(id);
+      const after = append(
+        before,
+        bindingPrompt,
+        message("assistant", [{ type: "text", text: ack }]),
+      );
+      expect(after.timeline, ack).toBe(before.timeline);
+      expect(after.questions, ack).toBe(before.questions);
+      expect(after.pendingBindingReply, ack).toBeNull();
+    }
+
+    const rows: Record<string, unknown>[] = [
+      bindingPrompt,
+      { type: "progress", cwd: "/ignored" },
+      { type: "system", subtype: "api_error" },
+      { type: "ai-title", aiTitle: "Bound" },
+      { type: "user", isMeta: true, message: { role: "user", content: "meta" } },
+      message("user", "<system-reminder>hook context</system-reminder>"),
+      {
+        type: "assistant",
+        isSidechain: true,
+        message: { role: "assistant", content: "Sidechain noise" },
+      },
+      message("assistant", [{ type: "thinking", thinking: "Just reply OK." }], {
+        id: "msg_bind_1",
+        stop_reason: "end_turn",
+      }),
+      message("assistant", [{ type: "redacted_thinking", data: "opaque" }], {
+        id: "msg_other_thinking",
+        stop_reason: "end_turn",
+      }),
+      message("assistant", [{ type: "text", text: "OK" }], {
+        id: "msg_bind_1",
+        stop_reason: "end_turn",
+      }),
+      // A second OK without another binding message is kept.
+      message("assistant", "OK"),
+      bindingPrompt,
+      message(
+        "assistant",
+        [
+          { type: "thinking", thinking: "Short ack" },
+          { type: "text", text: "OK." },
+        ],
+        { id: "msg_bind_2", stop_reason: "end_turn" },
+      ),
+      message("user", "Real prompt"),
+      message("assistant", "OK"),
+    ];
+    const full = append(createClaudeState(id), ...rows);
+    expect(timelineContent(full)).toEqual(["assistant:OK", "user:Real prompt", "assistant:OK"]);
+    for (let split = 0; split <= rows.length; split++) {
+      const partial = append(createClaudeState(id), ...rows.slice(0, split));
+      const beforeTimeline = [...partial.timeline];
+      const merged = append(partial, ...rows.slice(split));
+      expect(merged).toEqual(full);
+      expect(partial.timeline).toEqual(beforeTimeline);
+    }
+  });
+
+  const okBlock = [{ type: "text", text: "OK" }];
+  it.each([
+    {
+      name: "substantial assistant reply",
+      rows: [
+        message("assistant", "Native Claude integration response"),
+        message("assistant", "OK"),
+      ],
+      expected: ["assistant:Native Claude integration response", "assistant:OK"],
+    },
+    {
+      name: "API error marked with isApiErrorMessage",
+      rows: [{ ...message("assistant", okBlock), isApiErrorMessage: true }],
+    },
+    {
+      name: "synthetic model error",
+      rows: [message("assistant", okBlock, { model: "<synthetic>" })],
+    },
+    {
+      name: "assistant row with tool_use block",
+      rows: [
+        message("assistant", [...okBlock, { type: "tool_use", id: "t1", name: "Read", input: {} }]),
+      ],
+    },
+    {
+      name: "assistant row with tool_use stop_reason",
+      rows: [message("assistant", okBlock, { stop_reason: "tool_use" })],
+    },
+    ...["msg_b", undefined].map((id) => ({
+      name: `${id === undefined ? "missing" : "different"} assistant message ID after thinking row`,
+      rows: [
+        message("assistant", [{ type: "thinking", thinking: "hmm" }], {
+          id: "msg_a",
+          stop_reason: null,
+        }),
+        message("assistant", okBlock, { id, stop_reason: "end_turn" }),
+      ],
+    })),
+    {
+      name: "user interruption clears pending binding reply",
+      rows: [message("user", "[Request interrupted by user]"), message("assistant", "OK")],
+    },
+    {
+      name: "local command clears pending binding reply",
+      rows: [message("user", "<command-name>/help</command-name>"), message("assistant", "OK")],
+    },
+  ])("retains visible replies after a binding ($name)", ({ rows, expected = ["assistant:OK"] }) => {
+    const state = append(createClaudeState(id), bindingPrompt, ...rows);
+    expect(timelineContent(state)).toEqual(expected);
   });
 
   it("copies the timeline only when emitting and preserves existing items", () => {

@@ -19,14 +19,8 @@ import {
   mutableTelemetry,
   sameFingerprint,
 } from "../shared/source-cache.js";
-import type { ClaudeBindingIndex } from "./binding-index.js";
-import { claudeSourceKey } from "./binding-index.js";
 import { validClaudeId } from "./identity.js";
-import {
-  claudeInteraction,
-  type ParsedClaudeBindingRecord,
-  resolveClaudeBindingEvent,
-} from "./interaction.js";
+import { claudeInteraction, type ParsedClaudeBindingRecord } from "./interaction.js";
 import {
   appendClaudeRecords,
   claudeDecoderDiagnostics,
@@ -44,7 +38,6 @@ interface CacheEntry {
 }
 export class ClaudeSessionSource implements SessionSource {
   readonly descriptor: SessionSourceDescriptor;
-  readonly #index: ClaudeBindingIndex | undefined;
   #decoder = new CheckpointedJsonlDecoder();
   #snapshot: SessionSourceSnapshot | null = null;
   #telemetry = mutableTelemetry();
@@ -56,12 +49,8 @@ export class ClaudeSessionSource implements SessionSource {
   constructor(
     private readonly directory: string,
     instanceKey: string,
-    {
-      agent = "claude",
-      index,
-    }: { readonly agent?: string; readonly index?: ClaudeBindingIndex } = {},
+    { agent = "claude" }: { readonly agent?: string } = {},
   ) {
-    this.#index = index;
     this.descriptor = {
       sourceType: "claude-jsonl",
       instanceKey,
@@ -150,14 +139,10 @@ export class ClaudeSessionSource implements SessionSource {
           rejected.set(key, { fingerprint, checkpoint: decoded.checkpoint, state });
           continue;
         }
-        const bindingEvents = [];
-        for (const binding of parsedBindings) {
-          bindingEvents.push(await resolveClaudeBindingEvent(binding, nativeId, this.#index));
-        }
         const entry =
           old?.entry !== undefined && old.state === state
             ? old.entry
-            : materializeClaudeSession(state, nativeId, this.descriptor, this.#index);
+            : materializeClaudeSession(state, nativeId, this.descriptor);
         const localId = entry.localId;
         next.set(key, {
           fingerprint,
@@ -166,7 +151,7 @@ export class ClaudeSessionSource implements SessionSource {
           entry,
         });
         seen.add(nativeId);
-        bindings.push(...bindingEvents.map((event) => ({ ...event, localId })));
+        bindings.push(...parsedBindings.map((event) => ({ ...event, localId })));
       }
     } catch (error) {
       if (!expectedIo(error)) throw error;
@@ -197,10 +182,10 @@ export class ClaudeSessionSource implements SessionSource {
 }
 export async function createClaudeSessionSource(
   configDirectory: string,
-  options: { readonly agent?: string; readonly index?: ClaudeBindingIndex } = {},
+  options: { readonly agent?: string } = {},
 ) {
   const directory = resolve(configDirectory);
-  return new ClaudeSessionSource(directory, claudeSourceKey(directory), options);
+  return new ClaudeSessionSource(directory, `claude-jsonl\0${directory}`, options);
 }
 
 async function discoverClaudeFiles(
@@ -239,7 +224,6 @@ function materializeClaudeSession(
   state: ClaudeState,
   nativeId: string,
   descriptor: SessionSourceDescriptor,
-  index: ClaudeBindingIndex | undefined,
 ): SourceSessionEntry {
   const projectDirectory = state.project ?? state.firstCwd;
   const origin = {
@@ -269,7 +253,7 @@ function materializeClaudeSession(
       diagnostics: state.diagnostics,
     },
     timeline: state.timeline,
-    interaction: index ? claudeInteraction(index, projectDirectory, state.taskName) : null,
+    interaction: claudeInteraction(projectDirectory, state.taskName),
   };
   return {
     localId,

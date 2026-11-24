@@ -1,17 +1,13 @@
-import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, it, vi } from "vitest";
 
-import {
-  ClaudeBindingIndex,
-  claudeSourceKey,
-} from "../../src/server/adapters/claude/binding-index.js";
+import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-message.js";
 import { claudeInteraction } from "../../src/server/adapters/claude/interaction.js";
 import { ClaudeSessionManager } from "../../src/server/adapters/claude/session-manager.js";
 import { interruptSteps } from "../../src/server/adapters/shared/session-management.js";
 import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
-import { SessionLaunchError } from "../../src/server/management/session-manager.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
 
 const operationId = "00000000-0000-4000-8000-000000000001";
@@ -29,11 +25,9 @@ const launchOptions = {
 
 async function setup() {
   const directory = await createTempDirectory("claude-manager-");
-  const bindings = join(directory, "bindings");
-  const index = new ClaudeBindingIndex(bindings, claudeSourceKey(directory));
   const tmux = new TmuxLauncher(socket);
-  const manager = new ClaudeSessionManager(directory, tmux, index, "/custom bin/claude");
-  return { directory, bindings, index, tmux, manager };
+  const manager = new ClaudeSessionManager(directory, tmux, "/custom bin/claude");
+  return { directory, tmux, manager };
 }
 
 it.each([
@@ -42,24 +36,14 @@ it.each([
   ["yolo", true, false],
   ["auto", false, true],
 ] as const)(
-  "publishes the binding before respawning Claude (mode=%s, worktree=%s, resume=%s)",
+  "passes the binding as the first positional argument (mode=%s, worktree=%s, resume=%s)",
   async (permissionMode, worktree, resume) => {
-    const { directory, bindings, tmux, manager } = await setup();
+    const { directory, tmux, manager } = await setup();
     await writeFile(join(directory, ".ahub-env"), 'CLAUDE_ENV_TEST="hello world"\n');
     const launch = vi
       .spyOn(tmux, "launchWithTarget")
       .mockImplementation(async (id, cwd, prepare, env) => {
-        await expect(access(bindings)).rejects.toMatchObject({ code: "ENOENT" });
-        const argv = await prepare(target);
-        const [file] = await readdir(bindings);
-        expect(file).toMatch(/^[a-f0-9]{32}\.json$/);
-        expect(JSON.parse(await readFile(join(bindings, file!), "utf8"))).toEqual({
-          ...target,
-          kind: resume ? "resume" : "create",
-          operationId,
-          ...(resume ? { nativeId } : {}),
-          source: claudeSourceKey(directory),
-        });
+        const argv = prepare(target);
         expect(id).toBe(operationId);
         expect(cwd).toBe("/launch-directory");
         expect(argv).toEqual([
@@ -73,9 +57,10 @@ it.each([
               : []),
           ...(worktree ? ["--"] : []),
           `Ignore this message and reply with only "OK". [ahub-bind:${JSON.stringify({
-            id: file!.slice(0, -5),
-            project: "/project",
-            task: "Task",
+            ...target,
+            operationId,
+            projectDirectory: "/project",
+            taskName: "Task",
           })}]`,
         ]);
         expect(env).toEqual({ CLAUDE_CONFIG_DIR: directory, CLAUDE_ENV_TEST: "hello world" });
@@ -93,51 +78,20 @@ it.each([
   },
 );
 
-it("does not publish a record when session creation fails and propagates publication errors", async () => {
-  const { tmux, manager, bindings } = await setup();
-  const launch = vi.spyOn(tmux, "launchWithTarget");
-  launch.mockRejectedValueOnce(new Error("tmux new-session failed"));
-  await expect(manager.launch(launchOptions)).rejects.toThrow("tmux new-session failed");
-  await expect(access(bindings)).rejects.toMatchObject({ code: "ENOENT" });
-
-  await writeFile(bindings, "not a directory");
-  launch.mockImplementationOnce(async (_id, _cwd, prepare) => {
-    await prepare(target);
-    return target;
-  });
-  await expect(manager.launch(launchOptions)).rejects.toMatchObject({ code: "EEXIST" });
-  expect(launch).toHaveBeenCalledTimes(2);
-});
-
-it("discards temporary binding records only when respawn fails with not_started", async () => {
-  const { tmux, manager, bindings } = await setup();
-  const launch = vi.spyOn(tmux, "launchWithTarget");
-  launch.mockImplementationOnce(async (_id, _cwd, prepare) => {
-    await prepare(target);
-    throw new SessionLaunchError("not_started", "tmux respawn-pane failed", null);
-  });
-  await expect(manager.launch(launchOptions)).rejects.toThrow("tmux respawn-pane failed");
-  expect(await readdir(bindings)).toEqual([]);
-
-  launch.mockImplementationOnce(async (_id, _cwd, prepare) => {
-    await prepare(target);
-    throw new SessionLaunchError("unknown", "tmux respawn-pane failed", "tmux attach", target);
-  });
-  await expect(manager.launch(launchOptions)).rejects.toThrow("tmux respawn-pane failed");
-  expect(await readdir(bindings)).toHaveLength(1);
-});
-
-it("validates identity, binding metadata, and missing directories before starting Claude", async () => {
+it("validates identity, binding inputs, and missing directories before starting Claude", async () => {
   const { tmux, manager, directory } = await setup();
   const launch = vi.spyOn(tmux, "launchWithTarget");
   await expect(manager.launch({ ...launchOptions, resumeNativeId: "invalid" })).rejects.toThrow(
     "Invalid resume identity",
   );
-  await expect(
-    manager.launch({ ...launchOptions, projectDirectory: "relative/project" }),
-  ).rejects.toThrow("Invalid Claude binding record");
-  await expect(manager.launch({ ...launchOptions, taskName: "   " })).rejects.toThrow(
-    "Invalid Claude binding record",
+  await expect(manager.launch({ ...launchOptions, taskName: "bad\ntask" })).rejects.toThrow(
+    "Task name",
+  );
+  expect(() =>
+    formatClaudeBindingMessage({ ...target, socketPath: "relative" }, null, null),
+  ).toThrow("Invalid Claude binding target");
+  expect(() => formatClaudeBindingMessage(target, null, null, "invalid")).toThrow(
+    "Invalid operation ID",
   );
   expect(launch).not.toHaveBeenCalled();
   await expect(manager.resolveDirectory(join(directory, "missing"))).rejects.toMatchObject({
@@ -147,8 +101,8 @@ it("validates identity, binding metadata, and missing directories before startin
 });
 
 it("provides shared interrupt steps and two pairs of exit interrupts", async () => {
-  const { manager, index } = await setup();
-  expect(claudeInteraction(index, null, null).interruptSteps).toBe(interruptSteps);
+  const { manager } = await setup();
+  expect(claudeInteraction(null, null).interruptSteps).toBe(interruptSteps);
   let elapsed = 0;
   expect(
     manager.exitSteps().map((step) => ({
