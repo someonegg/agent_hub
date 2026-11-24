@@ -14,7 +14,6 @@ export function formatBindingCommand(
   taskName: string | null,
 ): string {
   const project = validProjectDirectory(projectDirectory) ? projectDirectory : "";
-  // Claude's worktree isolation rejects tmux commands, so use the launcher's session name.
   return `! printf '${BINDING_MARKER}\\n%s\\n%s\\n%s\\n%s\\n%s\\n' "\${TMUX%%,*}" "$AHUB_TMUX_SESSION_NAME" ${shellQuote(operationId)} ${shellQuote(project)} ${shellQuote(JSON.stringify(taskName))}`;
 }
 

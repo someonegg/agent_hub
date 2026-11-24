@@ -1,49 +1,39 @@
-import { validTaskName } from "../../../shared/task-name.js";
-import type {
-  DomainAgentInteraction,
-  InteractionBindingAttempt,
-} from "../../domain/session-domain.js";
-import { bindingAttempts, formatBindingCommand } from "../shared/binding-protocol.js";
+import type { DomainAgentInteraction } from "../../domain/session-domain.js";
 import type { DecodedRecord } from "../shared/jsonl-decoder.js";
 import { DEFAULT_KEY_BINDINGS, interruptSteps } from "../shared/session-management.js";
+import {
+  type ClaudeBindingIndex,
+  parseClaudeBindingMessage,
+  type ParsedClaudeBindingMessage,
+} from "./binding-index.js";
+import { isClaudeContextInjectionBlock } from "./user-content.js";
 
-export const validClaudeId = (id: string) =>
-  /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id);
-
-export function claudeBindingCommand(
-  operationId = "",
-  projectDirectory?: string | null,
-  taskName: string | null = null,
-): string {
-  if (operationId && !validClaudeId(operationId)) throw new Error("Invalid operation ID");
-  if (taskName !== null && !validTaskName(taskName)) throw new Error("Invalid task name");
-  return formatBindingCommand(operationId, projectDirectory, taskName);
-}
-
-/** Only call with the main user record's native bash stdout wrapper. */
-export function claudeBindingAttempts(text: string, ordinal: number): InteractionBindingAttempt[] {
-  const found: InteractionBindingAttempt[] = [];
-  for (const match of text.matchAll(/<bash-stdout>([\s\S]*?)<\/bash-stdout>/g)) {
-    const lines = match[1]!.replace(/\r\n?/g, "\n").split("\n");
-    found.push(...bindingAttempts(lines, ordinal, validClaudeId));
-  }
-  return found;
+export interface ParsedClaudeBindingRecord {
+  readonly ordinal: number;
+  readonly time: number;
+  readonly parsed: ParsedClaudeBindingMessage;
 }
 
 export function claudeInteraction(
+  index: ClaudeBindingIndex,
   projectDirectory: string | null,
   taskName: string | null,
 ): DomainAgentInteraction {
   return {
     transport: "tmux",
-    bindingCommand: claudeBindingCommand("", projectDirectory, taskName),
+    bindingCommand: async (target) => {
+      const command = await index.publish(target, { kind: "handoff" }, projectDirectory, taskName);
+      return {
+        command,
+        discard: () => index.discard(command),
+      };
+    },
     interruptSteps,
     keyBindings: DEFAULT_KEY_BINDINGS,
   };
 }
 
-/** Only native main-session user shell wrappers can supply binding evidence. */
-export function claudeRecordBindings(record: DecodedRecord) {
+export function parseClaudeBindingRecord(record: DecodedRecord): ParsedClaudeBindingRecord | null {
   const row = record.value;
   if (
     row.type !== "user" ||
@@ -53,7 +43,7 @@ export function claudeRecordBindings(record: DecodedRecord) {
     row.isCompactSummary === true ||
     row.subtype === "subagent"
   )
-    return [];
+    return null;
   const message = row.message;
   if (
     !message ||
@@ -62,25 +52,67 @@ export function claudeRecordBindings(record: DecodedRecord) {
     message.role !== "user" ||
     !("content" in message)
   )
-    return [];
-  const content =
-    typeof message.content === "string"
-      ? [{ type: "text", text: message.content }]
-      : message.content;
-  if (!Array.isArray(content)) return [];
-  const attempts = content.flatMap((block) =>
-    block &&
-    block.type === "text" &&
-    typeof block.text === "string" &&
-    /^\s*<bash-(?:input|stdout|stderr)>/.test(block.text)
-      ? claudeBindingAttempts(block.text, record.ordinal)
-      : [],
-  );
+    return null;
+
+  const content = extractClaudeBindingText(message.content);
+  if (content === null) return null;
+  const parsed = parseClaudeBindingMessage(content);
+  if (!parsed) return null;
   const time = typeof row.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
-  return attempts.map((attempt, position) => ({
-    time: Number.isFinite(time) ? time : 0,
+  return {
     ordinal: record.ordinal,
-    position,
-    attempt,
-  }));
+    time: Number.isFinite(time) ? time : 0,
+    parsed,
+  };
+}
+
+export async function resolveClaudeBindingEvent(
+  entry: ParsedClaudeBindingRecord,
+  nativeId: string,
+  index?: ClaudeBindingIndex,
+) {
+  const { ordinal, time, parsed } = entry;
+  const binding = index ? await index.lookup(parsed.id, nativeId) : null;
+  return {
+    time,
+    ordinal,
+    position: 0,
+    attempt: binding
+      ? {
+          ordinal,
+          valid: true as const,
+          socketPath: binding.socketPath,
+          sessionName: binding.sessionName,
+          ...(binding.kind !== "handoff" ? { operationId: binding.operationId } : {}),
+          ...(parsed.projectDirectory !== undefined
+            ? { projectDirectory: parsed.projectDirectory }
+            : {}),
+          ...(parsed.taskName !== undefined ? { taskName: parsed.taskName } : {}),
+        }
+      : {
+          ordinal,
+          valid: false as const,
+          expired: true as const,
+        },
+  };
+}
+
+function extractClaudeBindingText(content: unknown): string | null {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return null;
+  let candidate: string | null = null;
+  for (const block of content) {
+    if (
+      !block ||
+      typeof block !== "object" ||
+      Array.isArray(block) ||
+      block.type !== "text" ||
+      typeof block.text !== "string"
+    )
+      return null;
+    if (isClaudeContextInjectionBlock(block.text)) continue;
+    if (candidate !== null) return null;
+    candidate = block.text;
+  }
+  return candidate;
 }

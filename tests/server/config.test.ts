@@ -108,12 +108,6 @@ it("names local-port in integer and range validation errors", () => {
   }
 });
 
-it("resolves the global Claude readiness script and rejects empty paths", () => {
-  expect(runnable(["--claude-ready-script", "./ready"]).claudeReadyScript).toBe(resolve("ready"));
-  expect(runnable([]).claudeReadyScript).toBeUndefined();
-  expect(() => runnable(["--claude-ready-script", " "])).toThrow("must not be empty");
-});
-
 it("resolves all server path options consistently for home, relative and absolute paths", () => {
   for (const path of ["~/config with spaces", "./config with spaces", "/tmp/config with spaces"]) {
     const expected = path.startsWith("~/") ? resolve(homedir(), path.slice(2)) : resolve(path);
@@ -126,8 +120,6 @@ it("resolves all server path options consistently for home, relative and absolut
       path,
       "--hosting",
       "--tmux-socket",
-      path,
-      "--claude-ready-script",
       path,
       "--ssl",
       "--ssl-cert",
@@ -145,7 +137,6 @@ it("resolves all server path options consistently for home, relative and absolut
       uploadDirectory: resolve(expected, "uploads"),
       hostingDirectory: resolve(expected, "hosting"),
       tmuxSocket: expected,
-      claudeReadyScript: expected,
       tls: {
         enabled: true,
         certificatePath: expected,

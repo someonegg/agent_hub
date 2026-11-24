@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-index.js";
 import {
   appendClaudeRecords,
   type ClaudeState,
@@ -31,6 +32,9 @@ describe("Claude incremental allocation", () => {
     for (const row of [
       { type: "progress", cwd: "/ignored" },
       message("user", "<system-reminder>hidden</system-reminder>"),
+      message("user", "<system-context>hidden</system-context>"),
+      message("user", "<ide_opened_file>hidden</ide_opened_file>"),
+      message("user", "<ide_selection>hidden</ide_selection>"),
       message("assistant", [{ type: "tool_use", name: "Read", id: "read", input: {} }]),
       message("user", [{ type: "tool_result", tool_use_id: "missing", content: "result" }]),
     ]) {
@@ -63,6 +67,21 @@ describe("Claude incremental allocation", () => {
     });
     expect(after.diagnostics).toHaveLength(1);
     expect(before.cwd).toBeNull();
+  });
+
+  it("hides binding messages and extracts project/task metadata synchronously", () => {
+    const before = createClaudeState(id);
+    const after = append(
+      before,
+      message("user", formatClaudeBindingMessage("a".repeat(32), "/bound-project", "Bound task")),
+    );
+    expect(after.timeline).toBe(before.timeline);
+    expect(after.questions).toBe(before.questions);
+    expect(after).toMatchObject({
+      project: "/bound-project",
+      taskName: "Bound task",
+      firstUser: null,
+    });
   });
 
   it("copies the timeline only when emitting and preserves existing items", () => {

@@ -49,7 +49,7 @@ export class SessionInteractionError extends Error {
 interface PreparedBinding {
   readonly binding: TmuxBinding;
   readonly interruptSteps: DomainAgentInteraction["interruptSteps"];
-  readonly bindingCommand: string;
+  readonly bindingCommand: DomainAgentInteraction["bindingCommand"];
   readonly keyBindings: NonNullable<InteractionSessionSnapshot["interaction"]>["keyBindings"];
 }
 
@@ -116,16 +116,6 @@ export class SessionInteractionService {
     const target = await this.tmux.resolveTarget(attempt);
     return target && this.bindings.owns(sessionId, target) ? target : null;
   }
-  async interruptLaunch(target: TmuxBinding, sessionId: string, assertActive: () => void) {
-    const { binding, interruptSteps } = await this.#prepare(sessionId);
-    if (binding.socketPath !== target.socketPath || binding.sessionName !== target.sessionName)
-      throw new Error("Launch binding changed before interrupt");
-    await this.tmux.sendKeys(target, interruptSteps(), () => {
-      assertActive();
-      this.#assertOwner(sessionId, target);
-    });
-  }
-
   sendExitKeys(
     target: TmuxBinding,
     sessionId: string,
@@ -234,8 +224,17 @@ export class SessionInteractionService {
     message = normalizeMessage(message);
     this.#assertAvailable(sessionId);
     const { binding } = await this.#prepare(sessionId);
-    this.#assertAvailable(sessionId);
     this.#assertInputAllowed(sessionId, binding, requireIdle);
+    await this.#sendMessage(sessionId, binding, message, requireIdle, confirmSubmission);
+  }
+
+  async #sendMessage(
+    sessionId: string,
+    binding: TmuxBinding,
+    message: string,
+    requireIdle = false,
+    confirmSubmission = false,
+  ) {
     const guard = this.#inputGuard(sessionId, binding, requireIdle);
     if (!confirmSubmission) {
       await this.#perform(() => this.tmux.sendMessage(binding, message, guard));
@@ -262,12 +261,20 @@ export class SessionInteractionService {
   async handoffPaneBinding(sessionId: string): Promise<void> {
     this.#assertAvailable(sessionId);
     const { binding, bindingCommand } = await this.#prepare(sessionId);
-    this.#assertAvailable(sessionId);
-    await this.#perform(() =>
-      this.tmux.sendMessage(binding, bindingCommand, () =>
-        this.#assertInputAllowed(sessionId, binding),
-      ),
-    );
+    this.#assertInputAllowed(sessionId, binding);
+    const prepared =
+      typeof bindingCommand === "string"
+        ? { command: bindingCommand }
+        : await bindingCommand(binding);
+    let message: string;
+    try {
+      message = normalizeMessage(prepared.command);
+      this.#assertInputAllowed(sessionId, binding);
+    } catch (error) {
+      await prepared.discard?.().catch(() => {});
+      throw error;
+    }
+    await this.#sendMessage(sessionId, binding, message);
   }
 
   async sendKeys(

@@ -7,7 +7,6 @@ import {
   shellQuote,
   TmuxLauncher,
 } from "../../src/server/interaction/tmux-launcher.js";
-import { TmuxInteractionService } from "../../src/server/interaction/tmux-service.js";
 
 const execute = vi.hoisted(() => vi.fn());
 vi.mock("node:child_process", async (original) => {
@@ -53,10 +52,6 @@ function fails(error: Error) {
 beforeEach(() => {
   execute.mockReset();
   execute.mockImplementation(succeeds("/actual/tmux.sock"));
-  vi.spyOn(TmuxInteractionService.prototype, "connect").mockImplementation(async (attempt) => {
-    if (!attempt.valid) throw new Error("invalid");
-    return { socketPath: attempt.socketPath, sessionName: attempt.sessionName };
-  });
 });
 it.each([undefined, "/configured/socket path"])(
   "launches with configured socket %s and records the actual socket",
@@ -188,4 +183,148 @@ it("escapes trailing semicolons in env arguments and keeps values out of launch 
     }),
   ).rejects.toThrow(/^tmux new-session failed$/);
   expect(execute.mock.calls[0]![1]).toContain("TEST=secret\\;");
+});
+
+it.each([undefined, "/configured/socket path"])(
+  "creates a placeholder session before building and respawning a deferred command (%s)",
+  async (socket) => {
+    const tmux = new TmuxLauncher(socket);
+    const prepare = vi.fn(async (target) => {
+      expect(target).toEqual({
+        socketPath: "/actual/tmux.sock",
+        sessionName: "ahub-00000000-0000-0000-0000-000000000007",
+      });
+      expect(execute).toHaveBeenCalledTimes(1);
+      return ["claude", "prompt"];
+    });
+    const binding = await tmux.launchWithTarget(
+      "00000000-0000-0000-0000-000000000007",
+      "/project",
+      prepare,
+      {
+        CLAUDE_CONFIG_DIR: "/agent;",
+        TEST: "value",
+      },
+    );
+    expect(binding).toEqual({
+      socketPath: "/actual/tmux.sock",
+      sessionName: "ahub-00000000-0000-0000-0000-000000000007",
+    });
+    expect(prepare).toHaveBeenCalledOnce();
+    const first = execute.mock.calls[0]![1] as string[];
+    expect(first.slice(0, socket ? 2 : 1)).toEqual(socket ? ["-S", socket] : ["new-session"]);
+    expect(first).not.toContain("-e");
+    expect(first.slice(-2)).toEqual(["sleep", "60"]);
+    expect(execute.mock.calls[1]![1]).toEqual([
+      "-S",
+      "/actual/tmux.sock",
+      "respawn-pane",
+      "-k",
+      "-t",
+      "=ahub-00000000-0000-0000-0000-000000000007:",
+      "-e",
+      "CLAUDE_CONFIG_DIR=/agent\\;",
+      "-e",
+      "TEST=value",
+      "-e",
+      "AHUB_TMUX_SESSION_NAME=ahub-00000000-0000-0000-0000-000000000007",
+      "-c",
+      "/project",
+      "claude",
+      "prompt",
+    ]);
+    expect(execute.mock.calls[2]![1]).toEqual([
+      "-S",
+      "/actual/tmux.sock",
+      "set-option",
+      "-p",
+      "-t",
+      "=ahub-00000000-0000-0000-0000-000000000007:",
+      "remain-on-exit",
+      "off",
+    ]);
+  },
+);
+
+it("cleans up the placeholder session when deferred preparation or respawn fails", async () => {
+  const tmux = new TmuxLauncher();
+  await expect(
+    tmux.launchWithTarget("00000000-0000-0000-0000-000000000007", "/project", async () => {
+      throw new Error("publish failed");
+    }),
+  ).rejects.toThrow("publish failed");
+  expect(execute).toHaveBeenCalledTimes(2);
+  expect(execute.mock.calls[1]![1]).toEqual([
+    "-S",
+    "/actual/tmux.sock",
+    "kill-session",
+    "-t",
+    "=ahub-00000000-0000-0000-0000-000000000007:",
+  ]);
+
+  execute.mockClear();
+  execute
+    .mockImplementationOnce(succeeds("/actual/tmux.sock"))
+    .mockImplementationOnce(fails(new Error("Command failed: tmux -e SECRET=value")))
+    .mockImplementationOnce(succeeds(""));
+  await expect(
+    tmux.launchWithTarget(
+      "00000000-0000-0000-0000-000000000007",
+      "/project",
+      async () => ["claude"],
+      {
+        SECRET: "value",
+      },
+    ),
+  ).rejects.toMatchObject({
+    outcome: "not_started",
+    message: "tmux respawn-pane failed",
+    attachCommand: null,
+  });
+  expect(execute.mock.calls[2]![1]).toEqual([
+    "-S",
+    "/actual/tmux.sock",
+    "kill-session",
+    "-t",
+    "=ahub-00000000-0000-0000-0000-000000000007:",
+  ]);
+
+  execute.mockClear();
+  execute
+    .mockImplementationOnce(succeeds("/actual/tmux.sock"))
+    .mockImplementationOnce(fails(Object.assign(new Error("timeout"), { killed: true })));
+  await expect(
+    tmux.launchWithTarget("00000000-0000-0000-0000-000000000007", "/project", async () => [
+      "claude",
+    ]),
+  ).rejects.toMatchObject({
+    outcome: "unknown",
+    message: "tmux respawn-pane failed",
+    target: {
+      socketPath: "/actual/tmux.sock",
+      sessionName: "ahub-00000000-0000-0000-0000-000000000007",
+    },
+    attachCommand: attachCommand("/actual/tmux.sock", "ahub-00000000-0000-0000-0000-000000000007"),
+  });
+  expect(execute).toHaveBeenCalledTimes(2);
+});
+
+it("rejects invalid configured socket paths before starting tmux", async () => {
+  await expect(
+    new TmuxLauncher("relative/socket").launch("00000000-0000-0000-0000-000000000007", "/project", [
+      "codex",
+    ]),
+  ).rejects.toMatchObject({
+    outcome: "not_started",
+    message: "Invalid tmux socket path",
+  });
+  await expect(
+    new TmuxLauncher("/bad\nsocket").launch("00000000-0000-0000-0000-000000000007", "/project", [
+      "codex",
+    ]),
+  ).rejects.toMatchObject({
+    outcome: "not_started",
+    message: "Invalid tmux socket path",
+  });
+  expect(execute).not.toHaveBeenCalled();
 });

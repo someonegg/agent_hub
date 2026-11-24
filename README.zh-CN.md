@@ -74,7 +74,7 @@ agent-hub
 </details>
 
 展开**终端预览**跟进 CLI，并通过屏幕按钮处理提示。
-快捷键、中断与 Codex 会话移交详见[与会话交互](docs/usage.zh-CN.md#发送提示与文件)。
+快捷键、中断与会话移交详见[与会话交互](docs/usage.zh-CN.md#发送提示与文件)。
 
 ## 通过管理 CLI 操作会话
 

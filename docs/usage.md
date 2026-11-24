@@ -66,7 +66,7 @@ Sent prompts appear as **Pending** until conversation messages update; pure slas
 commands skip this preview. Failed sends retain your draft. Draft text and
 attachment selections survive session navigation but reset on page refresh.
 
-If Codex switches sessions in the same terminal after `/clear`, `/resume`, or
+If an agent switches sessions in the same terminal after `/clear`, `/resume`, or
 running a plan, click **Handoff** on the old session's connected page. When it
 shows **Superseded**, follow **Go to bound session**. Unsent drafts stay on the old page.
 

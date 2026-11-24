@@ -12,7 +12,6 @@ export async function startNode(config: ServerConfig) {
   const hub = await createAhub({
     agents: config.agents,
     socket: config.tmuxSocket,
-    claudeReadyScript: config.claudeReadyScript,
     interactionEnabled: config.interactionEnabled,
     uploads,
   });

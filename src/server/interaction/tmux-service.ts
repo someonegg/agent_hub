@@ -11,7 +11,6 @@ import {
   type InteractionTransport,
   InteractionTransportError,
   type MessageSubmissionOptions,
-  type TerminalCursorSnapshot,
   type TmuxBinding,
 } from "./transport.js";
 
@@ -208,47 +207,6 @@ export class TmuxInteractionService implements InteractionTransport {
         assertAvailable,
       );
       return { content: result.stdout, truncated: result.truncated === true };
-    });
-  }
-
-  /** Read cursor and screen in one tmux command queue; discard moving or truncated captures. */
-  captureTerminalWithCursor(binding: TmuxBinding): Promise<TerminalCursorSnapshot | null> {
-    return this.#serialize(binding, async () => {
-      const target = tmuxTarget(binding.sessionName);
-      const position = [
-        "display-message",
-        "-p",
-        "-t",
-        target,
-        "#{cursor_x},#{cursor_y},#{pane_width},#{pane_height}",
-      ];
-      const result = await this.#capture(binding, [
-        ...position,
-        ";",
-        "capture-pane",
-        "-p",
-        "-t",
-        target,
-        ";",
-        ...position,
-      ]);
-      if (result.truncated) return null;
-      const lines = result.stdout.split("\n");
-      if (lines.pop() !== "") return null;
-      const before = lines.shift();
-      const after = lines.pop();
-      if (!before || before !== after || !/^\d+,\d+,\d+,\d+$/.test(before)) return null;
-      const [cursorX, cursorY, width, height] = before.split(",").map(Number);
-      if (
-        ![cursorX, cursorY, width, height].every(Number.isSafeInteger) ||
-        width <= 0 ||
-        height <= 0 ||
-        cursorX >= width ||
-        cursorY >= height ||
-        lines.length !== height
-      )
-        return null;
-      return { content: lines.join("\n"), cursorX, cursorY };
     });
   }
 

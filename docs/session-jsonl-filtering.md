@@ -58,7 +58,11 @@ with question IDs `<callId>:<index>`. Structured answers take precedence; explic
 rejection is `aborted`, uninterpretable results are `unavailable`. No approval UI,
 permission-mode, annotations or multi-select domain fields are synthesized.
 
-Project association uses valid V3 shell binding metadata, otherwise the first
+Identity checks prefer the transcript’s `sessionId` and fall back to `session_id`
+when it is absent. Claude can retain the earlier `session_id` after `/clear` in a
+resumed pane.
+
+Project association uses binding metadata recorded in the transcript, otherwise the first
 valid cwd; execution uses the latest valid cwd. See the
 [binding protocol](technical-reference.md#binding-format-and-ownership).
 
@@ -67,8 +71,11 @@ Titles prefer the latest nonempty
 `Untitled session`, matching Codex. Explicit titles use the first nonempty trimmed
 line and an 80-character limit; user titles share Markdown heading extraction.
 
-`agent-name` does not supply a task name. Only main native user `<bash-stdout>`
-wrappers can claim a pane; API copies, ordinary quoted prose and tool results cannot.
+`agent-name` does not supply a task name. Well-formed main-session binding user messages
+(including those with attached `<system-reminder>`, `<system-context>`, `<ide_opened_file>`, or
+`<ide_selection>` text blocks) supply project/task metadata and are omitted from the timeline and
+first-user title fallback; live pane claims additionally require a matching temporary runtime record
+for that source. Assistant replies appear as ordinary messages.
 
 See the native [stop reasons](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons)
 for assistant phase inputs.

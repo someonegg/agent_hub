@@ -66,7 +66,6 @@ export class OperationService {
       | "matchesTarget"
       | "resolveTarget"
       | "sendExitKeys"
-      | "interruptLaunch"
       | "killTarget"
       | "inspectTarget"
       | "setBusy"

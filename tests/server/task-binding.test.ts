@@ -3,10 +3,6 @@ import { execFileSync } from "node:child_process";
 import { expect, it } from "vitest";
 
 import {
-  appendClaudeRecords,
-  createClaudeState,
-} from "../../src/server/adapters/claude/session-normalizer.js";
-import {
   codexBindingAttemptsFrom,
   codexBindingCommand,
 } from "../../src/server/adapters/codex/interaction-parser.js";
@@ -73,27 +69,3 @@ it("rejects shell output delimiters before generating commands", () => {
     codexBindingCommand(undefined, "/project", "Fix </user_shell_command> parsing"),
   ).toThrow("Task name");
 });
-
-it("preserves Claude task and project metadata across invalid updates", () => {
-  const first = appendClaudeRecords(createClaudeState("session"), [
-    claudeBindingRecord(1, "/first", JSON.stringify("first")),
-  ]);
-  for (const task of ['""', "not-json", "42", JSON.stringify("a>b")]) {
-    const second = appendClaudeRecords(first, [claudeBindingRecord(2, "relative", task)]);
-    expect(second, JSON.stringify(task)).toMatchObject({ project: "/first", taskName: "first" });
-    expect(first, JSON.stringify(task)).toMatchObject({ project: "/first", taskName: "first" });
-  }
-});
-
-function claudeBindingRecord(ordinal: number, project: string, task: string) {
-  return {
-    ordinal,
-    value: {
-      type: "user",
-      message: {
-        role: "user",
-        content: `<bash-stdout>AHUB_TMUX_BIND_V3\n/tmp/socket\nahub-00000000-0000-0000-0000-000000000007\n\n${project}\n${task}\n</bash-stdout>`,
-      },
-    },
-  };
-}

@@ -1,238 +1,198 @@
 import { execFileSync } from "node:child_process";
-import { mkdir, realpath, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { expect, it, vi } from "vitest";
 
-import { claudePromptPosition } from "../../src/server/adapters/claude/prompt-readiness.js";
-import { ClaudeSessionManager } from "../../src/server/adapters/claude/session-manager.js";
+import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-index.js";
 import { createAhub } from "../../src/server/create-hub.js";
 import { createApiRouter } from "../../src/server/http/api-router.js";
-import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
 import { TmuxInteractionService } from "../../src/server/interaction/tmux-service.js";
 import { startHttpServer } from "../helpers/http-server.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
 
-it("does not send bootstrap input to Claude's real directory trust dialog", async () => {
-  const root = await realpath(await createTempDirectory("claude-native-trust-"));
-  const directory = join(root, "untrusted-project");
-  const agent = join(root, "agent");
-  const socket = join(root, "tmux.sock");
-  await mkdir(directory);
-  await mkdir(agent);
-  const key = "test-only-not-a-real-api-key";
-  await writeFile(
-    join(agent, ".claude.json"),
-    JSON.stringify({
-      hasCompletedOnboarding: true,
-      lastOnboardingVersion: "2.1.318",
-      theme: "dark",
-      customApiKeyResponses: { approved: [key.slice(-20)], rejected: [] },
-    }),
-  );
-  await writeFile(
-    join(agent, "settings.json"),
-    JSON.stringify({
-      env: {
-        ANTHROPIC_API_KEY: key,
-        ANTHROPIC_BASE_URL: "http://127.0.0.1:1",
-        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
-      },
-    }),
-  );
-  const tmux = new TmuxLauncher(socket);
-  const send = vi.spyOn(tmux.transport, "sendMessage");
-  const operationId = "00000000-0000-4000-8000-000000000001";
-  const target = { socketPath: socket, sessionName: `ahub-${operationId}` };
-  const result = new ClaudeSessionManager(agent, tmux)
-    .launch({
-      operationId,
-      workingDirectory: directory,
-      worktree: false,
-      permissionMode: "default",
-    })
-    .then(
-      () => null,
-      (error: unknown) => error,
-    );
-  try {
-    let sawTrustDialog = false;
-    const deadline = Date.now() + 10_000;
-    while (Date.now() < deadline) {
-      const snapshot = await tmux.transport.captureTerminalWithCursor(target).catch(() => null);
-      if (snapshot?.content.includes("Yes, I trust this folder")) {
-        expect(claudePromptPosition(snapshot)).toBeNull();
-        sawTrustDialog = true;
-        break;
-      }
-      await delay(100);
-    }
-    expect(sawTrustDialog).toBe(true);
-    expect(await result).toMatchObject({
-      outcome: "unknown",
-      target,
-      message: expect.stringContaining("readiness was not confirmed"),
-      attachCommand: expect.stringContaining("tmux"),
-    });
-    expect(send).not.toHaveBeenCalled();
-  } finally {
-    try {
-      execFileSync("tmux", ["-S", socket, "kill-server"]);
-    } catch {}
-    await result;
-  }
-}, 30_000);
-
 /** Native CLI and tmux; credentials, model responses, agents and projects are test-owned. */
-it("creates, interacts, interrupts, exits and resumes the original Claude identity, including worktrees", async () => {
-  const root = await realpath(await createTempDirectory("claude-native-management-"));
+it("runs the Claude lifecycle across cold and running default servers", async () => {
+  const root = await realpath(await createTempDirectory("ahc-"));
   const directory = join(root, "project");
   const agent = join(root, "agent");
-  const socket = join(root, "tmux.sock");
-  await mkdir(directory);
-  await mkdir(agent);
-  execFileSync("git", ["-C", directory, "init", "-q"]);
-  execFileSync("git", [
-    "-C",
-    directory,
-    "-c",
-    "user.name=Test",
-    "-c",
-    "user.email=test@example.invalid",
-    "commit",
-    "--allow-empty",
-    "-qm",
-    "Test",
-  ]);
-  let mode: "text" | "question" | "hold" = "text";
-  let requests = 0;
-  const api = createServer(async (req, res) => {
-    for await (const _ of req) {
-      /* Drain the request without retaining prompts. */
-    }
-    if (!req.url?.includes("/messages")) {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end("{}");
-      return;
-    }
-    requests++;
-    if (mode === "hold") {
-      res.writeHead(200, { "content-type": "text/event-stream" });
-      res.flushHeaders();
-      return;
-    }
-    res.writeHead(200, { "content-type": "text/event-stream" });
-    const event = (type: string, data: unknown) =>
-      res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
-    event("message_start", {
-      type: "message_start",
-      message: {
-        id: `msg_test_${requests}`,
-        type: "message",
-        role: "assistant",
-        model: "claude-sonnet-4-6",
-        content: [],
-        stop_reason: null,
-        stop_sequence: null,
-        usage: { input_tokens: 1, output_tokens: 0 },
-      },
-    });
-    const question = mode === "question";
-    mode = "text";
-    event("content_block_start", {
-      type: "content_block_start",
-      index: 0,
-      content_block: question
-        ? { type: "tool_use", id: "ask_native", name: "AskUserQuestion", input: {} }
-        : { type: "text", text: "" },
-    });
-    event("content_block_delta", {
-      type: "content_block_delta",
-      index: 0,
-      delta: question
-        ? {
-            type: "input_json_delta",
-            partial_json: JSON.stringify({
-              questions: [
-                {
-                  header: "Test",
-                  question: "Choose a test option",
-                  options: [
-                    { label: "One", description: "First" },
-                    { label: "Two", description: "Second" },
-                  ],
-                  multiSelect: false,
-                },
-              ],
-            }),
-          }
-        : { type: "text_delta", text: "Native Claude integration response" },
-    });
-    event("content_block_stop", { type: "content_block_stop", index: 0 });
-    event("message_delta", {
-      type: "message_delta",
-      delta: { stop_reason: question ? "tool_use" : "end_turn", stop_sequence: null },
-      usage: { output_tokens: 1 },
-    });
-    event("message_stop", { type: "message_stop" });
-    res.end();
-  });
-  await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
-  const address = api.address();
-  if (!address || typeof address === "string") throw new Error("Missing mock address");
-  const key = "test-only-not-a-real-api-key";
-  await writeFile(
-    join(agent, ".claude.json"),
-    JSON.stringify({
-      hasCompletedOnboarding: true,
-      lastOnboardingVersion: "2.1.318",
-      theme: "dark",
-      customApiKeyResponses: { approved: [key.slice(-20)], rejected: [] },
-      projects: {
-        [directory]: { hasTrustDialogAccepted: true, hasCompletedProjectOnboarding: true },
-      },
-    }),
-  );
-  await writeFile(
-    join(agent, "settings.json"),
-    JSON.stringify({
-      env: {
-        ANTHROPIC_API_KEY: key,
-        ANTHROPIC_BASE_URL: `http://127.0.0.1:${address.port}`,
-        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
-      },
-      model: "claude-sonnet-4-6",
-    }),
-  );
-  const hub = await createAhub({
-    agents: [{ nickname: "claude", path: agent, adapter: "claude" }],
-    socket,
-  });
-  const kill = vi.spyOn(hub.interaction, "killTarget");
-  const { base } = await startHttpServer(createApiRouter(hub), () => hub.close());
-  const until = async (predicate: () => Promise<boolean>, description: string) => {
-    const deadline = Date.now() + 45_000;
-    while (Date.now() < deadline) {
-      await hub.operations.poll();
-      if (await predicate()) return;
-      await delay(100);
-    }
-    let terminal = "";
-    try {
-      terminal = execFileSync("tmux", ["-S", socket, "capture-pane", "-p"], { encoding: "utf8" });
-    } catch {}
-    throw new Error(`Timed out: ${description}\n${terminal}`);
+  const socket = join(root, `tmux-${process.getuid!()}`, "default");
+  const bindingsDirectory = join(root, "bindings");
+  const records = async () => {
+    const files = (await readdir(bindingsDirectory)).sort();
+    return Object.fromEntries(
+      await Promise.all(
+        files.map(
+          async (file) => [file, await readFile(join(bindingsDirectory, file), "utf8")] as const,
+        ),
+      ),
+    );
   };
-  const succeeded = async (id: string) => {
-    await until(async () => {
-      const op = await hub.operations.get(id);
-      if (op?.status === "failed" || op?.status === "unknown") throw new Error(JSON.stringify(op));
-      return op?.status === "succeeded";
-    }, "operation confirmation");
-    return (await hub.operations.get(id))!;
+  const initialResolvers: (() => void)[] = [];
+  const releaseInitial = () => {
+    for (const resolve of initialResolvers.splice(0)) resolve();
   };
+  let cleanupHub: { close(): void } | undefined;
+  let cleanupApi: ReturnType<typeof createServer> | undefined;
+  let cleanupSendKeys: { mockRestore(): void } | undefined;
   try {
+    vi.stubEnv("TMUX", undefined);
+    vi.stubEnv("TMUX_TMPDIR", root);
+    await mkdir(directory);
+    await mkdir(agent);
+    execFileSync("git", ["-C", directory, "init", "-q"]);
+    execFileSync("git", [
+      "-C",
+      directory,
+      "-c",
+      "user.name=Test",
+      "-c",
+      "user.email=test@example.invalid",
+      "commit",
+      "--allow-empty",
+      "-qm",
+      "Test",
+    ]);
+    let mode: "text" | "question" | "hold" | "initial" = "initial";
+    let requests = 0;
+    const api = createServer(async (req, res) => {
+      for await (const _ of req) {
+        /* Drain the request without retaining prompts. */
+      }
+      if (!req.url?.includes("/messages")) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end("{}");
+        return;
+      }
+      requests++;
+      if (mode === "hold") {
+        res.writeHead(200, { "content-type": "text/event-stream" });
+        res.flushHeaders();
+        return;
+      }
+      if (mode === "initial") {
+        await new Promise<void>((resolve) => {
+          initialResolvers.push(resolve);
+        });
+      }
+      res.writeHead(200, { "content-type": "text/event-stream" });
+      const event = (type: string, data: unknown) =>
+        res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+      event("message_start", {
+        type: "message_start",
+        message: {
+          id: `msg_test_${requests}`,
+          type: "message",
+          role: "assistant",
+          model: "claude-sonnet-4-6",
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 1, output_tokens: 0 },
+        },
+      });
+      const question = mode === "question";
+      mode = "text";
+      event("content_block_start", {
+        type: "content_block_start",
+        index: 0,
+        content_block: question
+          ? { type: "tool_use", id: "ask_native", name: "AskUserQuestion", input: {} }
+          : { type: "text", text: "" },
+      });
+      event("content_block_delta", {
+        type: "content_block_delta",
+        index: 0,
+        delta: question
+          ? {
+              type: "input_json_delta",
+              partial_json: JSON.stringify({
+                questions: [
+                  {
+                    header: "Test",
+                    question: "Choose a test option",
+                    options: [
+                      { label: "One", description: "First" },
+                      { label: "Two", description: "Second" },
+                    ],
+                    multiSelect: false,
+                  },
+                ],
+              }),
+            }
+          : { type: "text_delta", text: "Native Claude integration response" },
+      });
+      event("content_block_stop", { type: "content_block_stop", index: 0 });
+      event("message_delta", {
+        type: "message_delta",
+        delta: { stop_reason: question ? "tool_use" : "end_turn", stop_sequence: null },
+        usage: { output_tokens: 1 },
+      });
+      event("message_stop", { type: "message_stop" });
+      res.end();
+    });
+    cleanupApi = api;
+    await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
+    const address = api.address();
+    if (!address || typeof address === "string") throw new Error("Missing mock address");
+    const key = "test-only-not-a-real-api-key";
+    await writeFile(
+      join(agent, ".claude.json"),
+      JSON.stringify({
+        hasCompletedOnboarding: true,
+        lastOnboardingVersion: "2.1.318",
+        theme: "dark",
+        customApiKeyResponses: { approved: [key.slice(-20)], rejected: [] },
+        projects: {
+          [directory]: { hasTrustDialogAccepted: true, hasCompletedProjectOnboarding: true },
+        },
+      }),
+    );
+    await writeFile(
+      join(agent, "settings.json"),
+      JSON.stringify({
+        env: {
+          ANTHROPIC_API_KEY: key,
+          ANTHROPIC_BASE_URL: `http://127.0.0.1:${address.port}`,
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+        },
+        model: "claude-sonnet-4-6",
+      }),
+    );
+    const options = {
+      agents: [{ nickname: "claude", path: agent, adapter: "claude" as const }],
+      bindingsDirectory,
+    };
+    const hub = await createAhub(options);
+    cleanupHub = hub;
+    let activeHub = hub;
+    const sendKeys = vi.spyOn(TmuxInteractionService.prototype, "sendKeys");
+    cleanupSendKeys = sendKeys;
+    const initialKill = vi.spyOn(hub.interaction, "killTarget");
+    const { base } = await startHttpServer(createApiRouter(hub), () => hub.close());
+    const until = async (predicate: () => Promise<boolean>, description: string) => {
+      const deadline = Date.now() + 45_000;
+      while (Date.now() < deadline) {
+        await activeHub.operations.poll();
+        if (await predicate()) return;
+        await delay(100);
+      }
+      let terminal = "";
+      try {
+        terminal = execFileSync("tmux", ["-S", socket, "capture-pane", "-p"], { encoding: "utf8" });
+      } catch {}
+      throw new Error(`Timed out: ${description}\n${terminal}`);
+    };
+    const succeeded = async (id: string) => {
+      await until(async () => {
+        const op = await activeHub.operations.get(id);
+        if (op?.status === "failed" || op?.status === "unknown")
+          throw new Error(JSON.stringify(op));
+        return op?.status === "succeeded";
+      }, "operation confirmation");
+      return (await activeHub.operations.get(id))!;
+    };
     const created = await succeeded(
       hub.operations.create({
         projectDirectory: directory,
@@ -240,7 +200,44 @@ it("creates, interacts, interrupts, exits and resumes the original Claude identi
         requestId: "claude-native-create",
       }).operationId,
     );
+    expect(sendKeys).not.toHaveBeenCalled();
     const sessionId = created.sessionId!;
+    const initialRecords = await records();
+    expect(Object.keys(initialRecords)).toHaveLength(1);
+    const initialFile = Object.keys(initialRecords)[0]!;
+    const initialId = initialFile.slice(0, -5);
+    const projects = join(agent, "projects");
+    const rawJsonl = async () => {
+      const directories = await readdir(projects, { withFileTypes: true });
+      const files = (
+        await Promise.all(
+          directories
+            .filter((entry) => entry.isDirectory())
+            .map(async (entry) => {
+              const project = join(projects, entry.name);
+              return (await readdir(project))
+                .filter((name) => name.endsWith(".jsonl"))
+                .map((name) => join(project, name));
+            }),
+        )
+      ).flat();
+      return (await Promise.all(files.map((file) => readFile(file, "utf8")))).join("\n");
+    };
+    expect(await rawJsonl()).toContain(
+      JSON.stringify(formatClaudeBindingMessage(initialId, directory, null)),
+    );
+    expect(await hub.sessions.messages(sessionId, {})).toMatchObject({ items: [] });
+    await until(async () => initialResolvers.length > 0, "initial model request");
+    mode = "text";
+    releaseInitial();
+    await until(
+      async () =>
+        JSON.stringify(await hub.sessions.messages(sessionId, {})).includes(
+          "Native Claude integration response",
+        ),
+      "initial response after binding",
+    );
+    expect(await records()).toEqual(initialRecords);
     const nativeId = (await hub.sessions.managementSnapshot()).byId.get(sessionId)!.sourceId;
     expect(nativeId).toMatch(/^[a-f0-9-]+$/);
     expect((await hub.sessions.list()).agents).toEqual([
@@ -263,12 +260,12 @@ it("creates, interacts, interrupts, exits and resumes the original Claude identi
       supported: true,
       state: "connected",
     });
+    const beforeHello = requests;
     await hub.interaction.sendMessage(sessionId, "Say hello");
     await until(
       async () =>
-        JSON.stringify(await hub.sessions.messages(sessionId, {})).includes(
-          "Native Claude integration response",
-        ),
+        requests > beforeHello &&
+        JSON.stringify(await hub.sessions.messages(sessionId, {})).includes("Say hello"),
       "ordinary response",
     );
     mode = "question";
@@ -295,38 +292,123 @@ it("creates, interacts, interrupts, exits and resumes the original Claude identi
       supported: true,
       state: "disconnected",
     });
+    sendKeys.mockClear();
     const resumed = await succeeded(
       hub.operations.create({ resumeSessionId: sessionId, requestId: "claude-native-resume" })
         .operationId,
     );
     expect(resumed.sessionId).toBe(sessionId);
+    expect(sendKeys).not.toHaveBeenCalled();
+    const resumeRecords = await records();
+    expect(Object.keys(resumeRecords)).toHaveLength(2);
+    expect(resumeRecords).toMatchObject(initialRecords);
+    const resumeTarget = await hub.interaction.resolveTarget(sessionId);
+    expect(resumeTarget).toMatchObject({
+      socketPath: socket,
+      sessionName: `ahub-${resumed.operationId}`,
+    });
     expect((await hub.sessions.managementSnapshot()).byId.get(sessionId)?.sourceId).toBe(nativeId);
-    const worktree = await succeeded(
-      hub.operations.create({
-        projectDirectory: directory,
-        worktree: true,
-        requestId: "claude-native-worktree",
-      }).operationId,
+    const transport = new TmuxInteractionService();
+    const resumeFile = Object.keys(resumeRecords).find((file) => !(file in initialRecords))!;
+    const resumeMarker = `"id":"${resumeFile.slice(0, -5)}"`;
+    const capture = async () => (await transport.captureTerminal(resumeTarget!)).content;
+    await until(async () => (await capture()).includes(resumeMarker), "resume prompt in pane");
+    await hub.interaction.sendMessage(sessionId, "/clear");
+    await until(
+      async () => !(await capture()).includes(resumeMarker),
+      "cleared Claude conversation",
     );
-    const session = (await hub.sessions.managementSnapshot()).byId.get(worktree.sessionId!)!;
-    expect(session.projectDirectory).toBe(directory);
-    expect(session.workingDirectory).not.toBe(directory);
-    await succeeded(hub.operations.manage("exit", session.id).operationId);
-    const deleteTarget = await hub.interaction.resolveTarget(sessionId);
-    expect(deleteTarget).not.toBeNull();
-    await succeeded(hub.operations.manage("delete", sessionId).operationId);
-    expect((await hub.sessions.managementSnapshot()).byId.has(sessionId)).toBe(false);
-    expect(await new TmuxInteractionService().inspect(deleteTarget!)).toBe("exited");
-    // Ctrl-C is adapter-compatible; native versions may require the shared fallback.
-    const killedTargets = kill.mock.calls.map(([target]) => JSON.stringify(target));
-    expect(new Set(killedTargets).size).toBe(killedTargets.length);
-    expect(killedTargets.length).toBeLessThanOrEqual(3);
-  } finally {
+    const handoff = await fetch(`${base}/api/v1/sessions/${sessionId}/handoff-pane-binding`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(handoff.status).toBe(204);
+    const handoffRecords = await records();
+    expect(Object.keys(handoffRecords)).toHaveLength(3);
+    const handoffFile = Object.keys(handoffRecords).find((file) => !(file in resumeRecords))!;
+    expect(JSON.parse(handoffRecords[handoffFile]!)).toMatchObject({
+      ...resumeTarget,
+      kind: "handoff",
+    });
+    await until(
+      async () =>
+        (await rawJsonl()).includes(
+          JSON.stringify(formatClaudeBindingMessage(handoffFile.slice(0, -5), directory, null)),
+        ),
+      "handoff JSONL",
+    );
+    expect(await records()).toEqual(handoffRecords);
+    expect(sendKeys).not.toHaveBeenCalled();
+    await until(async () => {
+      await hub.sessions.refresh();
+      const interaction = await hub.interaction.describe(sessionId);
+      return interaction?.supported === true && interaction.state === "superseded";
+    }, "handoff ownership");
+    const superseded = await hub.interaction.describe(sessionId);
+    expect(superseded).toMatchObject({
+      state: "superseded",
+      supersededBySessionId: expect.any(String),
+    });
+    if (!superseded?.supported || !superseded.supersededBySessionId)
+      throw new Error("Missing handoff session");
+    const handoffSessionId = superseded.supersededBySessionId;
+    expect(handoffSessionId).not.toBe(sessionId);
+    expect(await hub.interaction.resolveTarget(handoffSessionId)).toEqual(resumeTarget);
     hub.close();
+    const restarted = await createAhub(options);
+    activeHub = restarted;
+    const restartedKill = vi.spyOn(restarted.interaction, "killTarget");
     try {
-      execFileSync("tmux", ["-S", socket, "kill-server"]);
+      expect(await restarted.interaction.resolveTarget(handoffSessionId)).toEqual(resumeTarget);
+      expect(await restarted.interaction.describe(sessionId)).toMatchObject({
+        state: "superseded",
+        supersededBySessionId: handoffSessionId,
+      });
+      expect(JSON.stringify(await restarted.sessions.messages(handoffSessionId, {}))).not.toContain(
+        "ahub-bind:",
+      );
+      const worktree = await succeeded(
+        restarted.operations.create({
+          projectDirectory: directory,
+          worktree: true,
+          requestId: "claude-native-worktree",
+        }).operationId,
+      );
+      const session = (await restarted.sessions.managementSnapshot()).byId.get(
+        worktree.sessionId!,
+      )!;
+      expect(session.projectDirectory).toBe(directory);
+      expect(session.workingDirectory).not.toBe(directory);
+      await succeeded(restarted.operations.manage("exit", session.id).operationId);
+      const deleteTarget = await restarted.interaction.resolveTarget(handoffSessionId);
+      expect(deleteTarget).not.toBeNull();
+      await succeeded(restarted.operations.manage("delete", handoffSessionId).operationId);
+      expect((await restarted.sessions.managementSnapshot()).byId.has(handoffSessionId)).toBe(
+        false,
+      );
+      expect(await new TmuxInteractionService().inspect(deleteTarget!)).toBe("exited");
+      // Ctrl-C is adapter-compatible; native versions may require the shared fallback.
+      const killedTargets = [...initialKill.mock.calls, ...restartedKill.mock.calls].map(
+        ([target]) => JSON.stringify(target),
+      );
+      expect(new Set(killedTargets).size).toBe(killedTargets.length);
+      expect(killedTargets.length).toBeLessThanOrEqual(3);
+    } finally {
+      restarted.close();
+    }
+  } finally {
+    cleanupHub?.close();
+    releaseInitial();
+    cleanupSendKeys?.mockRestore();
+    vi.unstubAllEnvs();
+    try {
+      execFileSync("tmux", ["-S", socket, "kill-server"], { stdio: "ignore" });
     } catch {}
-    api.closeAllConnections();
-    await new Promise<void>((resolve) => api.close(() => resolve()));
+    const apiToClose = cleanupApi;
+    if (apiToClose?.listening) {
+      apiToClose.closeAllConnections();
+      await new Promise<void>((resolve) => apiToClose.close(() => resolve()));
+    }
   }
 }, 180_000);
