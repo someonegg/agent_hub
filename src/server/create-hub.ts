@@ -1,3 +1,5 @@
+import { createAgySessionSource } from "./adapters/agy/agy-session-source.js";
+import { createAgySessionManager } from "./adapters/agy/session-manager.js";
 import { createClaudeSessionSource } from "./adapters/claude/claude-session-source.js";
 import { createClaudeSessionManager } from "./adapters/claude/session-manager.js";
 import { createCodexSessionSource } from "./adapters/codex/codex-session-source.js";
@@ -100,6 +102,11 @@ interface SessionAdapter {
 
 async function createAdapter(agent: AgentConfig, socket?: string): Promise<SessionAdapter> {
   switch (agent.adapter ?? "codex") {
+    case "agy":
+      return {
+        source: await createAgySessionSource(agent.path, { agent: agent.nickname }),
+        manager: createAgySessionManager(agent.path, socket, agent.command),
+      };
     case "claude":
       return {
         source: await createClaudeSessionSource(agent.path, { agent: agent.nickname }),

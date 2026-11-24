@@ -24,10 +24,11 @@ use each returned `nextAfter` as the next request's `after`.
 
 ### Discovery and caching
 
-| Runtime | Sources                                                                                                  |
-| ------- | -------------------------------------------------------------------------------------------------------- |
-| Codex   | `rollout-*.jsonl` under `sessions/` and `archived_sessions/`; advisory titles from `session_index.jsonl` |
-| Claude  | `projects/<project>/<UUID>.jsonl`; main sessions only, excluding native shell commands/output            |
+| Runtime     | Sources                                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Codex       | `rollout-*.jsonl` under `sessions/` and `archived_sessions/`; advisory titles from `session_index.jsonl`                    |
+| Claude      | `projects/<project>/<UUID>.jsonl`; main sessions only, excluding native shell commands/output                               |
+| Antigravity | `brain/<UUID>/.system_generated/logs/transcript_full.jsonl`; only sessions whose first user message is an Agent Hub binding |
 
 Codex follows trusted-directory symlinks through depth 8 (root = 0), without
 cycle detection or real-path deduplication. Logical paths determine order/cache keys.
@@ -93,9 +94,11 @@ Public nicknames route requests; configured absolute paths namespace identities.
 Renaming/reordering preserves session IDs; moving agent directories changes them.
 Projects merge by directory across agents; agent paths remain private.
 
-Defaults configure both `codex=~/.codex` and `claude=~/.claude`, Codex first unless
-`~/.codex` is absent. Explicit agents replace defaults in argument order; nickname
-`default` has no special meaning. Creation uses the first nickname when omitted;
+Defaults configure `codex=~/.codex` and `claude=~/.claude` (Codex first unless
+`~/.codex` is absent), plus `agy=~/.gemini/antigravity-cli` when that directory
+exists. Any explicit agent replaces all defaults in argument order; nickname
+`default` has no special meaning, and at most one `--agy-agent` is allowed because
+`agy` has a fixed data directory. Creation uses the first nickname when omitted;
 unknown nicknames return `400`, request-ID reuse across agents `409`.
 Operations use the owning CLI/environment: `CODEX_HOME` or `CLAUDE_CONFIG_DIR`.
 See [Multiple agents](usage.md#multiple-agents).
@@ -403,13 +406,15 @@ the exit flow. See [operation-service.ts](../src/server/management/operation-ser
 
 Adapters require authenticated runtime CLIs on `PATH`:
 
-| Runtime     | Create and resume                                                                      | Launch options                                                                       | History management                                                                            |
-| ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                               | `codex archive <UUID>` and `codex delete <UUID> --force`                                      |
-| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions` | The adapter deletes local session files directly; no native archive/delete command is invoked |
+| Runtime     | Create and resume                                                                      | Launch options                                                                            | History management                                                                                                                         |
+| ----------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                                    | `codex archive <UUID>` and `codex delete <UUID> --force`                                                                                   |
+| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions`      | The adapter deletes local session files directly; no native archive/delete command is invoked                                              |
+| Antigravity | Interactive `agy -i <binding>` and `agy --resume <UUID> -i <binding>`                  | Worktree is silently ignored; Auto: `--mode auto`; YOLO: `--dangerously-skip-permissions` | No archive; delete removes only UUID-named files under `brain/`, `conversations/`, `annotations/`, and `presence/`, never shared databases |
 
 Implementations: [Codex](../src/server/adapters/codex/session-manager.ts),
-[Claude](../src/server/adapters/claude/session-manager.ts).
+[Claude](../src/server/adapters/claude/session-manager.ts),
+[Antigravity](../src/server/adapters/agy/session-manager.ts).
 
 ### Claude launch binding
 
@@ -420,6 +425,14 @@ with the launch options and the binding message as the first positional argument
 clean up the placeholder session. Confirmation checks the persisted binding's
 target, project, pane ownership, and (for resume) original session identity
 independently of the model's reply.
+
+### Antigravity launch binding
+
+The binding is an independent `[ahub-bind:{...}]` message (see
+[`binding-message.ts`](../src/server/adapters/agy/binding-message.ts)) passed with
+`-i`. Besides the Claude fields it carries `workingDirectory`, because the
+transcript has no `cwd`. Resume reuses the same identity. The bind reply (`OK`) is
+hidden even when `--resume` inserts a system message between request and reply.
 
 ### Tracking and recovery
 

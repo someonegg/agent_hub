@@ -22,10 +22,15 @@ describe("server command line", () => {
       host: "127.0.0.1",
       port: 4173,
       localHost: "127.0.0.1",
-      agents: (existsSync(resolve(homedir(), ".codex"))
-        ? ["codex", "claude"]
-        : ["claude", "codex"]
-      ).map((nickname) => ({ nickname, path: resolve(homedir(), `.${nickname}`) })),
+      agents: [
+        ...(existsSync(resolve(homedir(), ".codex"))
+          ? ["codex", "claude"]
+          : ["claude", "codex"]
+        ).map((nickname) => ({ nickname, path: resolve(homedir(), `.${nickname}`) })),
+        ...(existsSync(resolve(homedir(), ".gemini/antigravity-cli"))
+          ? [{ nickname: "agy", path: resolve(homedir(), ".gemini/antigravity-cli") }]
+          : []),
+      ],
       tls: { enabled: false },
       interactionEnabled: true,
       uploadDirectory: resolve(homedir(), ".agent-hub/uploads"),
@@ -145,4 +150,27 @@ it("resolves all server path options consistently for home, relative and absolut
       },
     });
   }
+});
+
+it("configures a single agy agent at its fixed data path", () => {
+  expect(runnable(["--agy-agent", "agy"])).toMatchObject({
+    agents: [
+      { nickname: "agy", adapter: "agy", path: resolve(homedir(), ".gemini/antigravity-cli") },
+    ],
+  });
+  expect(runnable(["--agy-agent", "ag", "--codex-agent", "c=/tmp/c"])).toMatchObject({
+    agents: [
+      { nickname: "ag", adapter: "agy", path: resolve(homedir(), ".gemini/antigravity-cli") },
+      { nickname: "c" },
+    ],
+  });
+  expect(() => loadConfig(["--agy-agent", "ag=/tmp/agy-data"])).toThrow(
+    "--agy-agent requires a non-empty nickname only",
+  );
+  expect(() => loadConfig(["--agy-agent", "   "])).toThrow(
+    "--agy-agent requires a non-empty nickname only",
+  );
+  expect(() => loadConfig(["--agy-agent", "a", "--agy-agent", "b"])).toThrow(
+    "Only one --agy-agent is supported",
+  );
 });

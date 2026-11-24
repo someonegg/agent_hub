@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import { parse } from "@babel/parser";
 
 const serverDirectory = resolve("src/server");
+const agyDirectory = resolve(serverDirectory, "adapters/agy");
 const claudeDirectory = resolve(serverDirectory, "adapters/claude");
 const codexDirectory = resolve(serverDirectory, "adapters/codex");
 const apiDirectory = resolve(serverDirectory, "api");
@@ -21,17 +22,19 @@ export async function checkArchitecture() {
       !serverRelativePath.startsWith(`adapters${sep}`) && serverRelativePath !== "create-hub.ts"
     );
   });
-  await assertIndependent(files, [codexDirectory, claudeDirectory]);
+  await assertIndependent(files, [codexDirectory, claudeDirectory, agyDirectory]);
   await assertIndependent(
     [
       resolve(codexDirectory, "codex-session-source.ts"),
       resolve(claudeDirectory, "claude-session-source.ts"),
+      resolve(agyDirectory, "agy-session-source.ts"),
       ...(await typescriptFiles(resolve(serverDirectory, "repository"))),
     ],
     [resolve(serverDirectory, "interaction/pane-binding-manager.js")],
   );
-  await assertIndependent(await typescriptFiles(claudeDirectory), [codexDirectory]);
-  await assertIndependent(await typescriptFiles(codexDirectory), [claudeDirectory]);
+  await assertIndependent(await typescriptFiles(claudeDirectory), [codexDirectory, agyDirectory]);
+  await assertIndependent(await typescriptFiles(codexDirectory), [claudeDirectory, agyDirectory]);
+  await assertIndependent(await typescriptFiles(agyDirectory), [codexDirectory, claudeDirectory]);
   await assertIndependent(await typescriptFiles(resolve(serverDirectory, "repository")), [
     apiContract,
     apiDirectory,

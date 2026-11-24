@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | 繁體中文
 
-Agent Hub 是用於管理 Codex 和 Claude Code 工作階段的網頁控制台，支援單機和多節點。
+Agent Hub 是用於管理 Codex、Claude Code 和 Antigravity CLI（`agy`）工作階段的網頁控制台，支援單機和多節點。
 按專案瀏覽工作階段、跟進最新回覆，並從電腦或手機繼續工作。
 
 ![切換節點並操作 Agent Hub 工作階段](docs/images/zh-TW/ahub-intro.gif)
@@ -21,11 +21,12 @@ Agent Hub 是用於管理 Codex 和 Claude Code 工作階段的網頁控制台�
 執行要求：
 
 - macOS 或 Linux，Node.js >=22.13 與 npm
-- 已設定的本機 Codex 或 Claude Code CLI
+- 上述 CLI 中至少有一種已在本機設定
 - tmux，用於建立、恢復工作階段和互動
 
-Hub 預設讀取 `~/.codex` 和 `~/.claude`，兩種執行環境可單獨或同時使用。
-自訂目錄見[多個智慧體設定](docs/usage.zh-TW.md#多個智慧體)。
+Hub 預設讀取 `~/.codex` 和 `~/.claude`。
+若存在 `~/.gemini/antigravity-cli`，Hub 會自動啟用 `agy`，並顯示透過 Hub 建立的工作階段。
+詳見[多個智慧體設定](docs/usage.zh-TW.md#多個智慧體)。
 
 全域安裝並啟動 Hub：
 
@@ -45,7 +46,7 @@ agent-hub
 
 ## 多節點模式
 
-在執行 Codex 或 Claude Code 的各台機器上以 `agent-hub --node-only` 啟動節點。
+在執行受支援 CLI 的各台機器上以 `agent-hub --node-only` 啟動節點。
 啟動 Hub 時，為每個節點加入一個 `--node id=origin`。
 使用網頁頂部的標籤切換節點。
 

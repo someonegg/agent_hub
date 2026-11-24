@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { expect, it } from "vitest";
 
+import { createAgySessionSource } from "../../src/server/adapters/agy/agy-session-source.js";
+import { formatAgyBindingMessage } from "../../src/server/adapters/agy/binding-message.js";
 import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-message.js";
 import { createClaudeSessionSource } from "../../src/server/adapters/claude/claude-session-source.js";
 import { createCodexSessionSource } from "../../src/server/adapters/codex/codex-session-source.js";
@@ -29,6 +31,32 @@ const adapters = [
     initial: line({ type: "system", sessionId: id, cwd: "/working", version: "1.2" }),
     title: (title: string) =>
       line({ type: "user", sessionId: id, message: { role: "user", content: title } }),
+  },
+  {
+    name: "Antigravity",
+    create: createAgySessionSource,
+    file: `brain/${id}/.system_generated/logs/transcript_full.jsonl`,
+    initial: line({
+      source: "USER_EXPLICIT",
+      type: "USER_INPUT",
+      created_at: "2026-11-04T00:00:00Z",
+      content: `<USER_REQUEST>\n${formatAgyBindingMessage(
+        {
+          socketPath: "/tmp/contract.sock",
+          sessionName: "ahub-00000000-0000-0000-0000-000000000000",
+        },
+        "/working",
+        "/working",
+        null,
+      )}\n</USER_REQUEST>`,
+    }),
+    title: (title: string) =>
+      line({
+        source: "USER_EXPLICIT",
+        type: "USER_INPUT",
+        created_at: "2026-11-04T00:00:01Z",
+        content: `<USER_REQUEST>\n${title}\n</USER_REQUEST>`,
+      }),
   },
 ];
 it.each(adapters)(
@@ -108,19 +136,31 @@ it.each(adapters)(
               ],
             },
           })
-        : line({
-            timestamp: "2026-11-04T00:00:00Z",
-            type: "user",
-            sessionId: id,
-            message: {
-              role: "user",
-              content: formatClaudeBindingMessage(
+        : adapter.name === "Claude"
+          ? line({
+              timestamp: "2026-11-04T00:00:00Z",
+              type: "user",
+              sessionId: id,
+              message: {
+                role: "user",
+                content: formatClaudeBindingMessage(
+                  { socketPath: "/tmp/contract.sock", sessionName: pane },
+                  null,
+                  null,
+                ),
+              },
+            })
+          : line({
+              source: "USER_EXPLICIT",
+              type: "USER_INPUT",
+              created_at: "2026-11-04T00:00:00Z",
+              content: `<USER_REQUEST>\n${formatAgyBindingMessage(
                 { socketPath: "/tmp/contract.sock", sessionName: pane },
+                "/working",
+                "/working",
                 null,
-                null,
-              ),
-            },
-          });
+              )}\n</USER_REQUEST>`,
+            });
     await writeFile(path, adapter.initial);
     const source = await adapter.create(agent);
     let fail = false;
@@ -145,13 +185,14 @@ it.each(adapters)(
     });
     const initial = await store.refresh();
     const sessionId = [...initial.sessions.keys()][0]!;
+    const baseline = bindings.latest(sessionId);
     fail = true;
     await appendFile(path, bind("ahub-00000000-0000-0000-0000-000000000001"));
     await expect(store.refresh()).rejects.toThrow("injected source failure");
-    expect(bindings.latest(sessionId)).toBeNull();
+    expect(bindings.latest(sessionId)).toEqual(baseline);
     await appendFile(path, bind("ahub-00000000-0000-0000-0000-000000000002"));
     await expect(store.refresh()).rejects.toThrow("injected source failure");
-    expect(bindings.latest(sessionId)).toBeNull();
+    expect(bindings.latest(sessionId)).toEqual(baseline);
     fail = false;
     await store.refresh();
     expect(source.lastRefreshTelemetry()).toMatchObject({ fullFiles: 0, appendFiles: 0 });
