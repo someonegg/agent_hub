@@ -18,6 +18,7 @@ use each returned `nextAfter` as the next request's `after`.
 - [File uploads](#file-uploads)
 - [Optional hosting](#optional-hosting)
 - [Browser state](#browser-state)
+- [Multi-node routing and TLS](#multi-node-routing-and-tls)
 
 ## Sources and identity
 
@@ -119,17 +120,12 @@ See [domain types](../src/shared/domain.ts) and
 
 ## Catalog
 
-`GET /api/v1/sessions` returns a complete catalog snapshot:
-`{ revision, agents, projects, sessions }`. Clients filter and group sessions locally.
-
-| Collection | Fields                                                                                 |
-| ---------- | -------------------------------------------------------------------------------------- |
-| `agents`   | `nickname`, `runtimeName`, and `management: { archive }`, including empty agents       |
-| `projects` | `directory`                                                                            |
-| `sessions` | `id`, `agent`, `title`, `projectDirectory`, optional `taskName`, `status`, `updatedAt` |
-
-Catalog reads resolve titles from the owning agent’s valid `thread_name`, falling
-back to the original title. Missing directories yield `projectDirectory: null`.
+`GET /api/v1/sessions` returns a complete `SessionListResponse` snapshot
+(`revision`, `agents` including empty agents, `projects`, `sessions`; see
+[api-contract.ts](../src/shared/api-contract.ts)). Clients filter and group
+locally. Catalog reads resolve titles from the owning agent’s valid
+`thread_name` (falling back to the original title); missing directories yield
+`projectDirectory: null`.
 
 Only `after` (43-character base64url revision) is accepted; invalid/extra queries return `400`.
 
@@ -170,11 +166,8 @@ bodyless `204`. Probes run every 1.5 seconds with capacity 100/process and
 10/session; overflow returns `429` and `Retry-After: 2`. Disconnect, timeout, and
 shutdown release capacity. Concurrent same-session probes share immutable source
 and runtime observations; pagination remains request-specific. Each response
-uses the same runtime observation for status and interaction.
-
-`SessionReadService` assembles public responses using an injected interaction
-describer. Interaction effects read internal facts through `InteractionSessionReader`
-over the same catalog and revalidate observations before acting.
+uses one runtime observation for status and interaction; interaction effects
+revalidate observations before acting.
 
 `stateRevision` covers `session` except `updatedAt`, plus all of `interaction`;
 it does not validate history. Out-of-range ordinals return `400 after_out_of_range`
@@ -209,7 +202,7 @@ Create and resume include the operation UUID. Handoff sends the same message to 
 target with `operationId` omitted. Invalid target or operation fields yield an invalid binding
 attempt. Project and task metadata are optional, and invalid values are ignored. Hub rebuilds
 pane claims from the transcript on restart.
-See [Claude JSONL filtering](session-jsonl-filtering.md#claude-code).
+See [Claude JSONL processing](session-jsonl-filtering.md#claude-code).
 
 A process-wide manager tracks each session’s latest binding attempt and valid claims
 to socket/session pairs across agents. Attempts, including appends, are ordered by
@@ -244,10 +237,9 @@ preserve it without invalidating bindings; there is no clear operation.
 | `GET /api/v1/sessions/:id/terminal`              | Fresh `{ content, capturedAt, truncated }` |
 | `WS /api/v1/sessions/:id/terminal-preview`       | Snapshot/delta/error frames                |
 
-[interaction.ts](../src/shared/interaction.ts) defines keys/message limits.
-Supported responses include `state`, `activity`, `supersededBySessionId`,
-`attachCommand`; unsupported responses contain `supported: false`, `attachCommand`.
-States: `unbound`, `disconnected`, `connected`, `unknown`, `superseded`.
+[interaction.ts](../src/shared/interaction.ts) defines keys and message limits;
+[api-contract.ts](../src/shared/api-contract.ts) defines `InteractionResponse`
+(states: `unbound`, `disconnected`, `connected`, `unknown`, `superseded`).
 
 Effects require current-user socket ownership, session liveness, and binding ownership.
 Targets use a required absolute `socketPath` and `sessionName` matching `ahub-<UUID>`.
@@ -279,9 +271,8 @@ confirmation; the recorded JSONL message confirms ownership.
 Activity is null unless connected. Output within five monotonic seconds means
 `working`, otherwise `idle`; initial/failed observations mean `unknown`.
 Activity ignores `%output` and `%extended-output` frames that are empty after
-removing terminal input-mode sequences (bracketed paste, focus reporting,
-`modifyOtherKeys`, and Kitty keyboard protocol) and empty synchronized-output
-wrappers. Subscriptions retry on the next read. Reader/interaction reads renew a
+stripping non-visual terminal input-mode and synchronized-output sequences.
+Subscriptions retry on the next read, and reader/interaction reads renew a
 30-minute lease. Activity shares preview control clients without capturing
 frames. Transitions affect reader revisions, repeated working output does not;
 catalog excludes activity.
@@ -294,20 +285,16 @@ the last 256,000 UTF-8 bytes at character boundaries, marking removed prefixes
 transports share binding checks and capture limits.
 
 WebSocket inherits TLS/mTLS, rejects queries/cross-origin browser requests, and
-accepts no application messages. Ordinary HTTP returns `426`.
+accepts no application messages. Ordinary HTTP returns `426`. Connections start
+with a `snapshot` frame and follow with `delta` or `error` frames (see
+`TerminalPreviewMessage` in [api-contract.ts](../src/shared/api-contract.ts)).
 
-| Frame `type` | Fields                                                              |
-| ------------ | ------------------------------------------------------------------- |
-| `snapshot`   | `revision`, `content`, `truncated`, `capturedAt`                    |
-| `delta`      | `baseRevision`, `revision`, `operations`, `truncated`, `capturedAt` |
-| `error`      | `code`, `message`, `retryable`                                      |
-
-Connections start with snapshots. Delta operations (`startLine`, `deleteCount`,
-`lines`) use preceding-frame indices in descending, nonoverlapping order.
-Split/join on `"\n"` preserves blank/trailing lines; truncation-only changes may
-have no operations. Oversized, expensive, or non-smaller deltas become snapshots.
-Invalid frames require reconnect without clearing display. Errors close with `1013`
-if retryable, otherwise `1008`.
+Delta operations (`startLine`, `deleteCount`, `lines`) use preceding-frame
+indices in descending, nonoverlapping order; split/join on `"\n"` preserves
+blank/trailing lines, and truncation-only changes may have no operations.
+Oversized, expensive, or non-smaller deltas become snapshots. Invalid frames
+require reconnect without clearing display. Errors close with `1013` if
+retryable, otherwise `1008`.
 
 Shared listeners/captures never resize/change terminal environments. Output merges
 over 350 ms; only content/truncation changes publish. Capacity is 100/process,
@@ -336,12 +323,11 @@ an independent agent launch option.
 
 ### Operation model
 
-Operations include `operationId`, `type`, `status`, `createdAt`, `updatedAt`,
-nullable `sessionId`, `error`, `phase`, `attachCommand`, optional
-`target: { socketPath, sessionName }`, and launch `mode: new | resume`.
-Types: `create`, `exit`, `archive`, `delete`; statuses: `pending`, `succeeded`,
-`failed`, `unknown`. Exit phases are `sending_exit`, `waiting_exit`; archive adds
-`archiving`, `confirming_archive`; delete adds `deleting`, `confirming_delete`.
+`HubOperation` ([api-contract.ts](../src/shared/api-contract.ts)) tracks
+`type` (`create | exit | archive | delete`), `status` (`pending | succeeded |
+failed | unknown`), launch `mode` (`new | resume`), and lifecycle `phase`:
+`sending_exit` / `waiting_exit` for exit, plus `archiving` / `confirming_archive`
+or `deleting` / `confirming_delete`.
 
 ### Idempotency and conflicts
 
@@ -388,10 +374,10 @@ Exit validates the latest binding and controls the whole tmux session, including
 manual binds, while retaining history. Unbound succeeds; missing fails; archived
 sessions use the same checks. Query errors or ownership changes produce `unknown`.
 
-Both adapters send Ctrl-C at 0, 200, 2600, and 2800 ms, Ctrl-D at 6 seconds, then
-one targeted `kill-session` at 15 seconds if still running. Each step checks
-cancellation and ownership/state; natural exit stops further input. Forced close
-still requires absence confirmation within the 30-second exit budget.
+Both adapters send a staged Ctrl-C sequence, Ctrl-D, then one targeted
+`kill-session` if still running. Each step checks cancellation and
+ownership/state; natural exit stops further input. Forced close still requires
+absence confirmation within the 30-second exit budget.
 See [ADR-112](adr/0112-separate-exit-from-history-management.md).
 
 #### Archive and delete
@@ -401,18 +387,17 @@ native identity, exits, invokes native archive once (25-second command limit),
 and confirms archive state within 30 seconds.
 
 Delete runs Exit validation and sequence, then permanently removes history through
-the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove session
-JSONL and associated per-session directory). Exit, deletion, and same-source
+the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove the
+session JSONL, its `<UUID>/subagents` directory, and the per-session directory
+if empty). Exit, deletion, and same-source
 absence confirmation have separate 30-, 25-, and 30-second budgets. Initially
 absent in a successful snapshot succeeds. Successful snapshots may skip unreadable
 data and confirm absence; thrown reads cannot.
 
 Occupancy blocks ordinary input/handoff with `409 session_busy`; archive/delete
 hold it through confirmation. Native identity validation, directory resolution,
-history effects, and exit steps belong to the owning adapter. The
-[coordinator](../src/server/management/operation-service.ts) owns idempotency,
-occupancy, deadlines, retention, and cleanup; executors validate, invoke adapters,
-and confirm results. Shutdown reuses the exit service.
+history effects, and exit steps belong to the owning adapter; shutdown reuses
+the exit flow. See [operation-service.ts](../src/server/management/operation-service.ts).
 
 ### Runtime CLI compatibility
 
@@ -428,13 +413,13 @@ Implementations: [Codex](../src/server/adapters/codex/session-manager.ts),
 
 ### Claude launch binding
 
-Claude creates `ahub-<operationId>` with a short placeholder command to keep the tmux server alive
-while Hub obtains its canonical socket path. Hub replaces the pane via `respawn-pane -k` with
-`claude` or `claude --resume <UUID>`, the launch options, and the binding message as the first
-positional argument. Worktree launches delimit options with `--` to keep the message positional.
-Confirmed pre-start respawn errors kill the placeholder session. The operation executor
-confirms the target, project, and pane ownership from the persisted binding and checks that
-resume claimed the original session. The model can finish its reply independently.
+Claude creates a placeholder `ahub-<operationId>` session to obtain its
+canonical tmux socket path, then starts `claude` (or `claude --resume <UUID>`)
+with the launch options and the binding message as the first positional argument
+(using `--` before it when `--worktree` is set). Confirmed pre-start failures
+clean up the placeholder session. Confirmation checks the persisted binding's
+target, project, pane ownership, and (for resume) original session identity
+independently of the model's reply.
 
 ### Tracking and recovery
 
@@ -457,8 +442,10 @@ other resource failures use `command_failed`. Session connection errors use
 
 ### Client behavior and results
 
-`ahub-cli session` is a stateless HTTP client, without native-history access,
-direct tmux control, server discovery/startup, or persisted recovery state.
+`ahub-cli session` (and `project`/`agent` catalog commands) is a stateless HTTP
+client targeting a single-machine Hub or standalone Node (`/api/v1/...`), not a
+multi-node Hub proxy, without native-history access, direct tmux control, server
+discovery/startup, or persisted recovery state.
 URL precedence: `--url`, `AGENT_HUB_URL`, `http://127.0.0.1:4173`.
 HTTP/HTTPS are supported; HTTPS uses Node.js verification and `NODE_EXTRA_CA_CERTS`.
 
@@ -546,13 +533,12 @@ failure `500`. Mutations reject cross-origin requests. Content/deletion are
 session-scoped; non-preview types (including HTML/SVG) download. Originals use
 `nosniff`, sandbox CSP, and `no-store`.
 
-PNG/JPEG/GIF/WebP/AVIF thumbnails are static, auto-oriented WebP, at most
-360 × 280 without enlargement (40-million-pixel input limit). Generation runs
-serially in the background, coalesces same-thumbnail work, and never delays/fails
-upload. Older uploads generate on demand; decode failures return `404`. BMP skips
-thumbnails. History loads thumbnails lazily, originals only on expansion; failed
-thumbnails never trigger automatic original loads. Thumbnail files are atomic,
-beside originals, with `private, max-age=86400` caching.
+PNG/JPEG/GIF/WebP/AVIF thumbnails are static, auto-oriented WebP images up to
+360 × 280 without enlargement (40-million-pixel input limit), cached with
+`private, max-age=86400` (BMP skips thumbnails). Generation runs asynchronously
+in the background without delaying or failing uploads (and on demand for older
+uploads; unavailable or decode failures return `404`). History loads thumbnails
+lazily and never falls back to downloading originals automatically.
 
 Storage is `<home-dir>/uploads/<Hub session ID>/` with absolute content paths and
 atomic metadata replacement. HTTP/storage validate Hub IDs, UUID-v4 attachment IDs,
@@ -580,8 +566,7 @@ HTTP resources inherit configured HTTPS/mTLS/proxy authentication.
 Malformed URLs/encodings return `400`, missing resources `404`, unexpected
 storage/metadata/deletion errors `500 internal_error` with `requestId`. Logs
 correlate method/path/error without bodies; post-header failures terminate responses.
-Publish/delete share an atomic-rename lock; recovery requires OS-confirmed PID
-absence. Tombstones protect new locks; live PID reuse prevents reclamation.
+Publish and delete share a file lock with stale-PID recovery.
 
 ### Web pages
 
@@ -688,7 +673,8 @@ The Hub root opens the first configured Node. Tabs restore each Node’s last
 session list, session, or upload history URL during the current page load.
 Drafts and staged attachments survive in-app Node changes within the loaded tab.
 Operation IDs, tab-local navigation state, and the default Agent are scoped per
-Node. Language and theme are shared.
+Node. Other browser preferences (language, theme, worktree, permission mode, and
+Enter to send) are shared.
 
 The Hub streams HTTP bodies and WebSocket traffic. Unknown Nodes return `404`.
 Upstream connection failures return `502` and timeouts return `504`. The
@@ -712,6 +698,5 @@ For HTTPS and WSS upstreams, all Nodes share the Hub's optional
 certificate and hostname with Node.js trust roots and any `NODE_EXTRA_CA_CERTS`.
 The Node verifies the Hub identity using the Node's own `--ssl-ca`.
 
-Hosted pages run in the Hub origin. Only publish content trusted to access
-same-origin APIs for every configured Node. Keep snapshot resource links
-relative so assets resolve below the node and snapshot prefix.
+Hosted pages run in the Hub origin with access to same-origin APIs across every
+configured Node; keep snapshot asset links relative to the snapshot prefix.

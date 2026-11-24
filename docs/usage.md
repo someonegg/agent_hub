@@ -45,8 +45,8 @@ sure its original process has exited.
 Use the session's **…** menu to:
 
 - **Exit session:** stop its connected terminal and retain history.
-- **Archive (Codex only):** stop execution and move the session to the archived list.
-- **Delete:** permanently remove session history after confirmation.
+- **Archive session (Codex only):** stop execution and move the session to the archived list.
+- **Delete session:** permanently remove session history after confirmation.
 
 Creating and resuming use tmux. If login or permission confirmation blocks startup,
 use **Session information → Tmux access** or the displayed attach command to finish in a terminal.
@@ -59,7 +59,7 @@ A green **Live** badge indicates a connected terminal. Send prompts from the
 message input. By default, **Shift+Enter** sends and **Enter** inserts a newline.
 Enable **Enter to send** in [Settings](#browser-settings) to reverse this.
 
-Expand **Terminal Preview** to inspect the CLI. Click **Interrupt** to stop the current operation.
+Expand **Terminal** to inspect the CLI. Click **Interrupt** to stop the current operation.
 **Working** and **Idle** reflect terminal output, not task completion.
 
 Sent prompts appear as **Pending** until conversation messages update; pure slash
@@ -72,29 +72,25 @@ shows **Superseded**, follow **Go to bound session**. Unsent drafts stay on the 
 
 ### File uploads
 
-Use the attachment button to **Take photo**, **Choose images**, or **Choose files**;
-you can also paste images or drop files. Preview or remove attachments before
-sending, with or without text. Multiple files are supported; folders are not.
-Each file can be up to **20 MiB**.
-
-Images retain their original content, including EXIF metadata. Camera behavior
-depends on the browser; HEIC/HEIF support depends on the runtime.
+Use the attachment button (**Take photo**, **Choose images**, **Choose files**),
+paste images, or drop files (multiple files supported; no folders; up to **20 MiB**
+each). You can preview or remove attachments before sending, with or without text.
 
 Open **Session information → Upload history** to preview, download, or delete
-files, including unsent uploads. Removing an attachment from a draft does not
-delete its uploaded file; deleting it from history also removes it from the draft.
+uploaded files (including unsent uploads).
 
-When sending attachments, Hub adds their absolute server paths to the prompt for the agent to read.
-Files persist under `uploads/` in the [Hub data root](#configure-the-server), which
-must be accessible to the agent. Session deletion triggers background cleanup;
-archive and exit retain uploads. See the [upload reference](technical-reference.md#file-uploads)
-for storage and cleanup details, or [preview upload history](images/ahub-uploads.png).
+When sending attachments, Hub prepends their absolute server paths to the prompt
+from `uploads/` under the [Hub data root](#configure-the-server), which must be
+accessible to the agent. Deleting a session triggers background cleanup; archive
+and exit retain uploads. See the [upload reference](technical-reference.md#file-uploads)
+or [preview upload history](images/ahub-uploads.png).
 
 ## Browser settings
 
 Open **Settings** at the bottom of the sidebar to choose language, theme, the
-default Agent for new sessions, and Worktree and permission mode defaults. Changes save automatically
-in this browser. Permission mode defaults also apply to resume; launch dialogs allow overrides.
+default Agent for new sessions, Worktree and permission mode defaults, and
+**Enter to send**. Changes save automatically in this browser. Permission mode
+defaults also apply to resume; launch dialogs allow overrides.
 
 The interface starts in English. Language changes take effect immediately
 and do not translate conversation or terminal content.
@@ -118,37 +114,28 @@ ahub-cli session inspect <id>
 ahub-cli session inspect <id> --follow
 ```
 
-Use a Hub ID returned by `list` or `create`. `list` returns the full list without
-pagination and excludes archived sessions unless `--all` is supplied.
-For `inspect`, pass the returned `Next after` value to
-`ahub-cli session inspect <id> --after <value>` to read the next page of messages.
-`--follow` keeps observing until `Ctrl+C`; it does not stop when a task finishes.
+Pass a Hub ID returned by `list` or `create`. `list` excludes archived sessions
+unless `--all` is given; `inspect` paginates with `--after <next-after>`, and
+`--follow` keeps observing until `Ctrl+C` (it does not stop when a task finishes).
 
-Create defaults to the project directory and first configured Agent. Use `--cwd`
-to change the working directory while retaining the project association,
-`--agent <nickname>` to select an Agent, or `--worktree` for a separate worktree.
-`resume <id>` retains the original Agent.
-
-Both commands accept `--permission-mode <default|auto|yolo>`.
-`--yolo` is shorthand for `--permission-mode yolo`; the options cannot be combined.
-
-Use `create --task <name>` and `list --task <name>` to group sessions across projects.
-
-Input requires a connected, idle terminal by default. Use `send <id> --stdin`
-for piped input, `terminal <id>` to inspect the terminal, or `interrupt <id>` to
-interrupt execution. `--force` on `send` or `keys` allows input while working;
-it also permits `send` messages starting with `/`. After a terminal switches
-sessions, use `handoff <id>` to transfer its binding.
+`create` supports `--agent`, `--cwd` (keeps project association), `--worktree`,
+`--task`, and `--permission-mode <default|auto|yolo>` (or `--yolo`). `resume`
+retains the original Agent and accepts permission mode flags. Input commands
+(`send`, `keys`) require a connected, idle terminal unless `--force` is passed
+(which also allows `send` messages starting with `/`). Use `terminal`,
+`interrupt`, `handoff`, `exit`, `archive`, and `delete` to inspect and manage
+sessions; run `ahub-cli session --help` for all options.
 
 Commands connect to `http://127.0.0.1:4173` by default. Set `AGENT_HUB_URL` or
-pass `--url` to change it; use `--timeout <seconds>` to adjust the timeout.
-For a private CA, set `NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem` before starting the CLI.
+pass `--url` to change it; in [multi-node setups](#use-multiple-nodes), point to
+a Node's origin directly rather than the multi-node Hub. Use `--timeout <seconds>`
+to adjust timeouts, and `NODE_EXTRA_CA_CERTS=/absolute/path/to/ca.pem` for a
+private CA.
 
 Successful sending does not mean task completion. After a timeout or exit code `2`
 (unknown write result), check `list`, `inspect`, or `terminal` before retrying.
-Stopping the client does not cancel a submitted operation. Lifecycle commands,
-including delete, run without a CLI confirmation prompt.
-See `ahub-cli session --help` for all commands and the
+Stopping the client does not cancel a submitted operation, and lifecycle commands
+(including `delete`) run without a confirmation prompt. See the
 [CLI reference](technical-reference.md#session-cli) for result and timeout contracts.
 
 ## Publish pages and diffs
@@ -168,32 +155,27 @@ Publish a built directory containing `index.html`:
 ahub-cli page publish ./demo --project /path/to/project --name demo --title "Design comparison"
 ```
 
-Both directories must exist. Use relative asset paths; Hub does not build sites
-or accept remote publication uploads. Hosted pages run as trusted code on the
-same origin as Hub, so publish only content you trust.
+Use relative asset paths. Hosted pages run as trusted code on the same origin as
+Hub, so publish only content you trust. Republish with the same project and name
+to update in place while keeping the URL (`--name` defaults to the source
+directory name; for worktrees, pass the original project to `--project`).
 
-Publish again with the same project and name to update the page while retaining
-its URL. Without `--name`, the source directory name is used. For worktrees,
-pass the original project to `--project`.
-
-Open **Pages** (`/artifacts`) to browse, copy links, or delete pages and their
-snapshots. The CLI also supports `page list` and `page delete <id>`.
-Published pages survive removal of the source directory or worktree.
-See the [hosting reference](technical-reference.md#optional-hosting) for details.
+Browse, copy links, or delete pages in **Pages** (`/artifacts`), or via
+`ahub-cli page list` / `page delete <id>`. See the
+[hosting reference](technical-reference.md#optional-hosting) for details.
 
 ### Share a diff
 
-Generate the comparison you want, then publish it:
+Generate a diff file, then publish it:
 
 ```sh
 git diff HEAD > /tmp/review.diff
 ahub-cli diff publish /tmp/review.diff --title "Review changes"
 ```
 
-Open the returned `/diffs/<uuid>` URL. Publications do not expire: use
-`ahub-cli diff list` to find them and `ahub-cli diff delete <uuid>` after review.
-Deleting a publication leaves the source file unchanged.
-See the [diff reference](technical-reference.md#temporary-diffs) and
+Open the returned `/diffs/<uuid>` URL. Diffs do not expire: manage them with
+`ahub-cli diff list` and `ahub-cli diff delete <uuid>`. See the
+[diff reference](technical-reference.md#temporary-diffs) and
 [desktop](images/ahub-diff.png) / [mobile](images/ahub-diff-mobile.png) previews.
 
 ### Publish with an agent
@@ -212,8 +194,6 @@ for the full list.
 | `--home-dir <path>`    | `~/.agent-hub` | Hub data root containing `uploads/` and `hosting/` |
 | `--hosting`            | Disabled       | Serve published pages and diffs                    |
 | `--tmux-socket <path>` | tmux default   | Use a custom tmux socket                           |
-
-Agent Hub uses `~/.agent-hub` by default and does not migrate old data.
 
 ### Multiple agents
 
@@ -291,7 +271,9 @@ agent-hub --node Mac=http://192.168.1.10:4174 --node Linux=http://192.168.1.11:4
 
 Add one `--node id=origin` per Node in display order. The Hub opens the first
 Node. Use the tabs at the top to switch Nodes. Run copied tmux commands on the
-selected Node.
+selected Node. For `ahub-cli session`, `project`, or `agent` commands, pass a
+Node's origin with `--url` or `AGENT_HUB_URL` rather than the multi-node Hub
+address.
 
 Replace the example IPs with addresses the Hub can reach.
 For HTTPS, see

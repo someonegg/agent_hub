@@ -34,7 +34,7 @@ npm start -- --codex-agent 'default=/tmp/ahub-docs-demo' --port 4187
 - `tests/` and `scripts/`: checks, fixtures, and maintenance tools.
 
 For behavior and contracts, see the [technical reference](technical-reference.md)
-and [JSONL filtering](session-jsonl-filtering.md).
+and [JSONL processing](session-jsonl-filtering.md).
 
 ## Validate changes
 
@@ -48,12 +48,8 @@ npm run format:check
 ```
 
 Use `npm run format` to format files and `npm run lint -- --fix` to fix supported
-lint issues. Lint also checks server import boundaries; scanner fixtures stay in
-the test suite. See the [lint toolchain](../tools/client-lint/README.md) for rules.
-
-Reader changes should cover ordinal pagination, state/message wakeups, timeout, cancellation,
-and one-time out-of-range recovery in existing tests. Protocol details live in the
-[technical reference](technical-reference.md#conversation-reads).
+lint issues. Lint also checks server import boundaries; see the
+[lint toolchain](../tools/client-lint/README.md) for rules.
 
 Run additional checks for the affected area:
 
@@ -84,8 +80,8 @@ locally when changing native interaction or lifecycle behavior.
 ## Update documentation images
 
 UI changes must regenerate affected README screenshots and animations in all
-three languages. Install `playwright-cli` and its browser; GIF generation also
-requires Python 3 with Pillow.
+three languages (`en`, `zh-CN`, `zh-TW`). Install `playwright-cli` and its
+browser; GIF generation also requires Python 3 with Pillow.
 
 Start the frontend:
 
@@ -93,7 +89,7 @@ Start the frontend:
 npm run dev -- --port 4187 --strictPort
 ```
 
-In another terminal, generate the English assets:
+In another terminal, generate the English assets (outputs to `docs/images/`):
 
 ```sh
 node scripts/record-docs-intro.mjs
@@ -101,11 +97,9 @@ node scripts/capture-docs-interaction.mjs
 npm run test:hosting
 ```
 
-The first two scripts capture the real UI with fabricated sessions and mocked
-requests, without starting Codex or reading user sessions. Outputs go to
-`docs/images/`; the hosting check generates the diff screenshots.
-
-Repeat for `zh-CN` and `zh-TW`, for example:
+For `zh-CN` and `zh-TW` (outputs under `docs/images/zh-CN/` and
+`docs/images/zh-TW/`), repeat with `--language <lang>` (ensure `npm run build`
+has run before running `scripts/test-hosting.mjs` directly):
 
 ```sh
 node scripts/record-docs-intro.mjs --language zh-CN
@@ -113,25 +107,18 @@ node scripts/capture-docs-interaction.mjs --language zh-CN
 node --import tsx scripts/test-hosting.mjs --language zh-CN
 ```
 
-Chinese assets use matching filenames under `docs/images/zh-CN/` and
-`docs/images/zh-TW/`. The hosting script requires the build generated above.
-
-Both capture scripts accept a server URL and output path. To check CSP
-compatibility, start the built server with `npm start`, then run:
-
-```sh
-node scripts/capture-docs-interaction.mjs http://127.0.0.1:4173 /tmp/interaction.png
-```
-
-Related screenshots are saved beside the selected output; GIF source frames stay
-in the printed temporary directory. The scripts check page errors and horizontal
-overflow. Also inspect readability and clipping at README display widths,
-including the answered **User input** card and terminal output. Keep each GIF
-below 5 MiB and stop the frontend server after capture.
-
-When changing camera or attachment behavior, also check confirmation, cancellation,
-and repeat shots on real iOS Safari and Android Chrome devices, including
-standalone modes.
+- The first two scripts use fabricated sessions and mocked requests without
+  starting Codex or reading user sessions; `test:hosting` generates the diff
+  screenshots.
+- Both capture scripts accept `<origin> <output-path>`. To verify CSP
+  compatibility against the built server, run `npm start` and
+  `node scripts/capture-docs-interaction.mjs http://127.0.0.1:4173 /tmp/interaction.png`.
+- Scripts check page errors and horizontal overflow; also inspect readability
+  and clipping at README widths, keep each GIF below 5 MiB, and stop the dev
+  server afterward.
+- When changing camera or attachment behavior, also test confirmation,
+  cancellation, and repeat shots on real iOS Safari and Android Chrome devices
+  (including standalone modes).
 
 ## Update application icons
 
@@ -154,13 +141,7 @@ The npm package is `@someonegg/agent-hub`; it provides `agent-hub` (server) and
    installation from npm.
 4. Create the matching GitHub Release with English release notes.
 
-The workflow validates the tag, runs checks, and uses npm trusted publishing;
+The workflow validates the tag, runs checks, and uses
+[npm trusted publishing](https://docs.npmjs.com/trusted-publishers/);
 routine releases need no npm token. Retries skip versions already published.
 Never reuse a published version; release fixes as a new patch version.
-
-For a new package name, establish npm publishing access before pushing the tag;
-the old package's trusted publisher does not authorize the new package. Configure
-the new package's trusted publisher for `someonegg/agent_hub` and `publish.yml`,
-allowing `npm publish`. If an authenticated first publish is needed to create the
-package, publish the validated release first, then configure trusted publishing
-and verify the tag workflow. See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
