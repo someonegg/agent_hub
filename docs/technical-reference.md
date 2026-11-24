@@ -281,10 +281,13 @@ confirmation; the recorded JSONL message confirms ownership.
 
 Activity is null unless connected. Output within five monotonic seconds means
 `working`, otherwise `idle`; initial/failed observations mean `unknown`.
-`%output`/`%extended-output` subscriptions retry on the next read. Reader/interaction
-reads renew a 30-minute lease. Activity shares preview control clients without
-capturing frames. Transitions affect reader revisions, repeated working output
-does not; catalog excludes activity.
+Activity ignores `%output` and `%extended-output` frames that are empty after
+removing terminal input-mode sequences (bracketed paste, focus reporting,
+`modifyOtherKeys`, and Kitty keyboard protocol) and empty synchronized-output
+wrappers. Subscriptions retry on the next read. Reader/interaction reads renew a
+30-minute lease. Activity shares preview control clients without capturing
+frames. Transitions affect reader revisions, repeated working output does not;
+catalog excludes activity.
 
 ### Terminal Preview
 
