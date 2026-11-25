@@ -36,6 +36,7 @@ export const messages = {
   checkTheCurrentStateBeforeTryingAgain: "Check the current state before trying again.",
   chooseFiles: "Choose files",
   chooseImages: "Choose images",
+  closeLinkAddress: "Close link address",
   closeImagePreview: "Close image preview",
   closeNewSession: "Close new session",
   closeResumeSession: "Close resume session",
@@ -50,6 +51,7 @@ export const messages = {
   copyCommand: "Copy command",
   copyFailedSelectTheCommandAndCopyItManually:
     "Copy failed. Select the command and copy it manually.",
+  viewLinkAddress: "View link address",
   copyLink: "Copy link",
   couldNotCopyLink: "Could not copy link",
   couldNotLoadSession: "Could not load session",

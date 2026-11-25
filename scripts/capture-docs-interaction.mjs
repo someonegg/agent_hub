@@ -974,23 +974,36 @@ async function capture(
     await demo.screenshot({ path: resolveMobile("reader"), animations: "disabled" });
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await demo.evaluate(() => navigator.clipboard.writeText(""));
-    const address = demo.locator(".markdown-link-target").filter({ hasText: docsLogPath });
+    const linkAddress = demo.getByRole("button", { name: label("View preview log"), exact: true });
+    const addsLineHeight = await linkAddress.evaluate((button) => {
+      const line = button.parentElement;
+      const heightWithButton = line.getBoundingClientRect().height;
+      const text = document.createTextNode(button.textContent);
+      button.replaceWith(text);
+      const heightWithText = line.getBoundingClientRect().height;
+      text.replaceWith(button);
+      return heightWithButton > heightWithText + 0.5;
+    });
+    if (addsLineHeight) throw new Error("Markdown reference increased the line height");
+    await linkAddress.click();
+    const addressDialog = demo.getByRole("dialog", { name: label("View preview log") });
+    const address = addressDialog.locator("code");
     const lineCount = await address.evaluate((element) => {
       const range = document.createRange();
       range.selectNodeContents(element);
-      const rects = range.getClientRects();
-      const selection = getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-      return rects.length;
+      return range.getClientRects().length;
     });
     if (lineCount < 2) throw new Error("Long Markdown destination did not wrap on mobile");
-    await demo.keyboard.press("ControlOrMeta+c");
+    await addressDialog.getByRole("button", { name: label("Copy link") }).click();
     await demo.waitForFunction(
       async (expected) => (await navigator.clipboard.readText()) === expected,
       docsLogPath,
     );
-    await demo.evaluate(() => getSelection().removeAllRanges());
+    await addressDialog.getByRole("button", { name: label("Close link address") }).click();
+    await addressDialog.waitFor({ state: "hidden" });
+    await linkAddress.click();
+    await demo.keyboard.press("Escape");
+    await addressDialog.waitFor({ state: "hidden" });
     await openComposer();
     await previewToggle.click();
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });

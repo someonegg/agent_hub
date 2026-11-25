@@ -16,6 +16,7 @@ import type { MessageItem as Message } from "../../shared/domain";
 import { t } from "../i18n";
 import { nodePagePath } from "../node-path";
 import { EventTime } from "./EventTime";
+import { MarkdownLinkAddress } from "./MarkdownLinkAddress";
 
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
 const REMARK_PLUGINS = [remarkGfm, remarkMath];
@@ -55,14 +56,11 @@ const MARKDOWN_COMPONENTS = {
       );
     }
     const target = node && linkTargets.get(node);
-    if (!target?.url || target.label === target.url) return <span>{children}</span>;
-    const address = <code className="markdown-link-target">{target.url}</code>;
-    return target.label ? (
-      <span>
-        {children}（{address}）
-      </span>
-    ) : (
-      address
+    if (!target?.url) return <span>{children}</span>;
+    return (
+      <MarkdownLinkAddress label={target.label} url={target.url}>
+        {children}
+      </MarkdownLinkAddress>
     );
   },
   img: ({ alt }: ComponentProps<"img">) => (
