@@ -67,7 +67,6 @@ export function SessionPage({
     <div className="reader-page">
       {reader.context ? (
         <SessionReader
-          agentNickname={agents.length > 1 ? reader.context.session.origin.agent : undefined}
           managementBusy={operation.busy}
           operationStatus={
             !showManagementStatus ? <OperationStatus controller={operation} compact /> : null

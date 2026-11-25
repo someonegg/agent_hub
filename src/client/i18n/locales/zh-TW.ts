@@ -97,7 +97,6 @@ export const messages: Record<keyof typeof english, string> = {
   hide: "隱藏",
 
   agent: "智慧體",
-  agentLabel: "智慧體：",
   idle: "閒置",
 
   interrupt: "中斷",
@@ -176,7 +175,6 @@ export const messages: Record<keyof typeof english, string> = {
   selected: "已選擇",
   send: "傳送",
   sendingExitCommand: "正在傳送退出命令",
-  session: "工作階段",
   sessionList: "工作階段列表",
 
   sessionAgent: "工作階段智慧體",

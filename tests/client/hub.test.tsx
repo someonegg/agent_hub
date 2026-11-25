@@ -381,7 +381,9 @@ it("aggregates and filters merged projects, remembers the agent and keeps a dire
   const sidebar = screen.getByRole("complementary", { name: "Session list" });
   expect(within(sidebar).getByRole("link", { name: /Work trace/ })).toHaveTextContent("work");
   expect(within(sidebar).getAllByRole("button", { name: /reader, 2 sessions/ })).toHaveLength(1);
-  expect(screen.getByText("Agent: default")).toBeInTheDocument();
+  const breadcrumb = screen.getByRole("button", { name: "Back to list" }).parentElement;
+  expect(breadcrumb).toHaveTextContent(/^reader\/personal$/);
+  expect(screen.queryByText("Agent: default")).not.toBeInTheDocument();
   expect(within(sidebar).getByRole("option", { name: "work · Claude Code" })).toHaveValue("work");
   expect(within(sidebar).getByRole("option", { name: "empty · Codex" })).toHaveValue("empty");
   fireEvent.change(screen.getByRole("combobox", { name: "Filter by agent" }), {
@@ -390,6 +392,7 @@ it("aggregates and filters merged projects, remembers the agent and keeps a dire
   expect(within(sidebar).queryByRole("link", { name: /Reader work/ })).not.toBeInTheDocument();
   expect(within(sidebar).getByRole("link", { name: /Work trace/ })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Reader work" })).toBeInTheDocument();
+  expect(breadcrumb).toHaveTextContent(/^reader\/personal$/);
   expect(browserStorage.getItem("ahub.agent")).toBe("work");
   fireEvent.change(screen.getByRole("combobox", { name: "Filter by agent" }), {
     target: { value: "empty" },
