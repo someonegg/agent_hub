@@ -15,7 +15,6 @@ import { SessionInteraction } from "./SessionInteraction";
 import { Timeline } from "./Timeline";
 
 interface SessionReaderProps {
-  agentNickname?: string;
   recoveryActions?: ReactNode;
   operationStatus?: ReactNode;
   managementBusy?: boolean;
@@ -30,7 +29,6 @@ interface SessionReaderProps {
 }
 
 export function SessionReader({
-  agentNickname,
   recoveryActions,
   operationStatus,
   managementBusy,
@@ -133,7 +131,6 @@ export function SessionReader({
         <div ref={setMessageScroll} className="message-scroll" tabIndex={0}>
           <div ref={reader} className="reader">
             <SessionHeader
-              agentNickname={agentNickname}
               attachCommand={interaction?.attachCommand}
               management={management}
               session={context.session}

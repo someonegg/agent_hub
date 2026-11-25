@@ -86,6 +86,7 @@ function SessionHub({ cache }: { cache: SessionCache }) {
   const visibleCatalog = { ...catalog, list: visibleList };
   const hub = useHubNavigation(catalog.list);
   const { sessionId, navigate, selectedProject } = hub;
+  const sessionAgent = catalog.list?.sessions.find((session) => session.id === sessionId)?.agent;
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => browserStorage.getItem("ahub.sidebar-collapsed") === "true",
   );
@@ -143,8 +144,6 @@ function SessionHub({ cache }: { cache: SessionCache }) {
                   <path d="M21 12H3m7-7-7 7 7 7" />
                 </svg>
               </button>
-              <span>{t("projects")}</span>
-              <span aria-hidden="true">/</span>
               <strong>
                 {catalog.list?.projects
                   .find((project) => project.directory === selectedProject)
@@ -152,8 +151,12 @@ function SessionHub({ cache }: { cache: SessionCache }) {
                   .filter(Boolean)
                   .at(-1) ?? t("unknownProject")}
               </strong>
-              <span aria-hidden="true">/</span>
-              <span>{t("session")}</span>
+              {sessionAgent ? (
+                <>
+                  <span aria-hidden="true">/</span>
+                  <span>{sessionAgent}</span>
+                </>
+              ) : null}
             </>
           ) : null}
         </div>

@@ -99,7 +99,6 @@ export const messages = {
   hide: "Hide",
 
   agent: "Agent",
-  agentLabel: "Agent:",
   idle: "Idle",
 
   interrupt: "Interrupt",
@@ -178,7 +177,6 @@ export const messages = {
   selected: "Selected",
   send: "Send",
   sendingExitCommand: "Sending exit command",
-  session: "Session",
   sessionList: "Session list",
 
   sessionAgent: "Session agent",
