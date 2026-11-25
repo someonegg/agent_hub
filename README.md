@@ -74,7 +74,7 @@ See [file uploads](docs/usage.md#file-uploads) for storage, cleanup, and file li
 <details>
 <summary>Show session interaction screenshot</summary>
 
-<img src="docs/images/ahub-session-interaction.png" alt="Session conversation with answered User input, live terminal preview, controls, message input, and Handoff" width="900">
+<img src="docs/images/ahub-session-interaction.png" alt="Session conversation with answered User input, live terminal preview, controls, and message input" width="900">
 
 </details>
 

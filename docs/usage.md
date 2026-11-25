@@ -20,7 +20,7 @@ machines from one Hub, see [Use multiple nodes](#use-multiple-nodes).
 ## Read conversations
 
 Choose a project and session in the sidebar. Messages load from the beginning as you scroll, then update
-automatically at the end. Use **Archived** to browse read-only archived sessions.
+automatically at the end. Toggle **Show archived sessions** in the sidebar to browse read-only archived sessions.
 You can bookmark a session URL.
 
 The latest loaded plan opens automatically. Use **Show** and **Hide** to control
@@ -43,11 +43,12 @@ keeps the original Agent and project association, using an available original
 working or project directory. Before resuming a session started elsewhere, make
 sure its original process has exited.
 
-Use the session's **…** menu to:
+Use the **…** menu in the top bar to:
 
-- **Exit session:** stop its connected terminal and retain history.
 - **Archive session (Codex only):** stop execution and move the session to the archived list.
 - **Delete session:** permanently remove session history after confirmation.
+- **Handoff:** transfer pane binding to the active agent session after switching sessions in the same terminal.
+- **Exit session:** stop its connected terminal and retain history.
 
 Creating and resuming use tmux. If login or permission confirmation blocks startup,
 use **Session information → Tmux access** or the displayed attach command to finish in a terminal.
@@ -60,7 +61,8 @@ A green **Live** badge indicates a connected terminal. Send prompts from the
 message input. By default, **Shift+Enter** sends and **Enter** inserts a newline.
 Enable **Enter to send** in [Settings](#browser-settings) to reverse this.
 
-Expand **Terminal** to inspect the CLI. Click **Interrupt** to stop the current operation.
+Expand **Terminal** to inspect the CLI, and use **Interrupt** in the preview's
+top-right corner to stop the current operation.
 **Working** and **Idle** reflect terminal output, not task completion.
 
 Sent prompts appear as **Pending** until conversation messages update; pure slash
@@ -68,8 +70,9 @@ commands skip this preview. Failed sends retain your draft. Draft text and
 attachment selections survive session navigation but reset on page refresh.
 
 If an agent switches sessions in the same terminal after `/clear`, `/resume`, or
-running a plan, click **Handoff** on the old session's connected page. When it
-shows **Superseded**, follow **Go to bound session**. Unsent drafts stay on the old page.
+running a plan, open the top bar's **…** menu and click **Handoff** on the old
+session's connected page. When it shows **Superseded**, follow **Go to bound session**.
+Unsent drafts stay on the old page.
 
 ### File uploads
 

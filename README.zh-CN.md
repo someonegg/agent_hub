@@ -70,7 +70,7 @@ agent-hub
 <details>
 <summary>查看会话交互截图</summary>
 
-<img src="docs/images/zh-CN/ahub-session-interaction.png" alt="会话、已回答问题、终端预览、消息输入与移交绑定" width="900">
+<img src="docs/images/zh-CN/ahub-session-interaction.png" alt="会话、已回答问题、终端预览与消息输入" width="900">
 
 </details>
 

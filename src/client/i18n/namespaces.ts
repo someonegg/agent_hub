@@ -57,6 +57,7 @@ export const namespaceKeys = {
     "sessionList",
     "sessionAgent",
     "sessionManagement",
+    "showArchivedSessions",
     "startingCodex",
     "tmuxAccess",
     "trackingHasStoppedRefreshTheSessionListToCheckTheResult",

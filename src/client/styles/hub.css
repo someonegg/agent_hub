@@ -62,17 +62,6 @@
   min-width: 0;
   flex: 1;
 }
-.archive-switch input {
-  margin: 0;
-}
-.archive-switch {
-  margin: 0;
-  margin-inline-start: 8px;
-  min-height: 44px;
-  flex-shrink: 0;
-  white-space: nowrap;
-  cursor: pointer;
-}
 .project-heading {
   display: flex;
   align-items: center;
@@ -162,6 +151,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 44px;
   padding: 0 18px 8px 23px;
   color: var(--ink-soft);
   font-size: var(--text-small);
@@ -170,10 +160,38 @@
 .hub-section-label > span {
   font-family: var(--title-font);
 }
-.hub-section-label button:last-child {
+.hub-section-actions {
   margin-inline-start: auto;
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.hub-section-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+}
+.hub-section-actions > button:last-child {
+  font-size: 20px;
+}
+.archive-toggle {
+  opacity: 0.72;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+.archive-toggle:hover {
+  opacity: 1;
+}
+.archive-toggle[aria-pressed="true"] {
+  opacity: 1;
+  color: var(--current);
+  background: var(--selected-surface);
 }
 .hub-sidebar > nav {
   flex: 1;
@@ -277,6 +295,33 @@
   font-weight: var(--weight-medium);
   color: var(--ink-soft);
 }
+.hub-topbar-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.hub-topbar-actions:empty {
+  display: none;
+}
+.hub-topbar-status {
+  flex-shrink: 0;
+  padding: 0.75rem clamp(1rem, 2.5vw, 2rem);
+  border-bottom: 1px solid var(--mist);
+  background: var(--surface);
+}
+.hub-topbar-status:not(:has(.operation-status, [role="alert"])) {
+  display: none;
+}
+.hub-topbar-status .session-operation-details {
+  max-width: 72rem;
+}
+.hub-topbar-status .operation-status,
+.hub-topbar-status .interaction-error {
+  margin-top: 0;
+}
+.hub-topbar-status .session-operation-details > :not(:first-child) {
+  margin-top: 0.5rem;
+}
 @media (width < 768px) {
   .hub {
     display: block;
@@ -297,6 +342,12 @@
     gap: 8px;
     font-size: var(--text-small);
   }
+  .hub-topbar-actions {
+    margin-inline-start: auto;
+  }
+  .hub-topbar-status {
+    padding: 0.6rem 12px;
+  }
   .hub-back {
     display: grid;
     place-items: center;
@@ -309,6 +360,11 @@
   }
   .hub-project a {
     padding-block: 14px;
+  }
+  .hub-section-actions > button {
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
   }
   .hub-sidebar-footer {
     padding-bottom: max(16px, env(safe-area-inset-bottom));

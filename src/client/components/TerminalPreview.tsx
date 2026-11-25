@@ -103,15 +103,41 @@ export function TerminalPreview({
       className="terminal-preview"
       aria-label={t("terminalPreview")}
     >
-      <button
-        type="button"
-        className="terminal-preview-close"
-        aria-label={t("collapseTerminalPreview")}
-        title={t("collapseTerminalPreview")}
-        onClick={onToggle}
-      >
-        <span aria-hidden="true">×</span>
-      </button>
+      <div className="terminal-preview-actions">
+        <button
+          type="button"
+          className="terminal-preview-action terminal-preview-interrupt"
+          aria-label={t("interrupt")}
+          title={t("interrupt")}
+          aria-disabled={actionsDisabled}
+          onClick={() => void sendKey("interrupt")}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2" />
+          </svg>
+        </button>
+        <span className="terminal-preview-action-divider" aria-hidden="true" />
+        <button
+          type="button"
+          className="terminal-preview-action terminal-preview-close"
+          aria-label={t("collapseTerminalPreview")}
+          title={t("collapseTerminalPreview")}
+          onClick={onToggle}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.65"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M4.25 4.25 11.75 11.75M11.75 4.25 4.25 11.75" />
+          </svg>
+        </button>
+      </div>
       {previewExpanded ? (
         <div
           id={contentId}

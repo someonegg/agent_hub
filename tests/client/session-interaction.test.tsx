@@ -58,8 +58,8 @@ it.each(["message_not_submitted", "interaction_failed"])(
   },
 );
 
-it.each(["message", "keys", "interrupt", "handoff"] as const)(
-  "blocks concurrent actions during %s and only shows disabled controls for handoff",
+it.each(["message", "keys", "interrupt"] as const)(
+  "blocks concurrent actions during %s and disables controls while management is busy",
   async (operation) => {
     let finish!: () => void;
     const pending = new Promise<void>((resolve) => {
@@ -67,7 +67,6 @@ it.each(["message", "keys", "interrupt", "handoff"] as const)(
     });
     const sendMessage = vi.spyOn(api, "sendMessage").mockReturnValue(pending);
     const sendKeys = vi.spyOn(api, "sendKeys").mockReturnValue(pending);
-    const handoff = vi.spyOn(api, "handoffPaneBinding").mockReturnValue(pending);
     vi.spyOn(api, "upload").mockResolvedValue({
       path: "/tmp/report.txt",
       filename: "report.txt",
@@ -101,42 +100,35 @@ it.each(["message", "keys", "interrupt", "handoff"] as const)(
     fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
     const send = screen.getByRole("button", { name: "Send" });
     const interrupt = screen.getByRole("button", { name: "Interrupt" });
-    const handoffButton = screen.getByRole("button", { name: "Handoff" });
     const up = screen.getByRole("button", { name: "Up" });
-    fireEvent.click({ message: send, keys: up, interrupt, handoff: handoffButton }[operation]);
-    const disabled = operation === "handoff";
+    fireEvent.click({ message: send, keys: up, interrupt }[operation]);
     const initialKeyWrites = operation === "keys" || operation === "interrupt" ? 1 : 0;
-    for (const button of [send, interrupt, handoffButton, up]) {
-      expect(button).toHaveAttribute("aria-disabled", String(disabled));
+    for (const button of [send, interrupt, up]) {
+      expect(button).toHaveAttribute("aria-disabled", "false");
       fireEvent.click(button);
     }
-    if (disabled) expect(remove).toBeDisabled();
-    else expect(remove).toBeEnabled();
+    expect(remove).toBeEnabled();
     fireEvent.click(remove);
     expect(screen.getByRole("button", { name: "Remove report.txt" })).toBe(remove);
     fireEvent.keyDown(up.closest(".terminal-preview-body")!, { key: "ArrowDown" });
     fireEvent.keyDown(composer, { key: "Enter", shiftKey: true });
-    if (!disabled) {
-      fireEvent.click(screen.getByRole("button", { name: "Attach files" }));
-      expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    }
+    fireEvent.click(screen.getByRole("button", { name: "Attach files" }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     expect(sendMessage).toHaveBeenCalledTimes(operation === "message" ? 1 : 0);
     expect(sendKeys).toHaveBeenCalledTimes(initialKeyWrites);
-    expect(handoff).toHaveBeenCalledTimes(operation === "handoff" ? 1 : 0);
     expect(composer).toBeEnabled();
-    if (!disabled) {
-      rerender(
-        <SessionDraftProvider>
-          <SessionInteraction {...properties} managementBusy />
-        </SessionDraftProvider>,
-      );
-      expect(send).toHaveAttribute("aria-disabled", "true");
-      rerender(
-        <SessionDraftProvider>
-          <SessionInteraction {...properties} />
-        </SessionDraftProvider>,
-      );
-    }
+    rerender(
+      <SessionDraftProvider>
+        <SessionInteraction {...properties} managementBusy />
+      </SessionDraftProvider>,
+    );
+    expect(send).toHaveAttribute("aria-disabled", "true");
+    expect(interrupt).toHaveAttribute("aria-disabled", "true");
+    rerender(
+      <SessionDraftProvider>
+        <SessionInteraction {...properties} />
+      </SessionDraftProvider>,
+    );
     await act(async () => finish());
     if (operation !== "message") {
       expect(remove).toBeEnabled();

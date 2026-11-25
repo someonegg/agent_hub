@@ -189,6 +189,7 @@ export const messages = {
   sessionNotFound: "Session not found",
   sessionTimeline: "Session timeline",
   show: "Show",
+  showArchivedSessions: "Show archived sessions",
 
   someContentCouldNotBeFullyParsedCheckTheOriginalTextBelow:
     "Some content could not be fully parsed. Check the original text below.",

@@ -9,11 +9,17 @@
   border-color: var(--current);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--current) 18%, transparent);
 }
+.interaction-input-wrap {
+  display: flex;
+  align-items: flex-end;
+}
 .interaction-composer textarea {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+  min-height: 6.25rem;
   margin: 0;
-  padding: 0.7rem 0.75rem;
+  padding: 0.65rem 0.4rem 0.65rem 0.75rem;
   resize: vertical;
   color: var(--ink);
   background: transparent;
@@ -24,23 +30,17 @@
 }
 .interaction-actions {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0 0.4rem 0.1rem;
+  flex-shrink: 0;
+  padding: 0.45rem 0.45rem 0.45rem 0;
   background: transparent;
-}
-.interaction-secondary-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  flex-wrap: wrap;
 }
 .interaction-primary-actions {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  margin-left: auto;
-  gap: 0.3rem;
+  gap: 0.25rem;
   flex-wrap: nowrap;
   flex-shrink: 0;
 }
@@ -57,8 +57,18 @@
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
+.interaction-primary-actions > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  line-height: 1;
+}
 .interaction-actions .interaction-send {
-  min-height: var(--control-height);
   color: var(--paper);
   background: var(--current);
   border-color: var(--current);
@@ -90,12 +100,19 @@
   outline: 2px dashed var(--current);
   outline-offset: 4px;
 }
-.interaction-actions .interaction-attach {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
+@media (width < 768px) {
+  .interaction-composer textarea {
+    min-height: 5.75rem;
+  }
+  .interaction-actions {
+    padding: 0.4rem 0.4rem 0.4rem 0;
+  }
+  .interaction-primary-actions > button {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
 }
 .interaction-attachment-menu {
   position: fixed;

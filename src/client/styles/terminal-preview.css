@@ -25,7 +25,7 @@
 }
 .terminal-preview-body {
   position: relative;
-  min-height: 9.9rem;
+  min-height: 12rem;
   background: var(--terminal-output-surface);
 }
 .terminal-preview pre {
@@ -168,34 +168,69 @@
   cursor: pointer;
 }
 
-.terminal-preview-close {
+.terminal-preview-actions {
   position: absolute;
   z-index: 1;
-  top: 0.25rem;
-  right: 0.25rem;
+  top: 0.5rem;
+  right: 1rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--terminal-border) 72%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--terminal-surface) 88%, transparent);
+  backdrop-filter: blur(4px);
+}
+.terminal-preview-action {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
   padding: 0;
-  border: 1px solid var(--terminal-border);
-  border-radius: var(--radius-control);
+  border: 0;
+  border-radius: calc(var(--radius-control) - 2px);
   color: var(--terminal-ink);
-  background: color-mix(in srgb, var(--terminal-output-surface) 88%, transparent);
+  background: transparent;
   cursor: pointer;
-  font-size: 24px;
   line-height: 1;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
 }
-.terminal-preview-close:focus-visible {
-  outline: 2px solid var(--terminal-ink);
-  outline-offset: -3px;
+.terminal-preview-action-divider {
+  width: 1px;
+  height: 14px;
+  background: color-mix(in srgb, var(--terminal-border) 60%, transparent);
+}
+.terminal-preview-action[aria-disabled="true"] {
+  opacity: 0.38;
+  cursor: default;
+}
+.terminal-preview-action:focus-visible {
+  outline: 1.5px solid var(--terminal-ink);
+  outline-offset: -2px;
 }
 @media (hover: hover) and (pointer: fine) {
-  .terminal-preview-close {
-    opacity: 0.65;
+  .terminal-preview-actions {
+    opacity: 0.78;
+    transition: opacity 120ms ease;
   }
-  .terminal-preview-close:is(:hover, :focus-visible) {
+  .terminal-preview-actions:is(:hover, :focus-within) {
     opacity: 1;
+  }
+  .terminal-preview-action:not([aria-disabled="true"]):hover {
+    background: color-mix(in srgb, var(--terminal-ink) 12%, transparent);
+  }
+}
+@media (width < 768px) {
+  .terminal-preview-action {
+    width: 38px;
+    height: 38px;
+    min-height: 38px;
   }
 }

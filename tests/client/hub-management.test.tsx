@@ -1,4 +1,4 @@
-import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { HubOperation, InteractionResponse } from "../../src/shared/api-contract";
@@ -24,6 +24,14 @@ const pending: HubOperation = {
   createdAt: "2026-10-16T00:00:00Z",
   updatedAt: "2026-10-16T00:00:00Z",
 };
+const connectedInteraction: InteractionResponse = {
+  supported: true,
+  state: "connected",
+  activity: null,
+  supersededBySessionId: null,
+  attachCommand: null,
+};
+
 const flush = async () => {
   await act(async () => {
     for (let i = 0; i < 10; i++) await Promise.resolve();
@@ -99,7 +107,7 @@ describe("hub management", () => {
         document.querySelectorAll(".session-action-menu button"),
         (button) => button.textContent,
       ),
-    ).toEqual(["Archive session", "Delete session", "Exit session"]);
+    ).toEqual(["Archive session", "Delete session", "Handoff", "Exit session"]);
     view.rerender(renderControls(connected, true));
     expect(screen.getByRole("button", { name: "Exit session" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Archive session" })).toBeDisabled();
@@ -297,6 +305,169 @@ describe("hub management", () => {
     expect(screen.queryByRole("button", { name: "Delete session" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Session management" }));
     expect(screen.getByRole("button", { name: "Delete session" })).toBeDisabled();
+  });
+
+  it("offers Handoff only when connected, tracks busy state, and reports errors", async () => {
+    let finish!: () => void;
+    const handoff = vi.spyOn(api, "handoffPaneBinding").mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const onChanged = vi.fn();
+    const onHandoffBusyChange = vi.fn();
+    const session = { ...baseSession, sourceId: "native", status: "live" as const };
+    const view = render(
+      <ManageSession
+        session={session}
+        interaction={{ ...connectedInteraction, state: "disconnected" }}
+        onChanged={onChanged}
+        onHandoffBusyChange={onHandoffBusyChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Session management" }));
+    expect(screen.queryByRole("button", { name: "Handoff" })).not.toBeInTheDocument();
+
+    view.rerender(
+      <ManageSession
+        session={session}
+        interaction={connectedInteraction}
+        onChanged={onChanged}
+        onHandoffBusyChange={onHandoffBusyChange}
+      />,
+    );
+    const handoffButton = screen.getByRole("button", { name: "Handoff" });
+    expect(handoffButton).toHaveAttribute(
+      "title",
+      "Hand off this pane’s binding to the active agent session.",
+    );
+    fireEvent.click(handoffButton);
+    expect(handoff).toHaveBeenCalledExactlyOnceWith(SESSION_ID);
+    expect(onHandoffBusyChange).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole("button", { name: "Session management" }));
+    expect(screen.getByRole("button", { name: "Handoff" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Exit session" })).toBeDisabled();
+
+    await act(async () => finish());
+    expect(onChanged).not.toHaveBeenCalled();
+    expect(onHandoffBusyChange).toHaveBeenLastCalledWith(false);
+
+    handoff.mockRejectedValueOnce(new Error("handoff failed"));
+    fireEvent.click(screen.getByRole("button", { name: "Handoff" }));
+    await flush();
+    expect(screen.getByRole("alert")).toHaveTextContent("handoff failed");
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss interaction error" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("isolates in-flight handoff state across session switches and clears busy on unmount", async () => {
+    let rejectFirst!: (reason: unknown) => void;
+    let finishSecond!: () => void;
+    vi.spyOn(api, "handoffPaneBinding")
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_, reject) => {
+            rejectFirst = reject;
+          }),
+      )
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishSecond = resolve;
+          }),
+      );
+    const onChanged = vi.fn();
+    const onHandoffBusyChange = vi.fn();
+    const firstSession = {
+      ...baseSession,
+      id: SESSION_ID,
+      sourceId: "native",
+      status: "live" as const,
+    };
+    const secondSession = {
+      ...baseSession,
+      id: "019d8000-0000-7000-8000-000000000099",
+      sourceId: "native-2",
+      status: "live" as const,
+    };
+    const view = render(
+      <ManageSession
+        session={firstSession}
+        interaction={connectedInteraction}
+        onChanged={onChanged}
+        onHandoffBusyChange={onHandoffBusyChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Session management" }));
+    fireEvent.click(screen.getByRole("button", { name: "Handoff" }));
+    expect(onHandoffBusyChange).toHaveBeenLastCalledWith(true);
+
+    view.rerender(
+      <ManageSession
+        session={secondSession}
+        interaction={connectedInteraction}
+        onChanged={onChanged}
+        onHandoffBusyChange={onHandoffBusyChange}
+      />,
+    );
+    expect(onHandoffBusyChange).toHaveBeenLastCalledWith(false);
+    await act(async () => rejectFirst(new Error("stale handoff failed")));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Session management" }));
+    expect(screen.getByRole("button", { name: "Handoff" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Handoff" }));
+    expect(onHandoffBusyChange).toHaveBeenLastCalledWith(true);
+
+    view.unmount();
+    expect(onHandoffBusyChange).toHaveBeenLastCalledWith(false);
+    await act(async () => finishSecond());
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it("portals status details into statusTarget and flips the action menu away from the right viewport edge", async () => {
+    vi.spyOn(api, "handoffPaneBinding").mockRejectedValueOnce(new Error("portal handoff failed"));
+    const triggerTarget = document.createElement("div");
+    const statusTarget = document.createElement("div");
+    document.body.append(triggerTarget, statusTarget);
+    const originalWidth = window.innerWidth;
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 400 });
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.classList.contains("session-menu-host")) return new DOMRect(350, 16, 32, 32);
+        if (this.classList.contains("session-action-menu")) return new DOMRect(350, 54, 160, 166);
+        return new DOMRect();
+      });
+    try {
+      const session = { ...baseSession, sourceId: "native", status: "live" as const };
+      render(
+        <ManageSession
+          session={session}
+          interaction={connectedInteraction}
+          triggerTarget={triggerTarget}
+          statusTarget={statusTarget}
+          onChanged={vi.fn()}
+        />,
+      );
+      fireEvent.click(within(triggerTarget).getByRole("button", { name: "Session management" }));
+      const popup = triggerTarget.querySelector<HTMLElement>(".session-action-menu")!;
+      expect(popup.style.left).toBe("auto");
+      expect(popup.style.right).toBe("0px");
+
+      fireEvent.click(within(triggerTarget).getByRole("button", { name: "Handoff" }));
+      await flush();
+      expect(within(statusTarget).getByRole("alert")).toHaveTextContent("portal handoff failed");
+      expect(
+        document.querySelector(".session-management .session-operation-details"),
+      ).not.toBeInTheDocument();
+    } finally {
+      rectSpy.mockRestore();
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: originalWidth });
+      triggerTarget.remove();
+      statusTarget.remove();
+    }
   });
 });
 

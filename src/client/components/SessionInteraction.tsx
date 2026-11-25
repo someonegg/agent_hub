@@ -71,15 +71,13 @@ export function SessionInteraction({
       operationStatus={operationStatus}
       interaction={interaction}
       onNavigate={onNavigate}
-      actionsDisabled={controller.pendingOperation === "handoff" || !!managementBusy}
+      actionsDisabled={!!managementBusy}
       interactionSending={controller.pendingOperation === "send"}
       error={controller.error}
       errorDetail={controller.errorDetail}
       onDismissError={controller.clearError}
       onSendMessage={sendMessage}
-      onSendKeys={controller.sendKeys}
-      onSendTerminalKeys={controller.sendTerminalKeys}
-      onHandoffPaneBinding={controller.handoffPaneBinding}
+      onSendKeys={controller.sendTerminalKeys}
       {...preview}
     />
   );

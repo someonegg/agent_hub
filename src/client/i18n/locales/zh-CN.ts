@@ -187,6 +187,7 @@ export const messages: Record<keyof typeof english, string> = {
   sessionNotFound: "会话不存在",
   sessionTimeline: "会话时间线",
   show: "显示",
+  showArchivedSessions: "显示已归档会话",
 
   someContentCouldNotBeFullyParsedCheckTheOriginalTextBelow:
     "部分内容未能完整解析，请查看下方原文。",

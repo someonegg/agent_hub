@@ -187,6 +187,7 @@ export const messages: Record<keyof typeof english, string> = {
   sessionNotFound: "工作階段不存在",
   sessionTimeline: "工作階段時間線",
   show: "顯示",
+  showArchivedSessions: "顯示已封存工作階段",
 
   someContentCouldNotBeFullyParsedCheckTheOriginalTextBelow:
     "部分內容未能完整解析，請檢視下方原文。",

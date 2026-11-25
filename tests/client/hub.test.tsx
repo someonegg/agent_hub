@@ -239,23 +239,31 @@ describe("unified hub", () => {
     expect(within(nav).getAllByRole("link")).toHaveLength(1);
     expect(screen.queryByRole("link", { name: /Another trace/ })).not.toBeInTheDocument();
     expect(api.messages).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Archived" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show archived sessions" }));
     expect(within(nav).getAllByRole("link")).toHaveLength(2);
     fireEvent.click(within(nav).getByRole("link", { name: /Reader work/ }));
     await flush();
     expect(window.location.pathname).toBe(`/sessions/${SESSION_ID}`);
     expect(screen.getByRole("heading", { name: "Reader work" })).toBeInTheDocument();
+    expect(
+      within(document.querySelector(".hub-topbar")!).getByRole("button", {
+        name: "Session management",
+      }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Back to list/ }));
     await flush();
     expect(window.location.pathname).toBe("/");
-    expect(screen.getByRole("checkbox", { name: "Archived" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Show archived sessions" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     act(() => {
       window.history.replaceState(null, "", `/sessions/${archiveId}`);
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     await flush();
     expect(screen.getByRole("heading", { name: "Archived trace" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Archived" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show archived sessions" }));
     expect(within(nav).queryByRole("link", { name: /Archived trace/ })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Archived trace" })).toBeInTheDocument();
   });
