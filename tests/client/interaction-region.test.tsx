@@ -45,7 +45,6 @@ function props(value: InteractionResponse | null) {
     actionsDisabled: false,
     error: null,
     onDismissError: vi.fn(),
-    onHandoffPaneBinding: vi.fn().mockResolvedValue(undefined),
     onExpandPreview: vi.fn(),
     onSendMessage: vi.fn().mockResolvedValue(undefined),
     onSendKeys: vi.fn().mockResolvedValue(undefined),
@@ -156,12 +155,14 @@ describe("interaction region", () => {
     const user = userEvent.setup();
     const { rerender } = render(<StatefulInteractionRegion {...handlers} />);
     expect(screen.getByRole("textbox")).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Interrupt" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Interrupt" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Send" }).parentElement).toHaveClass(
       "interaction-primary-actions",
     );
     expect(screen.queryByRole("button", { name: "Esc" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Terminal" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Terminal" }));
+    expect(screen.getByRole("button", { name: "Interrupt" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Interrupt" }));
     expect(screen.getByRole("button", { name: "Interrupt" })).toHaveFocus();
     expect(handlers.onSendKeys).toHaveBeenNthCalledWith(1, ["interrupt"]);
@@ -306,38 +307,6 @@ it("keeps an expanded preview open and preserves edits made during delivery", as
   expect(toggle).toHaveAttribute("aria-expanded", "true");
 });
 
-it("preserves the collapsed preview and draft after handoff and disables Handoff while busy or disconnected", async () => {
-  const handlers = props(interaction("connected"));
-  const view = render(<StatefulInteractionRegion {...handlers} />);
-  fireEvent.change(screen.getByRole("textbox"), { target: { value: "draft" } });
-  const handoff = screen.getByRole("button", { name: "Handoff" });
-  fireEvent.click(handoff);
-  await act(async () => {
-    await Promise.resolve();
-  });
-  expect(handlers.onHandoffPaneBinding).toHaveBeenCalledOnce();
-  expect(handoff).toHaveAttribute(
-    "title",
-    "Hand off this pane’s binding to the active agent session.",
-  );
-  expect(screen.getByRole("textbox")).toHaveValue("draft");
-  expect(screen.getByRole("button", { name: "Terminal" })).toHaveAttribute(
-    "aria-expanded",
-    "false",
-  );
-  handoff.focus();
-  view.rerender(<StatefulInteractionRegion {...handlers} actionsDisabled />);
-  expect(handoff).toHaveFocus();
-  fireEvent.click(handoff);
-  expect(handlers.onHandoffPaneBinding).toHaveBeenCalledOnce();
-  expect(handoff).toBeEnabled();
-  expect(handoff).toHaveAttribute("aria-disabled", "true");
-  view.rerender(
-    <StatefulInteractionRegion {...handlers} interaction={interaction("disconnected")} />,
-  );
-  expect(screen.queryByRole("button", { name: "Handoff" })).not.toBeInTheDocument();
-});
-
 it("shows takeover beside the status, preserves drafts, and navigates to the replacement", () => {
   const handlers = props(interaction("connected"));
   const onNavigate = vi.fn();
@@ -367,7 +336,7 @@ it("shows takeover beside the status, preserves drafts, and navigates to the rep
   fireEvent.click(link);
   expect(onNavigate).toHaveBeenCalledWith("replacement");
   expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-  for (const name of ["Send", "Handoff", "BTab"])
+  for (const name of ["Send", "BTab"])
     expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
   view.rerender(<StatefulInteractionRegion {...props(interaction("connected"))} />);
   expect(screen.getByRole("textbox")).toHaveValue("draft");
@@ -388,29 +357,6 @@ it("shows the takeover even on first load, with no link when its session is miss
   expect(screen.getByText("Superseded")).toBeVisible();
   expect(screen.getByText("Replacement session unavailable")).toBeVisible();
   expect(screen.queryByRole("link")).not.toBeInTheDocument();
-});
-
-it("preserves expanded preview during and after handoff delivery", async () => {
-  let resolve!: () => void;
-  const handlers = props(interaction("connected"));
-  handlers.onHandoffPaneBinding.mockImplementationOnce(
-    () =>
-      new Promise<void>((done) => {
-        resolve = done;
-      }),
-  );
-  render(<StatefulInteractionRegion {...handlers} />);
-  const toggle = screen.getByRole("button", { name: "Terminal" });
-  fireEvent.click(toggle);
-  handlers.onTogglePreview.mockClear();
-  fireEvent.click(screen.getByRole("button", { name: "Handoff" }));
-  expect(handlers.onHandoffPaneBinding).toHaveBeenCalledOnce();
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(handlers.onExpandPreview).not.toHaveBeenCalled();
-  await act(async () => resolve());
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(handlers.onExpandPreview).not.toHaveBeenCalled();
-  expect(handlers.onTogglePreview).not.toHaveBeenCalled();
 });
 
 it("collapses the preview with its close button even while busy and restores toggle focus", () => {
@@ -524,7 +470,7 @@ describe("composer uploads", () => {
       clipboardData: { files: [new File(["one"], "one.png"), new File(["two"], "two.txt")] },
     });
     expect(input).toBeEnabled();
-    for (const name of ["Send", "Handoff", "Interrupt"]) {
+    for (const name of ["Send"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toBeEnabled();
       expect(button).toHaveAttribute("aria-disabled", "true");
@@ -533,7 +479,7 @@ describe("composer uploads", () => {
       expect(button).toHaveFocus();
     }
     fireEvent.click(screen.getByRole("button", { name: "Terminal" }));
-    for (const name of ["Enter", "Up", "BTab", "Left", "Down", "Right"]) {
+    for (const name of ["Interrupt", "Enter", "Up", "BTab", "Left", "Down", "Right"]) {
       const button = screen.getByRole("button", { name });
       expect(button).toBeEnabled();
       expect(button).toHaveAttribute("aria-disabled", "false");
@@ -545,8 +491,7 @@ describe("composer uploads", () => {
     fireEvent.keyDown(previewBody, { key: "c", ctrlKey: true });
     fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
     expect(handlers.onSendMessage).not.toHaveBeenCalled();
-    expect(handlers.onHandoffPaneBinding).not.toHaveBeenCalled();
-    expect(handlers.onSendKeys).toHaveBeenCalledTimes(12);
+    expect(handlers.onSendKeys).toHaveBeenCalledTimes(13);
     expect(screen.getByText("Uploading 1/2…")).toBeInTheDocument();
     await act(async () => finish(uploadResult("/tmp/space dir/one.png")));
     expect(input.value).toBe("before replace after");

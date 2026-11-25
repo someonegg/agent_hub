@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import type { HubOperation, InteractionResponse, SessionAgent } from "../../shared/api-contract";
@@ -285,11 +286,14 @@ interface ManageSessionProps {
   management?: SessionAgent["management"];
   interaction?: InteractionResponse | null;
   session: SessionDetail;
+  triggerTarget?: HTMLElement | null;
+  statusTarget?: HTMLElement | null;
   onChanged: () => void;
   onDeleted?: () => void;
   controller?: OperationController;
   showStatus?: boolean;
   onStart?: () => void;
+  onHandoffBusyChange?: (busy: boolean) => void;
 }
 
 export function ManageSession(props: ManageSessionProps) {
@@ -297,9 +301,12 @@ export function ManageSession(props: ManageSessionProps) {
     <ManageSessionControls
       management={props.management}
       session={props.session}
+      triggerTarget={props.triggerTarget}
+      statusTarget={props.statusTarget}
       interaction={props.interaction}
       controller={props.controller}
       onStart={props.onStart}
+      onHandoffBusyChange={props.onHandoffBusyChange}
       showStatus={
         props.showStatus ??
         (props.controller.operation?.type === "archive" ||
@@ -314,9 +321,12 @@ export function ManageSession(props: ManageSessionProps) {
 function StandaloneManageSession({
   management,
   session,
+  triggerTarget,
+  statusTarget,
   interaction,
   onChanged,
   onDeleted,
+  onHandoffBusyChange,
 }: ManageSessionProps) {
   const controller = useHubOperation(session.id, (operation) => {
     if (operation.type === "delete") {
@@ -328,8 +338,11 @@ function StandaloneManageSession({
     <ManageSessionControls
       management={management}
       session={session}
+      triggerTarget={triggerTarget}
+      statusTarget={statusTarget}
       interaction={interaction}
       controller={controller}
+      onHandoffBusyChange={onHandoffBusyChange}
       showStatus
     />
   );
@@ -339,31 +352,132 @@ function ManageSessionControls({
   management,
   interaction,
   session,
+  triggerTarget,
+  statusTarget,
   controller,
   showStatus,
   onStart,
+  onHandoffBusyChange,
 }: {
   session: SessionDetail;
   management?: SessionAgent["management"];
   interaction?: InteractionResponse | null;
+  triggerTarget?: HTMLElement | null;
+  statusTarget?: HTMLElement | null;
   controller: OperationController;
   showStatus: boolean;
   onStart?: () => void;
+  onHandoffBusyChange?: (busy: boolean) => void;
 }) {
   useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const [handoffError, setHandoffError] = useState<unknown>(null);
+  const handoffInFlight = useRef(false);
+  const handoffBusyReported = useRef(false);
+  const handoffGeneration = useRef(0);
+  const activeSessionId = useRef(session.id);
+  const onHandoffBusyChangeRef = useRef(onHandoffBusyChange);
+  onHandoffBusyChangeRef.current = onHandoffBusyChange;
+  const mounted = useRef(true);
+  const reportHandoffBusy = (nextBusy: boolean) => {
+    if (handoffBusyReported.current === nextBusy) return;
+    handoffBusyReported.current = nextBusy;
+    onHandoffBusyChangeRef.current?.(nextBusy);
+  };
+  const invalidateHandoff = () => {
+    handoffGeneration.current += 1;
+    handoffInFlight.current = false;
+  };
+  if (activeSessionId.current !== session.id) {
+    activeSessionId.current = session.id;
+    invalidateHandoff();
+  }
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      invalidateHandoff();
+      reportHandoffBusy(false);
+    };
+  }, []);
+  useEffect(() => {
+    setHandoffBusy(false);
+    setHandoffError(null);
+    return () => {
+      invalidateHandoff();
+      reportHandoffBusy(false);
+    };
+  }, [session.id]);
+  const busy = controller.busy || handoffBusy;
+  const runHandoff = async () => {
+    if (busy || handoffInFlight.current) return;
+    handoffInFlight.current = true;
+    const generation = ++handoffGeneration.current;
+    setHandoffBusy(true);
+    setHandoffError(null);
+    reportHandoffBusy(true);
+    try {
+      await api.handoffPaneBinding(session.id);
+    } catch (reason) {
+      if (mounted.current && handoffGeneration.current === generation) setHandoffError(reason);
+    } finally {
+      if (handoffGeneration.current === generation) {
+        handoffInFlight.current = false;
+        if (mounted.current) {
+          setHandoffBusy(false);
+          reportHandoffBusy(false);
+        }
+      }
+    }
+  };
   const deleteDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (deleteOpen) deleteDialog.current?.showModal();
     else deleteDialog.current?.close();
   }, [deleteOpen]);
   const menu = useRef<HTMLDivElement>(null);
+  const actionMenu = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const closeMenu = () => {
     setMenuOpen(false);
     menu.current?.querySelector<HTMLButtonElement>(".session-menu-trigger")?.focus();
   };
+  const startOperation = (request: () => Promise<HubOperation>) => {
+    setHandoffError(null);
+    onStart?.();
+    void controller.start(request);
+  };
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    const position = () => {
+      const host = menu.current;
+      const popup = actionMenu.current;
+      if (!host || !popup) return;
+      popup.style.left = "";
+      popup.style.right = "";
+      const margin = 8;
+      const rect = popup.getBoundingClientRect();
+      if (rect.width <= 0) return;
+      const hostRect = host.getBoundingClientRect();
+      if (rect.right > window.innerWidth - margin) {
+        if (hostRect.right - rect.width >= margin) {
+          popup.style.left = "auto";
+          popup.style.right = "0px";
+        } else {
+          popup.style.left = `${Math.max(margin, window.innerWidth - margin - rect.width) - hostRect.left}px`;
+          popup.style.right = "auto";
+        }
+      } else if (rect.left < margin) {
+        popup.style.left = `${margin - hostRect.left}px`;
+        popup.style.right = "auto";
+      }
+    };
+    position();
+    window.addEventListener("resize", position);
+    return () => window.removeEventListener("resize", position);
+  }, [menuOpen]);
   useEffect(() => {
     if (!menuOpen) return;
     menu.current?.querySelector<HTMLButtonElement>(".session-action-menu button")?.focus();
@@ -373,9 +487,9 @@ function ManageSessionControls({
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
   }, [menuOpen]);
-  return (
+  const menuControls = (
     <div
-      className="session-management"
+      className="session-menu-host"
       ref={menu}
       onKeyDown={(event) => {
         if (event.key === "Escape") closeMenu();
@@ -389,18 +503,21 @@ function ManageSessionControls({
         aria-controls={menuOpen ? menuId : undefined}
         onClick={() => setMenuOpen(!menuOpen)}
       >
-        ⋯
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <circle cx="3.25" cy="8" r="1.25" />
+          <circle cx="8" cy="8" r="1.25" />
+          <circle cx="12.75" cy="8" r="1.25" />
+        </svg>
       </button>
       {menuOpen ? (
-        <div className="session-action-menu" id={menuId}>
+        <div className="session-action-menu" id={menuId} ref={actionMenu}>
           {management?.archive !== false && session.status !== "archived" ? (
             <button
               type="button"
-              disabled={controller.busy}
+              disabled={busy}
               onClick={() => {
                 closeMenu();
-                onStart?.();
-                void controller.start(() => api.archiveSession(session.id));
+                startOperation(() => api.archiveSession(session.id));
               }}
             >
               {t("archiveSession")}
@@ -408,7 +525,7 @@ function ManageSessionControls({
           ) : null}
           <button
             type="button"
-            disabled={controller.busy}
+            disabled={busy}
             onClick={() => {
               closeMenu();
               setDeleteOpen(true);
@@ -417,52 +534,92 @@ function ManageSessionControls({
             {t("deleteSession")}
           </button>
           {interaction?.supported && interaction.state === "connected" ? (
-            <button
-              type="button"
-              disabled={controller.busy}
-              onClick={() => {
-                closeMenu();
-                onStart?.();
-                void controller.start(() => api.exitSession(session.id));
-              }}
-            >
-              {t("exitSession")}
-            </button>
+            <>
+              <button
+                type="button"
+                title={t("handOffThisPaneSBindingToTheActiveCodexSession")}
+                disabled={busy}
+                onClick={() => {
+                  closeMenu();
+                  void runHandoff();
+                }}
+              >
+                {t("handoff")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  closeMenu();
+                  startOperation(() => api.exitSession(session.id));
+                }}
+              >
+                {t("exitSession")}
+              </button>
+            </>
           ) : null}
         </div>
       ) : null}
-      <dialog
-        ref={deleteDialog}
-        className="create-session"
-        aria-label={t("deleteSession")}
-        onCancel={() => setDeleteOpen(false)}
-        onClose={() => setDeleteOpen(false)}
-      >
-        <h2>{t("deleteSessionLabel")}</h2>
-        <p>{t("deleteSessionConfirmation")}</p>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (controller.busy) return;
-            setDeleteOpen(false);
-            onStart?.();
-            void controller.start(() => api.deleteSession(session.id));
-          }}
-        >
-          <button type="button" autoFocus onClick={() => setDeleteOpen(false)}>
-            {t("cancel")}
-          </button>
-          <button type="submit" disabled={controller.busy}>
-            {t("confirmDelete")}
-          </button>
-        </form>
-      </dialog>
-      {showStatus ? (
-        <div className="session-operation-details">
-          <OperationStatus controller={controller} />
-        </div>
-      ) : null}
     </div>
+  );
+  const operationDetails =
+    showStatus || handoffError ? (
+      <div className="session-operation-details">
+        {showStatus ? <OperationStatus controller={controller} /> : null}
+        {handoffError ? (
+          <div className="interaction-error" role="alert">
+            <span>
+              <RequestError error={handoffError} />
+            </span>
+            <button
+              type="button"
+              onClick={() => setHandoffError(null)}
+              aria-label={t("dismissInteractionError")}
+            >
+              ×
+            </button>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
+  return (
+    <>
+      {triggerTarget ? createPortal(menuControls, triggerTarget) : null}
+      {statusTarget && operationDetails ? createPortal(operationDetails, statusTarget) : null}
+      <div
+        className={
+          triggerTarget ? "session-management session-management-detached" : "session-management"
+        }
+      >
+        {triggerTarget ? null : menuControls}
+        <dialog
+          ref={deleteDialog}
+          className="create-session"
+          aria-label={t("deleteSession")}
+          onCancel={() => setDeleteOpen(false)}
+          onClose={() => setDeleteOpen(false)}
+        >
+          <h2>{t("deleteSessionLabel")}</h2>
+          <p>{t("deleteSessionConfirmation")}</p>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (busy) return;
+              setDeleteOpen(false);
+              startOperation(() => api.deleteSession(session.id));
+            }}
+          >
+            <button type="button" autoFocus onClick={() => setDeleteOpen(false)}>
+              {t("cancel")}
+            </button>
+            <button type="submit" disabled={busy}>
+              {t("confirmDelete")}
+            </button>
+          </form>
+        </dialog>
+        {statusTarget ? null : operationDetails}
+      </div>
+    </>
   );
 }
 

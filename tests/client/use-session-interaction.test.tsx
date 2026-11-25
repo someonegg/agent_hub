@@ -17,29 +17,11 @@ function deferred() {
 }
 
 describe("session interaction state", () => {
-  it("shares the interaction lock and error handling with handoffPaneBinding", async () => {
-    const pending = deferred();
-    const handoffPaneBinding = vi.spyOn(api, "handoffPaneBinding").mockReturnValue(pending.promise);
-    const { result } = renderHook(() => useSessionInteraction("session-a"));
-    let operation!: Promise<void>;
-    act(() => {
-      operation = result.current.handoffPaneBinding();
-    });
-    const failure = operation.catch((reason: unknown) => reason);
-    expect(result.current.pendingOperation).toBe("handoff");
-    await expect(result.current.handoffPaneBinding()).rejects.toThrow("already in progress");
-    expect(handoffPaneBinding).toHaveBeenCalledTimes(1);
-    await act(async () => pending.reject(new Error("handoffPaneBinding failed")));
-    await failure;
-    expect(result.current.error).toBe("handoffPaneBinding failed");
-    expect(result.current.pendingOperation).toBeNull();
-  });
-
   it("sends semantic key sequences through the unified client operation", async () => {
     const sendKeys = vi.spyOn(api, "sendKeys").mockResolvedValue(undefined);
     const { result } = renderHook(() => useSessionInteraction("session-a"));
 
-    await act(async () => result.current.sendKeys(["interrupt", "BTab", "left"]));
+    await act(async () => result.current.sendTerminalKeys(["interrupt", "BTab", "left"]));
 
     expect(sendKeys).toHaveBeenCalledWith("session-a", ["interrupt", "BTab", "left"]);
     expect(result.current.pendingOperation).toBeNull();

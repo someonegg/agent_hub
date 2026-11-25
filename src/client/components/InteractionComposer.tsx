@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { type InteractionKey, MAX_INTERACTION_MESSAGE_BYTES } from "../../shared/api-contract";
+import { MAX_INTERACTION_MESSAGE_BYTES } from "../../shared/api-contract";
 
 import { formatNumber, t } from "../i18n";
 import { LocalizedError } from "../i18n/localized-error";
@@ -25,8 +25,6 @@ export function InteractionComposer({
   errorDetail,
   onDismissError,
   onSendMessage,
-  onSendKeys,
-  onHandoffPaneBinding,
   onExpandPreview,
   scrollToEnd,
 }: {
@@ -41,8 +39,6 @@ export function InteractionComposer({
   errorDetail?: unknown;
   onDismissError: () => void;
   onSendMessage: (message: string) => Promise<void>;
-  onSendKeys: (keys: readonly InteractionKey[]) => Promise<void>;
-  onHandoffPaneBinding: () => Promise<void>;
   onExpandPreview: () => void;
   scrollToEnd: () => void;
 }) {
@@ -113,15 +109,6 @@ export function InteractionComposer({
     });
     if (!mounted.current || !shouldExpandPreview || previewIsExpanded.current) return;
     onExpandPreview();
-  };
-  const handoff = async () => {
-    if (inputBlocked()) return;
-    await onHandoffPaneBinding();
-  };
-  const interrupt = () => {
-    if (inputBlocked()) return;
-    onExpandPreview();
-    void onSendKeys(["interrupt"]).catch(() => undefined);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     // WebKit may report IME-confirming keys after composition has ended.
@@ -220,22 +207,52 @@ export function InteractionComposer({
             if (!interactionSending) removeAttachment(id);
           }}
         />
-        <textarea
-          ref={composer}
-          onPaste={(event) => {
-            const files = Array.from(event.clipboardData.files);
-            if (!files.length) return;
-            event.preventDefault();
-            void uploadFiles(files);
-          }}
-          aria-label={t("messageToAgent")}
-          value={message}
-          rows={3}
-          maxLength={MAX_INTERACTION_MESSAGE_BYTES}
-          placeholder={t(enterToSend ? "shiftNewline" : "shiftSend")}
-          onChange={(event) => setMessage(event.target.value)}
-          onKeyDown={onKeyDown}
-        />
+        <div className="interaction-input-wrap">
+          <textarea
+            ref={composer}
+            onPaste={(event) => {
+              const files = Array.from(event.clipboardData.files);
+              if (!files.length) return;
+              event.preventDefault();
+              void uploadFiles(files);
+            }}
+            aria-label={t("messageToAgent")}
+            value={message}
+            rows={3}
+            maxLength={MAX_INTERACTION_MESSAGE_BYTES}
+            placeholder={t(enterToSend ? "shiftNewline" : "shiftSend")}
+            onChange={(event) => setMessage(event.target.value)}
+            onKeyDown={onKeyDown}
+          />
+          <div className="interaction-actions">
+            <div className="interaction-primary-actions">
+              {attachmentMenu}
+              <button
+                type="button"
+                className="interaction-send"
+                aria-label={t("send")}
+                title={t("send")}
+                aria-disabled={inputActionsDisabled || messageIsBlank || messageTooLarge}
+                onClick={() => void send().catch(() => undefined)}
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M8 12.75V3.25" />
+                  <path d="M3.75 7.25 8 3l4.25 4.25" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
         {messageTooLarge ? (
           <p className="interaction-message-limit" role="alert">
             {t("messageLimit", {
@@ -244,38 +261,6 @@ export function InteractionComposer({
             })}
           </p>
         ) : null}
-        <div className="interaction-actions">
-          <div className="interaction-secondary-actions">
-            <button
-              type="button"
-              className="interaction-handoff"
-              title={t("handOffThisPaneSBindingToTheActiveCodexSession")}
-              aria-disabled={inputActionsDisabled}
-              onClick={() => void handoff().catch(() => undefined)}
-            >
-              {t("handoff")}
-            </button>
-            <button
-              type="button"
-              className="interaction-interrupt"
-              aria-disabled={inputActionsDisabled}
-              onClick={interrupt}
-            >
-              {t("interrupt")}
-            </button>
-          </div>
-          <div className="interaction-primary-actions">
-            {attachmentMenu}
-            <button
-              type="button"
-              className="interaction-send"
-              aria-disabled={inputActionsDisabled || messageIsBlank || messageTooLarge}
-              onClick={() => void send().catch(() => undefined)}
-            >
-              {t("send")}
-            </button>
-          </div>
-        </div>
       </div>
     );
   }

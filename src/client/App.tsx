@@ -92,6 +92,8 @@ function SessionHub({ cache }: { cache: SessionCache }) {
   );
   const [createDirectory, setCreateDirectory] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [topbarActionsTarget, setTopbarActionsTarget] = useState<HTMLDivElement | null>(null);
+  const [topbarStatusTarget, setTopbarStatusTarget] = useState<HTMLDivElement | null>(null);
   function toggleSidebar() {
     const collapsed = !sidebarCollapsed;
     setSidebarCollapsed(collapsed);
@@ -157,9 +159,11 @@ function SessionHub({ cache }: { cache: SessionCache }) {
                   <span>{sessionAgent}</span>
                 </>
               ) : null}
+              <div className="hub-topbar-actions" ref={setTopbarActionsTarget} />
             </>
           ) : null}
         </div>
+        {sessionId ? <div className="hub-topbar-status" ref={setTopbarStatusTarget} /> : null}
         {sessionId ? (
           <>
             {hub.uploadsOpen ? (
@@ -174,6 +178,8 @@ function SessionHub({ cache }: { cache: SessionCache }) {
                 key={sessionId}
                 sessionId={sessionId}
                 agents={agents}
+                topbarActionsTarget={topbarActionsTarget}
+                topbarStatusTarget={topbarStatusTarget}
                 onNavigate={navigate}
                 onCatalogChanged={catalog.refresh}
                 onUpdatedAt={catalog.reportUpdatedAt}

@@ -81,21 +81,44 @@
   border: 0;
   margin: 0;
 }
+.session-management-detached {
+  display: contents;
+}
+.session-menu-host {
+  position: relative;
+  flex-shrink: 0;
+}
 .session-menu-trigger {
-  font-size: 1.6rem;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
   line-height: 1;
-  min-width: 44px;
-  min-height: 44px;
   cursor: pointer;
   background: transparent;
-  color: var(--ink);
+  color: var(--ink-soft);
   border: 1px solid var(--mist);
   border-radius: var(--radius-control);
+}
+.session-menu-trigger:hover {
+  color: var(--ink);
+  background: var(--hover-surface);
+}
+@media (width < 768px) {
+  .session-menu-trigger {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
 }
 .session-action-menu {
   position: absolute;
   right: 0;
-  top: 44px;
+  top: calc(100% + 6px);
   z-index: 30;
   padding: 0.5rem;
   min-width: 10rem;
@@ -104,12 +127,20 @@
   background: var(--surface);
   box-shadow: 0 8px 30px rgb(33 49 56 / 8%);
 }
+@media (width >= 768px) {
+  .hub-topbar-actions .session-action-menu {
+    left: 0;
+    right: auto;
+  }
+}
 .session-action-menu button {
   width: 100%;
   min-height: 44px;
+  padding: 0.6rem 1rem;
   border: 0;
   text-align: left;
   cursor: pointer;
+  color: var(--ink);
   background: transparent;
   border-radius: var(--radius-control);
   font-size: 0.875rem;
@@ -118,6 +149,13 @@
   position: relative;
   font-size: 1rem;
   overflow-wrap: anywhere;
+}
+.session-operation-details .interaction-error {
+  margin-top: 0.8rem;
+  border-radius: var(--radius-panel);
+}
+.session-operation-details .interaction-error button {
+  padding: 0 0.25rem;
 }
 .session-title-row:has(.session-operation-details :is(.operation-status, [role="alert"])) {
   flex-wrap: wrap;

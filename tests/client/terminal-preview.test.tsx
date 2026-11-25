@@ -140,6 +140,17 @@ it("interrupts with Ctrl+c in the preview without collapsing it", () => {
   expect(handlers.onToggle).not.toHaveBeenCalled();
 });
 
+it("renders Interrupt to the left of Collapse terminal and sends interrupt without collapsing", () => {
+  const handlers = props();
+  render(<TerminalPreview {...handlers} />);
+  const interrupt = screen.getByRole("button", { name: "Interrupt" });
+  const close = screen.getByRole("button", { name: "Collapse terminal" });
+  expect(interrupt.compareDocumentPosition(close) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  fireEvent.click(interrupt);
+  expect(handlers.onSendKeys).toHaveBeenCalledExactlyOnceWith(["interrupt"]);
+  expect(handlers.onToggle).not.toHaveBeenCalled();
+});
+
 it("sends once when Enter is pressed on a terminal button", async () => {
   const handlers = props();
   const user = userEvent.setup();

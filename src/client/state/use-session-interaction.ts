@@ -6,7 +6,7 @@ import { api } from "../api/client";
 import { messageFor } from "./request-errors";
 
 export function useSessionInteraction(sessionId: string) {
-  const [pendingOperation, setPendingOperation] = useState<"send" | "handoff" | null>(null);
+  const [pendingOperation, setPendingOperation] = useState<"send" | null>(null);
   const [errorDetail, setErrorDetail] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const activeSessionId = useRef(sessionId);
@@ -28,16 +28,13 @@ export function useSessionInteraction(sessionId: string) {
   const act = useCallback(
     async (
       operation: () => Promise<void>,
-      {
-        reportError = true,
-        kind = "send",
-      }: { reportError?: boolean; kind?: "send" | "handoff" } = {},
+      { reportError = true }: { reportError?: boolean } = {},
     ) => {
       if (!mounted.current || writing.current)
         throw new Error("An interaction is already in progress.");
       writing.current = true;
       const operationGeneration = ++generation.current;
-      setPendingOperation(kind);
+      setPendingOperation("send");
       if (reportError) setError(null);
       try {
         await operation();
@@ -71,9 +68,7 @@ export function useSessionInteraction(sessionId: string) {
     errorDetail: error === null ? null : errorDetail,
     clearError: () => setError(null),
     sendMessage: (message: string) => act(() => api.sendMessage(sessionId, message)),
-    handoffPaneBinding: () => act(() => api.handoffPaneBinding(sessionId), { kind: "handoff" }),
     sendTerminalKeys: (keys: readonly InteractionKey[]) =>
       act(() => api.sendKeys(sessionId, keys), { reportError: false }),
-    sendKeys: (keys: readonly InteractionKey[]) => act(() => api.sendKeys(sessionId, keys)),
   };
 }

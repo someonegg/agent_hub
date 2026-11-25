@@ -33,11 +33,9 @@ interface InteractionRegionProps {
   error: string | null;
   errorDetail?: unknown;
   onDismissError: () => void;
-  onHandoffPaneBinding: () => Promise<void>;
   onExpandPreview: () => void;
   onSendMessage: (message: string) => Promise<void>;
   onSendKeys: (keys: readonly InteractionKey[]) => Promise<void>;
-  onSendTerminalKeys?: (keys: readonly InteractionKey[]) => Promise<void>;
   preview: TerminalPreviewSnapshot | null;
   previewBusy: boolean;
   previewStopped: boolean;
@@ -63,10 +61,8 @@ export function InteractionRegion({
   errorDetail,
   onDismissError,
   onSendMessage,
-  onHandoffPaneBinding,
   onExpandPreview,
   onSendKeys,
-  onSendTerminalKeys = onSendKeys,
   preview,
   previewBusy,
   previewStopped,
@@ -161,7 +157,7 @@ export function InteractionRegion({
             contentId={previewContentId}
             actionsDisabled={actionsDisabled}
             interactionSending={interactionSending}
-            onSendKeys={onSendTerminalKeys}
+            onSendKeys={onSendKeys}
             onRetry={onRetryPreview}
             onToggle={() => {
               onTogglePreview();
@@ -278,8 +274,6 @@ export function InteractionRegion({
             errorDetail={errorDetail}
             onDismissError={onDismissError}
             onSendMessage={onSendMessage}
-            onSendKeys={onSendKeys}
-            onHandoffPaneBinding={onHandoffPaneBinding}
             onExpandPreview={onExpandPreview}
             scrollToEnd={scrollToEnd}
           />

@@ -70,7 +70,7 @@ agent-hub
 <details>
 <summary>檢視工作階段互動截圖</summary>
 
-<img src="docs/images/zh-TW/ahub-session-interaction.png" alt="工作階段、已回答問題、終端預覽、訊息輸入與移交繫結" width="900">
+<img src="docs/images/zh-TW/ahub-session-interaction.png" alt="工作階段、已回答問題、終端預覽與訊息輸入" width="900">
 
 </details>
 

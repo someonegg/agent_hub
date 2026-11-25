@@ -89,23 +89,41 @@ export function HubSidebar({
       </div>
       <div className="hub-section-label">
         <span>{t("projects")}</span>
-        <label className="check-row archive-switch">
-          <input
-            type="checkbox"
-            checked={navigation.includeArchived}
-            onChange={(event) => setIncludeArchived(event.target.checked)}
-          />
-          {t("archived")}
-        </label>
-        <button
-          type="button"
-          aria-label={t("newSession")}
-          onClick={() => {
-            onCreate(null);
-          }}
-        >
-          ＋
-        </button>
+        <div className="hub-section-actions">
+          <button
+            type="button"
+            className="archive-toggle"
+            aria-label={t("showArchivedSessions")}
+            aria-pressed={navigation.includeArchived}
+            title={t("showArchivedSessions")}
+            onClick={() => setIncludeArchived(!navigation.includeArchived)}
+          >
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.35"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="1.75" y="2.5" width="12.5" height="3" rx="0.75" />
+              <path d="M2.75 5.5v7.25a1 1 0 0 0 1 1h8.5a1 1 0 0 0 1-1V5.5" />
+              <path d="M6.25 8.75h3.5" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            aria-label={t("newSession")}
+            onClick={() => {
+              onCreate(null);
+            }}
+          >
+            ＋
+          </button>
+        </div>
       </div>
       <nav
         ref={projectNav}

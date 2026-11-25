@@ -17,6 +17,8 @@ interface SessionPageProps {
   cache?: SessionCache;
   agents?: readonly SessionAgent[];
   sessionId: string;
+  topbarActionsTarget?: HTMLElement | null;
+  topbarStatusTarget?: HTMLElement | null;
   onNavigate?: (id: string | null) => void;
   onCatalogChanged?: () => void;
   onUpdatedAt?: (id: string, updatedAt: string | null) => void;
@@ -26,6 +28,8 @@ export function SessionPage({
   sessionId,
   cache,
   agents = [],
+  topbarActionsTarget = null,
+  topbarStatusTarget = null,
   onNavigate,
   onCatalogChanged,
   onUpdatedAt,
@@ -34,6 +38,10 @@ export function SessionPage({
   const focused = useRef(false);
   const reader = useSessionReader(sessionId, cache);
   const [managementOperation, setManagementOperation] = useState(false);
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  useEffect(() => {
+    setHandoffBusy(false);
+  }, [sessionId]);
   const operation = useHubOperation(sessionId, (op) => {
     onCatalogChanged?.();
     if (op.type === "delete") {
@@ -67,7 +75,7 @@ export function SessionPage({
     <div className="reader-page">
       {reader.context ? (
         <SessionReader
-          managementBusy={operation.busy}
+          managementBusy={operation.busy || handoffBusy}
           operationStatus={
             !showManagementStatus ? <OperationStatus controller={operation} compact /> : null
           }
@@ -91,10 +99,13 @@ export function SessionPage({
                   ?.management
               }
               key={sessionId}
+              triggerTarget={topbarActionsTarget}
+              statusTarget={topbarStatusTarget}
               interaction={reader.context.interaction}
               controller={operation}
               showStatus={showManagementStatus}
               onStart={() => setManagementOperation(true)}
+              onHandoffBusyChange={setHandoffBusy}
               session={reader.context.session}
               onDeleted={() => {
                 cache?.storeMessages(sessionId, null);

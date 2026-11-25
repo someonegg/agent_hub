@@ -189,7 +189,7 @@ async function capture(
     }
     await demo.keyboard.press("Tab");
     const buttons = demo.locator(
-      ".interaction-toolbar button, .interaction-actions button, .terminal-key, .session-title-row button",
+      ".interaction-toolbar button, .interaction-actions button, .terminal-key, .hub-topbar-actions button",
     );
     for (const button of await buttons.all()) {
       if (!(await button.isVisible()) || !(await button.isEnabled())) continue;
@@ -261,13 +261,18 @@ async function capture(
     const actionSizes = await demo.locator(".interaction-actions").evaluate((element) => {
       const send = element.querySelector(".interaction-send").getBoundingClientRect();
       const attach = element.querySelector(".interaction-attach").getBoundingClientRect();
+      const expected = innerWidth < 768 ? 38 : 34;
       return (
-        Math.abs(send.height - 36) < 1 &&
-        Math.abs(send.top + send.height / 2 - attach.top - attach.height / 2) < 1
+        Math.abs(send.width - expected) < 1 &&
+        Math.abs(send.height - expected) < 1 &&
+        Math.abs(attach.width - expected) < 1 &&
+        Math.abs(attach.height - expected) < 1 &&
+        attach.bottom <= send.top + 1 &&
+        Math.abs(send.left + send.width / 2 - attach.left - attach.width / 2) < 1
       );
     });
     if (!actionSizes)
-      throw new Error("Send must be compact and centered beside the attachment button");
+      throw new Error("Send must be compact and stacked beneath the attachment button");
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     const original = await composer.inputValue();
     await composer.fill("One\nTwo\nThree");
@@ -284,7 +289,7 @@ async function capture(
     });
     if (
       metrics.rows !== 3 ||
-      Math.abs(metrics.textHeight - 3 * metrics.lineHeight) > 1 ||
+      metrics.textHeight < 3 * metrics.lineHeight - 1 ||
       !metrics.fits ||
       metrics.resize !== "vertical"
     )
@@ -309,7 +314,7 @@ async function capture(
     const labels = await menu.locator("button").allTextContents();
     if (
       labels.join("|") !==
-      ["Archive session", "Delete session", "Exit session"].map(label).join("|")
+      ["Archive session", "Delete session", "Handoff", "Exit session"].map(label).join("|")
     )
       throw new Error("Unexpected session menu order");
     const bounds = await menu.boundingBox();
@@ -887,8 +892,8 @@ async function capture(
       if (!(await demo.getByLabel(label(name), { exact: true }).isVisible()))
         throw new Error(`${name} is hidden`);
     }
-    if (!(await demo.getByRole("button", { name: label("Handoff"), exact: true }).isVisible()))
-      throw new Error("Handoff is hidden");
+    if (!(await demo.getByRole("button", { name: label("Interrupt"), exact: true }).isVisible()))
+      throw new Error("Interrupt is hidden");
     if (errors.length) throw new Error(errors.join("\n"));
     if (await demo.evaluate(() => document.documentElement.scrollWidth > innerWidth))
       throw new Error("Horizontal overflow");

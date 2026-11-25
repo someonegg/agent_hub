@@ -21,8 +21,6 @@ function props() {
     error: null,
     onDismissError: vi.fn(),
     onSendMessage: vi.fn().mockResolvedValue(undefined),
-    onSendKeys: vi.fn().mockResolvedValue(undefined),
-    onHandoffPaneBinding: vi.fn().mockResolvedValue(undefined),
     onExpandPreview: vi.fn(),
     scrollToEnd: vi.fn(),
   };
@@ -77,7 +75,6 @@ it("keeps Send focusable but blocks activation for blank input", async () => {
   await user.click(send);
   fireEvent.keyDown(textarea, { key: "Enter", shiftKey: true });
   expect(handlers.onSendMessage).not.toHaveBeenCalled();
-  expect(handlers.onSendKeys).not.toHaveBeenCalled();
   expect(textarea).toHaveValue("   ");
 });
 
