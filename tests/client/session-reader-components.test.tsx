@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -100,7 +100,8 @@ describe("session reader components", () => {
 
   it.each([null, "plan"] as const)(
     "preserves blocked Markdown destinations in %s content",
-    (itemType) => {
+    async (itemType) => {
+      const user = userEvent.setup();
       const { container } = render(
         <MessageItem
           planOpen
@@ -128,26 +129,34 @@ describe("session reader components", () => {
         />,
       );
       expect(container.querySelector("a")).toBeNull();
-      expect(
-        [...container.querySelectorAll(".markdown-link-target")].map((node) => node.textContent),
-      ).toEqual([
-        "/tmp/my  log.txt",
-        "./my  report.txt",
-        "./unlabeled",
-        "../notes",
-        "file:///tmp/secret",
-      ]);
-      expect(screen.getByText("View log").parentElement?.textContent).toBe(
-        "View log（/tmp/my  log.txt）",
-      );
-      expect(screen.getByText("View report", { exact: false }).textContent).toBe(
-        "View report（./my  report.txt）",
-      );
+      expect(container.textContent).not.toContain("/tmp/my  log.txt");
       expect(screen.getByText("Empty").textContent).toBe("Empty");
-      expect(screen.getByText("./same").parentElement?.textContent).toBe("./same");
-      const formattedLabel = screen.getByText("./formatted", { selector: "strong" });
-      expect(formattedLabel.parentElement?.textContent).toBe("./formatted");
-      expect(screen.getByText("./unlabeled").parentElement?.textContent).toBe("./unlabeled");
+      expect(screen.getByText("View log", { selector: "strong" })).toBeInTheDocument();
+      const cases = [
+        ["View log", "/tmp/my  log.txt", "{Enter}"],
+        ["View report", "./my  report.txt", " "],
+        ["./same", "./same"],
+        ["./formatted", "./formatted"],
+        ["View link address", "./unlabeled"],
+        ["Relative", "../notes"],
+        ["Blocked", "file:///tmp/secret"],
+      ] as const;
+      for (const [name, address, key] of cases) {
+        const trigger = screen.getByRole("button", { name });
+        if (key) {
+          trigger.focus();
+          await user.keyboard(key);
+        } else {
+          await user.click(trigger);
+        }
+        const dialog = screen.getByRole("dialog", { name });
+        const dialogContent = within(dialog);
+        expect(dialog.querySelector("code")?.textContent).toBe(address);
+        await user.click(dialogContent.getByRole("button", { name: "Copy link" }));
+        expect(await navigator.clipboard.readText()).toBe(address);
+        await user.click(dialogContent.getByRole("button", { name: "Close link address" }));
+        expect(dialog).not.toHaveAttribute("open");
+      }
     },
   );
 
