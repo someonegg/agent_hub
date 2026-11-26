@@ -44,53 +44,43 @@ body:has(.session-layout) {
     max(44px, calc(var(--session-viewport-height, 100dvh) - 10rem))
   );
   overflow: auto;
-  padding: 0 clamp(1rem, 2.5vw, 2rem);
+  padding: 0 var(--content-inline-padding);
   width: 100%;
   border-top: 1px solid var(--notice-border);
 }
 .interaction-dock:empty {
   display: none;
 }
-.interaction-dock .interaction-region {
-  max-width: var(--interaction-max-width);
-}
-@media (width < 768px) {
-  .interaction-dock {
-    padding-inline: 12px;
-  }
-}
 
 .reader-header h2 {
   font-family: var(--title-font);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.01em;
   display: block;
   flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
-  font-size: 2rem;
-  line-height: 1.55;
+  font-size: 1.75rem;
+  line-height: var(--leading-tight);
   margin: 0;
 }
 .empty-state h2 {
-  font-size: 1.5rem;
-  line-height: 1.55;
+  font-size: 1.375rem;
+  line-height: var(--leading-tight);
   font-family: var(--title-font);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   letter-spacing: 0.01em;
   color: var(--ink);
 }
 .session-meta {
   color: var(--ink-soft);
-  font-family: var(--body-font);
   font-size: var(--text-small);
   letter-spacing: normal;
 }
 .reader {
-  --reader-inline-padding: clamp(1rem, 2.5vw, 2rem);
   width: 100%;
-  max-width: calc(var(--reader-max-width) + var(--reader-inline-padding) * 2);
-  padding: 1.5rem var(--reader-inline-padding) 2rem;
+  max-width: calc(var(--reader-max-width) + var(--content-inline-padding) * 2);
+  padding: var(--space-large) var(--content-inline-padding) var(--space-xl);
 }
 .reader-header {
   display: flex;
@@ -130,7 +120,7 @@ body:has(.session-layout) {
   gap: 1rem;
 }
 .timeline {
-  padding: 2rem 0 0;
+  padding: var(--space-large) 0 0;
   margin: 0;
   list-style: none;
 }
@@ -145,50 +135,12 @@ body:has(.session-layout) {
   cursor: pointer;
   margin-left: 0;
 }
-.error-state button {
-  padding: 0.48rem 0.72rem;
-  color: var(--current);
-  background: transparent;
-  border: 1px solid var(--current);
-  cursor: pointer;
-}
 .infinite-scroll-sentinel {
   min-height: 1px;
   margin-top: 0.25rem;
 }
 .infinite-scroll-sentinel .loading {
   margin: 0;
-}
-.error-state {
-  margin: 1.25rem 0;
-  padding: 0.9rem 1rem;
-  position: relative;
-  padding-right: 3rem;
-  color: var(--error-ink);
-  background: var(--error-surface);
-}
-.error-state .error-dismiss {
-  position: absolute;
-  top: 0.45rem;
-  right: 0.45rem;
-  display: grid;
-  width: 1.8rem;
-  height: 1.8rem;
-  padding: 0;
-  place-items: center;
-  color: currentColor;
-  background: transparent;
-  border: 0;
-  font-size: 1.35rem;
-  line-height: 1;
-  cursor: pointer;
-}
-.error-state .error-dismiss:hover {
-  background: rgb(31 35 40 / 9%);
-}
-.error-state .error-dismiss:focus-visible {
-  outline: 1px solid currentColor;
-  outline-offset: -2px;
 }
 .empty-state {
   max-width: 30rem;
@@ -197,7 +149,6 @@ body:has(.session-layout) {
 }
 .loading {
   color: var(--ink-soft);
-  font-family: var(--body-font);
   font-size: var(--text-small);
 }
 .session-title-row {
@@ -214,26 +165,21 @@ body:has(.session-layout) {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 0.8rem 0 1rem;
+  gap: var(--space-small);
+  margin: 0.75rem 0 var(--space-medium);
   color: var(--ink-soft);
-  font: var(--text-small) var(--body-font);
+  font-size: var(--text-small);
 }
 .session-information {
   min-width: 0;
 }
 .session-information p {
   margin: 0;
-  font: var(--text-small) var(--body-font);
+  font-size: var(--text-small);
   overflow-wrap: anywhere;
 }
 #session-title:focus {
   outline: none;
-}
-@media (max-width: 720px) {
-  .reader-header {
-    display: block;
-  }
 }
 .session-information summary {
   width: fit-content;
@@ -259,19 +205,25 @@ body:has(.session-layout) {
   font-family: var(--mono-font);
 }
 .session-information-content p {
-  line-height: 1.6;
+  line-height: var(--leading-ui);
+}
+.session-uploads-link {
+  color: var(--ink-soft);
+  text-underline-offset: 3px;
 }
 @media (width < 768px) {
   .reader {
-    --reader-inline-padding: 12px;
-    padding: 16px var(--reader-inline-padding) 12px;
+    padding-block: 16px 12px;
+  }
+  .reader-header {
+    display: block;
   }
   .session-metadata {
     gap: var(--space-small);
     margin-bottom: var(--space-small);
   }
   .reader-header h2 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
   }
   .reader-controls {
     gap: var(--space-small);

@@ -32,12 +32,7 @@ p {
 .muted {
   color: var(--ink-soft);
 }
-.error-state > strong,
-.continuity-notice strong {
-  font-weight: var(--weight-semibold);
-}
 .eyebrow {
-  font-family: var(--body-font);
   font-size: var(--text-small);
   letter-spacing: normal;
   color: var(--current);
@@ -58,7 +53,6 @@ p {
   display: inline-block;
   flex-shrink: 0;
   white-space: nowrap;
-  font-family: var(--body-font);
   font-size: var(--text-status);
   font-weight: var(--weight-medium);
   letter-spacing: normal;
@@ -94,7 +88,7 @@ summary:focus-visible {
 button {
   min-height: var(--control-height);
   font-size: var(--text-control);
-  line-height: 1.4;
+  line-height: var(--leading-tight);
 }
 button:disabled,
 button[aria-disabled="true"] {
@@ -104,20 +98,55 @@ button[aria-disabled="true"] {
 button:hover:not(:disabled, [aria-disabled="true"]) {
   filter: brightness(0.97);
 }
-.error-state,
-.continuity-notice,
-.interaction-error {
+.error-state {
+  position: relative;
   max-width: var(--reader-max-width);
+  margin: 1.25rem 0;
+  padding: 0.9rem 3rem 0.9rem 1rem;
   overflow-wrap: anywhere;
+  color: var(--error-ink);
+  background: var(--error-surface);
   border: 1px solid var(--error-border);
   border-radius: var(--radius-control);
+}
+.error-state > strong {
+  font-weight: var(--weight-semibold);
+}
+.error-state button {
+  padding: 0.48rem 0.72rem;
+  color: var(--current);
+  background: transparent;
+  border: 1px solid var(--current);
+  cursor: pointer;
+}
+.error-state .error-dismiss {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  display: grid;
+  width: 1.8rem;
+  height: 1.8rem;
+  padding: 0;
+  place-items: center;
+  color: currentColor;
+  background: transparent;
+  border: 0;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.error-state .error-dismiss:hover {
+  background: rgb(31 35 40 / 9%);
+}
+.error-state .error-dismiss:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: -2px;
 }
 @media (width < 768px) {
   button {
     min-height: 44px;
   }
-  .error-state .error-dismiss,
-  .interaction-error button {
+  .error-state .error-dismiss {
     min-width: 44px;
     min-height: 44px;
   }
