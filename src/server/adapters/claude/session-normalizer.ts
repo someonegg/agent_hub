@@ -5,7 +5,7 @@ import { type DecodedRecord, isObject as object } from "../shared/jsonl-decoder.
 import { MAX_MESSAGE_CHARS, MAX_SESSION_DIAGNOSTICS } from "../shared/limits.js";
 import { appendClaudeIdentity, type ClaudeIdentityState } from "./identity.js";
 import { parseClaudeBindingRecord, type ParsedClaudeBindingRecord } from "./interaction.js";
-import { isClaudeContextInjectionBlock } from "./user-content.js";
+import { isClaudeContextInjectionBlock, unwrapClaudePastedContent } from "./user-content.js";
 import { normalizeQuestionResponse, normalizeQuestions } from "./user-input-normalizer.js";
 
 type ObjectValue = Record<string, unknown>;
@@ -171,7 +171,7 @@ export function appendClaudeRecords(
           flush();
           continue;
         }
-        text.push(content);
+        text.push(role === "user" ? unwrapClaudePastedContent(content) : content);
         continue;
       }
       flush();

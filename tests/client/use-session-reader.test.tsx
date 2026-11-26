@@ -55,6 +55,30 @@ it("preserves timeline items when a poll only updates session state", async () =
   expect(hook.result.current.context?.session.title).toBe("Updated title");
   hook.unmount();
 });
+it("retries a failed tail poll without waiting before resuming long polling", async () => {
+  vi.useFakeTimers();
+  const request = vi
+    .spyOn(api, "messages")
+    .mockResolvedValueOnce({ ...firstPage, nextAfter: 7, hasMore: false })
+    .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+    .mockResolvedValueOnce({ ...firstPage, items: [], nextAfter: 7, hasMore: false })
+    .mockImplementation(() => new Promise(() => {}));
+  const hook = renderHook(() => useSessionReader(SESSION_ID));
+  await flush();
+  expect(hook.result.current.readerRetrying).toBe(true);
+
+  await act(() => vi.advanceTimersByTimeAsync(1_200));
+  const poll = request.mock.calls[1]![1];
+  expect(poll).toMatchObject({ after: 7, wait: true });
+  expect(request.mock.calls.slice(2).map((call) => call[1])).toEqual([
+    { ...poll, wait: false },
+    poll,
+  ]);
+  expect(hook.result.current.context?.items).toEqual(firstPage.items);
+  expect(hook.result.current.readerError).toBeNull();
+  expect(hook.result.current.readerRetrying).toBe(false);
+});
+
 it("reloads once from zero after an out-of-range ordinal", async () => {
   const mock = vi
     .spyOn(api, "messages")
