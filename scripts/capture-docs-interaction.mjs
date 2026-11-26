@@ -976,6 +976,10 @@ async function capture(
     await settle();
     if ((await composerToggle.getAttribute("aria-expanded")) !== "false")
       throw new Error("Scrolling to the end must not expand the composer");
+    await demo.evaluate(() => {
+      document.querySelector(".message-scroll").scrollTo({ top: 0, behavior: "instant" });
+    });
+    await settle();
     await demo.screenshot({ path: resolveMobile("reader"), animations: "disabled" });
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await demo.evaluate(() => navigator.clipboard.writeText(""));

@@ -26,12 +26,18 @@
   --text-status: 0.75rem;
   --text-small: 0.8125rem;
   --text-control: 0.875rem;
+  --leading-tight: 1.35;
+  --leading-ui: 1.5;
+  --leading-body: 1.75;
   --control-height: 36px;
+  --space-xs: 0.25rem;
   --space-small: 0.5rem;
   --space-medium: 1rem;
   --space-large: 1.5rem;
+  --space-xl: 2rem;
   --reader-max-width: 64rem;
   --interaction-max-width: 60rem;
+  --content-inline-padding: clamp(1rem, 2.5vw, 2rem);
   --surface: #fff;
   --current-hover: #105d66;
 
@@ -66,6 +72,7 @@
   --body-ink: #48545b;
   --quote-border: #6d9198;
   font-size: 16px;
+  line-height: var(--leading-ui);
   color: var(--ink);
   font-family: var(--body-font);
   background: var(--paper);
@@ -104,4 +111,10 @@
   --connection-surface: #e8eedf;
   --connection-border: #bdcdb1;
   --scrollbar-thumb: #a0ad93;
+}
+
+@media (width < 768px) {
+  :root {
+    --content-inline-padding: 12px;
+  }
 }

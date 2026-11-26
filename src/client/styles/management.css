@@ -8,7 +8,7 @@
 .create-session h2 {
   font-size: 1rem;
   font-weight: var(--weight-semibold);
-  margin: 0 0 12px;
+  margin: 0 0 0.75rem;
   min-height: 36px;
   padding-right: 44px;
 }
@@ -20,7 +20,7 @@
 .create-session .dialog-body,
 .settings-launch {
   display: grid;
-  gap: 12px;
+  gap: 0.625rem;
 }
 .create-session .check-row {
   margin-top: 0;
@@ -42,7 +42,7 @@
   border: 1px solid var(--mist);
   background: var(--surface);
   color: var(--ink);
-  font-size: 0.875rem;
+  font-size: var(--text-control);
 }
 .session-management button {
   padding: 0.6rem 1rem;
@@ -53,7 +53,7 @@
   cursor: pointer;
 }
 .operation-status {
-  font-size: 1rem;
+  font-size: var(--text-control);
   padding: 1rem;
   margin-top: 0.8rem;
   border-left: 3px solid currentColor;
@@ -143,11 +143,11 @@
   color: var(--ink);
   background: transparent;
   border-radius: var(--radius-control);
-  font-size: 0.875rem;
+  font-size: var(--text-control);
 }
 .session-operation-details {
   position: relative;
-  font-size: 1rem;
+  font-size: var(--text-control);
   overflow-wrap: anywhere;
 }
 .session-operation-details .interaction-error {
@@ -178,7 +178,7 @@ dialog.create-session {
   overflow: auto;
   border-radius: var(--radius-panel);
   background: var(--surface);
-  padding: 26px;
+  padding: 1.25rem;
   box-shadow: 0 20px 80px #0002;
 }
 dialog::backdrop {
@@ -236,72 +236,6 @@ dialog::backdrop {
   display: grid;
   gap: 0.4rem;
   min-width: 0;
-}
-
-.artifacts-page {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 32px 20px;
-  overflow-wrap: anywhere;
-}
-.artifacts-page article {
-  border: 1px solid var(--mist);
-  padding: 20px;
-  margin: 12px 0;
-  border-radius: 8px;
-  background: var(--surface);
-}
-.artifact-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  margin-top: 12px;
-  font-size: var(--text-control);
-}
-
-.artifacts-page a {
-  color: var(--current);
-  text-underline-offset: 3px;
-}
-.artifacts-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  margin: 32px 0;
-}
-.artifacts-heading h1 {
-  margin: 4px 0 0;
-  font-family: var(--title-font);
-}
-.artifacts-heading .eyebrow {
-  margin: 0;
-  color: var(--ink-soft);
-}
-.artifacts-page h2 {
-  margin-top: 32px;
-  font-family: var(--mono-font);
-  font-size: var(--text-control);
-  font-weight: var(--weight-medium);
-  color: var(--ink-soft);
-}
-.artifacts-page h3 {
-  margin: 0 0 8px;
-  font-size: 1.125rem;
-}
-.artifacts-page time {
-  font-size: var(--text-small);
-  color: var(--ink-soft);
-}
-.artifacts-page button {
-  padding: 8px 14px;
-  border: 1px solid var(--mist);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--ink);
-  cursor: pointer;
-  font-size: var(--text-control);
 }
 
 .settings-launch {
