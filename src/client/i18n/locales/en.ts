@@ -104,6 +104,7 @@ export const messages = {
   idle: "Idle",
 
   interrupt: "Interrupt",
+  interruptWithEsc: "Interrupt (Esc)",
   invalidTerminalPreviewUpdateReconnecting: "Invalid terminal update; reconnecting",
 
   jumpToBottom: "Jump to bottom",

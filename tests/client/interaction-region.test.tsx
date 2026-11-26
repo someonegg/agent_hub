@@ -393,24 +393,15 @@ it("ignores composer Escape while preserving preview, focus and draft", async ()
   expect(handlers.onTogglePreview).not.toHaveBeenCalled();
 });
 
-it("ignores interrupt shortcuts outside the preview, with other modifiers, or while busy", () => {
+it("sends interrupt from Escape in the preview but not while actions are disabled", () => {
   const handlers = props(interaction("connected"));
   const view = render(<InteractionRegion {...handlers} previewExpanded />);
   const body = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
-  for (const modifiers of [
-    {},
-    { metaKey: true },
-    { ctrlKey: true, shiftKey: true },
-    { ctrlKey: true, altKey: true },
-    { ctrlKey: true, isComposing: true },
-    { ctrlKey: true, keyCode: 229 },
-  ]) {
-    expect(fireEvent.keyDown(body, { key: "c", ...modifiers })).toBe(true);
-  }
-  expect(fireEvent.keyDown(screen.getByRole("textbox"), { key: "c", ctrlKey: true })).toBe(true);
+  expect(fireEvent.keyDown(body, { key: "Escape" })).toBe(false);
+  expect(handlers.onSendKeys).toHaveBeenCalledExactlyOnceWith(["interrupt"]);
   view.rerender(<InteractionRegion {...handlers} previewExpanded actionsDisabled />);
-  expect(fireEvent.keyDown(body, { key: "c", ctrlKey: true })).toBe(false);
-  expect(handlers.onSendKeys).not.toHaveBeenCalled();
+  expect(fireEvent.keyDown(body, { key: "Escape" })).toBe(false);
+  expect(handlers.onSendKeys).toHaveBeenCalledTimes(1);
   expect(handlers.onTogglePreview).not.toHaveBeenCalled();
 });
 
@@ -488,10 +479,9 @@ describe("composer uploads", () => {
     const previewBody = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
     for (const key of ["Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab"])
       fireEvent.keyDown(previewBody, { key });
-    fireEvent.keyDown(previewBody, { key: "c", ctrlKey: true });
     fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
     expect(handlers.onSendMessage).not.toHaveBeenCalled();
-    expect(handlers.onSendKeys).toHaveBeenCalledTimes(13);
+    expect(handlers.onSendKeys).toHaveBeenCalledTimes(12);
     expect(screen.getByText("Uploading 1/2…")).toBeInTheDocument();
     await act(async () => finish(uploadResult("/tmp/space dir/one.png")));
     expect(input.value).toBe("before replace after");

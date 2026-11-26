@@ -68,11 +68,6 @@
   padding: 0;
   line-height: 1;
 }
-.interaction-actions .interaction-send {
-  color: var(--paper);
-  background: var(--current);
-  border-color: var(--current);
-}
 .interaction-error {
   display: flex;
   align-items: center;

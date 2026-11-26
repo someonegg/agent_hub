@@ -137,6 +137,7 @@ export const namespaceKeys = {
     "handoff",
     "idle",
     "interrupt",
+    "interruptWithEsc",
     "loadingUploads",
     "messageLimit",
     "messageToAgent",

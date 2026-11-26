@@ -74,19 +74,15 @@ export function TerminalPreview({
     if (
       !previewExpanded ||
       event.altKey ||
+      event.ctrlKey ||
       event.metaKey ||
       event.shiftKey ||
       event.nativeEvent.isComposing ||
       event.nativeEvent.keyCode === 229
     )
       return;
-    if (event.ctrlKey || event.key === "Escape") {
-      if (event.ctrlKey && event.key.toLowerCase() !== "c") return;
-      event.preventDefault();
-      void sendKey("interrupt");
-      return;
-    }
     if (
+      event.key !== "Escape" &&
       event.target instanceof Element &&
       event.target.closest("summary, details, .terminal-preview-notice button")
     )
@@ -108,12 +104,29 @@ export function TerminalPreview({
           type="button"
           className="terminal-preview-action terminal-preview-interrupt"
           aria-label={t("interrupt")}
-          title={t("interrupt")}
+          title={t("interruptWithEsc")}
           aria-disabled={actionsDisabled}
           onClick={() => void sendKey("interrupt")}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <rect x="2.75" y="2.75" width="10.5" height="10.5" rx="2" />
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            aria-hidden="true"
+          >
+            <circle cx="8" cy="8" r="6.75" />
+            <rect
+              x="5.7"
+              y="5.7"
+              width="4.6"
+              height="4.6"
+              rx="0.9"
+              fill="currentColor"
+              stroke="none"
+            />
           </svg>
         </button>
         <span className="terminal-preview-action-divider" aria-hidden="true" />
@@ -238,6 +251,7 @@ const PREVIEW_KEYS: Readonly<Record<string, InteractionKey | undefined>> = {
   "7": "7",
   "8": "8",
   "9": "9",
+  Escape: "interrupt",
   Enter: "enter",
   ArrowUp: "up",
   ArrowDown: "down",

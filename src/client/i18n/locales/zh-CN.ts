@@ -102,6 +102,7 @@ export const messages: Record<keyof typeof english, string> = {
   idle: "空闲",
 
   interrupt: "中断",
+  interruptWithEsc: "中断（Esc）",
   invalidTerminalPreviewUpdateReconnecting: "终端更新无效，正在重新连接",
 
   jumpToBottom: "跳到底部",
