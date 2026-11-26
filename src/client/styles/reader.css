@@ -27,8 +27,6 @@ body:has(.session-layout) {
   height: 100%;
 }
 .message-region {
-  position: relative;
-  container-type: size;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
@@ -196,43 +194,6 @@ body:has(.session-layout) {
   padding: 2.5rem 0;
   color: var(--ink-soft);
 }
-.page-jump-controls {
-  position: absolute;
-  z-index: 2;
-  right: clamp(0.9rem, 2.2vw, 1.75rem);
-  bottom: clamp(0.9rem, 2.2vw, 1.75rem);
-  display: grid;
-  gap: 0.35rem;
-  pointer-events: none;
-}
-.page-jump-control {
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  padding: 0;
-  color: var(--current);
-  background: color-mix(in srgb, var(--paper) 94%, transparent);
-  border: 1px solid var(--notice-border);
-  border-radius: 999px;
-  box-shadow: 0 0.3rem 1rem rgb(33 49 56 / 12%);
-  font-size: 1.125rem;
-  font-weight: var(--weight-medium);
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  visibility: hidden;
-}
-.page-jump-control.is-visible {
-  opacity: 1;
-  pointer-events: auto;
-  visibility: visible;
-}
-.page-jump-control:hover {
-  color: var(--paper);
-  background: var(--current);
-  border-color: var(--current);
-}
 .loading {
   color: var(--ink-soft);
   font-family: var(--body-font);
@@ -271,15 +232,6 @@ body:has(.session-layout) {
 @media (max-width: 720px) {
   .reader-header {
     display: block;
-  }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .page-jump-control {
-    transition:
-      opacity 180ms ease,
-      color 120ms ease,
-      background 120ms ease,
-      border-color 120ms ease;
   }
 }
 .session-information summary {
@@ -324,12 +276,6 @@ body:has(.session-layout) {
   }
   .session-information summary {
     min-height: 44px;
-  }
-}
-
-@container (height < 140px) {
-  .page-jump-controls {
-    display: flex;
   }
 }
 

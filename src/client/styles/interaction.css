@@ -6,7 +6,7 @@
   margin: 0;
   padding: 0.75rem 0.5rem max(0.75rem, env(safe-area-inset-bottom));
 }
-.interaction-heading {
+.interaction-recovery-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -55,7 +55,7 @@
   }
 }
 @media (max-width: 480px) {
-  .interaction-heading {
+  .interaction-recovery-bar {
     align-items: center;
     gap: 0.3rem;
   }
@@ -65,7 +65,6 @@
     min-height: 44px;
   }
   .terminal-keypad {
-    right: 26px;
     grid-template-rows: repeat(2, 44px);
   }
 }
@@ -90,6 +89,11 @@
   align-items: center;
   gap: 0.4rem 0.6rem;
   min-width: 0;
+  /* Let blank filler clicks pass through to the recovery bar's scroll handler. */
+  pointer-events: none;
+}
+.interaction-connection-status > * {
+  pointer-events: auto;
 }
 .resume-reason {
   max-width: 40ch;

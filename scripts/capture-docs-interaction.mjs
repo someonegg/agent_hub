@@ -55,27 +55,35 @@ async function capture(
     demo.evaluate(
       () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     );
+  const clickBlankSpot = async (selector) => {
+    const point = await demo.evaluate((barSelector) => {
+      const bar = document.querySelector(barSelector);
+      if (!bar) return null;
+      const box = bar.getBoundingClientRect();
+      const y = box.top + box.height / 2;
+      for (let x = box.left + 6; x <= box.right - 6; x += 6) {
+        if (document.elementFromPoint(x, y) === bar) return { x, y };
+      }
+      return null;
+    }, selector);
+    if (!point) throw new Error(`${selector} has no blank space to click`);
+    await demo.mouse.click(point.x, point.y);
+  };
 
   await demo.route("**/api/v1/capabilities", (route) => route.fulfill({ json: { hosting: true } }));
-  const verifyPageJumps = async () => {
+  const verifyMessageRegionLayout = async () => {
     await settle();
     const valid = await demo.evaluate(() => {
-      const controls = document.querySelector(".page-jump-controls");
       const region = document.querySelector(".message-region");
       return (
-        getComputedStyle(controls).position === "absolute" &&
-        controls.closest(".message-region") !== null &&
-        controls.getBoundingClientRect().bottom <= region.getBoundingClientRect().bottom &&
-        controls.getBoundingClientRect().top >= region.getBoundingClientRect().top &&
+        region !== null &&
+        document.querySelector(".page-jump-controls") === null &&
         document.documentElement.scrollHeight <= innerHeight + 1
       );
     });
-    if (!valid)
-      throw new Error("Page jumps must stay within the message region without document scrolling");
+    if (!valid) throw new Error("Message region must fit the viewport without document scrolling");
   };
   const verifyDockBehavior = async () => {
-    const topButton = demo.getByRole("button", { name: label("Back to top"), exact: true });
-    const endButton = demo.getByRole("button", { name: label("Jump to bottom"), exact: true });
     const composer = demo.getByRole("textbox", { name: label("Message to agent") });
     const draft = await composer.inputValue();
     const attachments = await demo.locator(".interaction-attachment").count();
@@ -96,7 +104,7 @@ async function capture(
     await previewToggle.click();
     if (!(await previewToggle.evaluate((element) => document.activeElement === element)))
       throw new Error("Preview expansion stole switch focus");
-    // Grow the real message flow to exercise message-region ResizeObserver and page jump geometry.
+    // Grow the real message flow to exercise message-region ResizeObserver and blank-click dock behavior.
     await demo.evaluate(() => {
       const spacer = document.createElement("li");
       spacer.id = "scroll-verification";
@@ -134,27 +142,19 @@ async function capture(
       ) > 1
     )
       throw new Error("New messages moved the reading position");
-    const topPosition = await topButton.boundingBox();
-    const endPosition = await endButton.boundingBox();
-    await endButton.click();
+    await clickBlankSpot(".interaction-toolbar");
     await demo.waitForFunction(() => {
       const scroll = document.querySelector(".message-scroll");
       return scroll.scrollHeight - scroll.clientHeight - scroll.scrollTop < 2;
     });
-    await endButton.waitFor({ state: "hidden" });
-    if (JSON.stringify(await topButton.boundingBox()) !== JSON.stringify(topPosition))
-      throw new Error("Top moved when End disappeared");
     const uncovered = await demo.evaluate(
       () =>
         document.querySelector(".terminal-preview").getBoundingClientRect().bottom <=
         document.querySelector(".interaction-region").getBoundingClientRect().top,
     );
     if (!uncovered) throw new Error("Dock covers the terminal at End");
-    await topButton.click();
+    await clickBlankSpot(".hub-topbar");
     await demo.waitForFunction(() => document.querySelector(".message-scroll").scrollTop < 2);
-    await topButton.waitFor({ state: "hidden" });
-    if (JSON.stringify(await endButton.boundingBox()) !== JSON.stringify(endPosition))
-      throw new Error("End moved when Top disappeared");
     await demo.evaluate(() => document.querySelector("#scroll-verification").remove());
     await settle();
   };
@@ -307,8 +307,8 @@ async function capture(
       throw new Error("Composer resize handle did not increase height");
     await composer.evaluate((element) => element.style.removeProperty("height"));
     await composer.fill(original);
-    if (await demo.locator(".interaction-heading").count())
-      throw new Error("Empty interaction heading");
+    if (await demo.locator(".interaction-recovery-bar").count())
+      throw new Error("Empty interaction recovery bar");
     await demo.getByRole("button", { name: label("Session management"), exact: true }).click();
     const menu = demo.locator(".session-action-menu");
     const labels = await menu.locator("button").allTextContents();
@@ -1022,7 +1022,7 @@ async function capture(
     const panelBounds = await demo.locator(".interaction-region").boundingBox();
     if (panelBounds.y < 0 || panelBounds.y + panelBounds.height > 845)
       throw new Error(`Mobile attachment composer is clipped: ${JSON.stringify(panelBounds)}`);
-    await verifyPageJumps();
+    await verifyMessageRegionLayout();
     await demo.screenshot({ path: resolveMobile("composer"), animations: "disabled" });
     await demo.getByRole("button", { name: label("Remove dashboard.png"), exact: true }).click();
     await verifyAttachments();
@@ -1031,23 +1031,23 @@ async function capture(
     deletionAttempts = 0;
     await verifyUploadHistory();
     await verifyAttachments();
-    await verifyPageJumps();
+    await verifyMessageRegionLayout();
     if (await demo.evaluate(() => document.documentElement.scrollWidth > innerWidth))
       throw new Error("Narrow composer horizontal overflow");
     await demo.setViewportSize({ width: 390, height: 844 });
     await verifyKeyboardViewport();
     await demo.setViewportSize({ width: 390, height: 400 });
-    await verifyPageJumps();
+    await verifyMessageRegionLayout();
     await composer.blur();
-    await verifyPageJumps();
+    await verifyMessageRegionLayout();
     await composer.focus();
     await demo.setViewportSize({ width: 1440, height: 1000 });
-    await verifyPageJumps();
+    await verifyMessageRegionLayout();
     await previewToggle.click();
-    await verifyPageJumps();
+    await verifyMessageRegionLayout();
     await demo.setViewportSize({ width: 1440, height: 400 });
     await demo.evaluate(() => document.querySelector(".message-scroll").scrollTo(0, 0));
-    await verifyPageJumps();
+    await verifyMessageRegionLayout();
     items = [1, 2].map((ordinal) => ({
       kind: "message",
       id: `plan-${ordinal}`,

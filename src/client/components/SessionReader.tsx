@@ -8,7 +8,6 @@ import { EmptyState } from "./EmptyState";
 import { ErrorState } from "./ErrorState";
 import { EventMark } from "./EventMark";
 import { MessageItem } from "./MessageItem";
-import { PageJumpControls } from "./PageJumpControls";
 import { isNearScrollEnd } from "./scroll-position";
 import { SessionHeader } from "./SessionHeader";
 import { SessionInteraction } from "./SessionInteraction";
@@ -20,6 +19,7 @@ interface SessionReaderProps {
   managementBusy?: boolean;
   management?: ReactNode;
   onNavigate?: (sessionId: string) => void;
+  onMessageScrollChange?: (element: HTMLDivElement | null) => void;
   context: SessionMessagesResponse;
   readerLoading: boolean;
   readerBusy: boolean;
@@ -34,6 +34,7 @@ export function SessionReader({
   managementBusy,
   management,
   onNavigate,
+  onMessageScrollChange,
   context,
   readerLoading,
   readerBusy,
@@ -45,6 +46,10 @@ export function SessionReader({
   const [dockTarget, setDockTarget] = useState<HTMLElement | null>(null);
   const reader = useRef<HTMLDivElement | null>(null);
   const [messageScroll, setMessageScroll] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    onMessageScrollChange?.(messageScroll);
+    return () => onMessageScrollChange?.(null);
+  }, [messageScroll, onMessageScrollChange]);
   useEffect(() => {
     if (!messageScroll) return;
     let follow = isNearScrollEnd(messageScroll);
@@ -199,7 +204,6 @@ export function SessionReader({
             ) : null}
           </div>
         </div>
-        <PageJumpControls scrollElement={messageScroll} contentElement={reader.current} />
       </div>
       <div ref={setDockTarget} className="interaction-dock" />
     </section>

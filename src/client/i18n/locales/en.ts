@@ -26,7 +26,6 @@ export const messages = {
   attachToTmuxBeforeTryingAgainCreatingAgainMayStartAnotherSession:
     "Attach to tmux before trying again; creating again may start another session.",
   backToHome: "Back to home",
-  backToTop: "Back to top",
   browseSessionsByProjectReadTheirHistoryAndContinueYourWork:
     "Browse sessions by project, read their history, and continue your work.",
 
@@ -106,8 +105,6 @@ export const messages = {
   interruptWithEsc: "Interrupt (Esc)",
   invalidTerminalPreviewUpdateReconnecting: "Invalid terminal update; reconnecting",
 
-  jumpToBottom: "Jump to bottom",
-
   left: "Left",
   linkCopied: "Link copied",
   live: "Live",
@@ -135,7 +132,6 @@ export const messages = {
   operation: "Operation",
   originalSessionID: "Original session ID ·",
 
-  pagePosition: "Page position",
   pages: "Pages",
   pendingAttachments: "Pending attachments",
   BTab: "BTab",
