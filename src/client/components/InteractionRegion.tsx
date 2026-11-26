@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -15,6 +15,7 @@ import { useSessionComposerPreference } from "../state/composer-preferences";
 import { useSessionDraft } from "../state/session-drafts";
 import { InteractionComposer } from "./InteractionComposer";
 import { InternalLink } from "./InternalLink";
+import { isBlankRegionClick, scrollToEdge } from "./scroll-position";
 import { TerminalPreview } from "./TerminalPreview";
 
 interface InteractionRegionProps {
@@ -114,6 +115,10 @@ export function InteractionRegion({
     const scroll = flow.current?.closest<HTMLElement>(".message-scroll");
     scroll?.scrollTo({ top: scroll.scrollHeight, behavior: "instant" });
   };
+  const scrollToBottomOnBlankClick = (event: MouseEvent<HTMLDivElement>) => {
+    if (!isBlankRegionClick(event)) return;
+    scrollToEdge(flow.current?.closest<HTMLElement>(".message-scroll"), "bottom");
+  };
   const wasPreviewExpanded = useRef(false);
   const hadPreviewContent = useRef(false);
   const previewContentId = useId();
@@ -174,7 +179,7 @@ export function InteractionRegion({
     return (
       <section className="interaction-region" aria-label={t("sessionInteraction")}>
         {interactionAvailable ? (
-          <div className="interaction-toolbar">
+          <div className="interaction-toolbar" onClick={scrollToBottomOnBlankClick}>
             <button
               type="button"
               className="composer-toggle"
@@ -239,7 +244,7 @@ export function InteractionRegion({
         ) : null}
 
         {status.kind !== "connected" || recoveryActions ? (
-          <div className="interaction-heading">
+          <div className="interaction-recovery-bar" onClick={scrollToBottomOnBlankClick}>
             {status.kind !== "connected" ? connectionStatus : null}
             {interaction?.supported && interaction.state === "superseded" ? (
               interaction.supersededBySessionId ? (

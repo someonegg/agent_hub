@@ -27,7 +27,6 @@ export const messages: Record<keyof typeof english, string> = {
   attachToTmuxBeforeTryingAgainCreatingAgainMayStartAnotherSession:
     "重試前請連線 tmux；再次建立可能啟動另一個工作階段。",
   backToHome: "返回首頁",
-  backToTop: "返回頂部",
   browseSessionsByProjectReadTheirHistoryAndContinueYourWork:
     "按專案瀏覽工作階段、閱讀歷史記錄並繼續工作。",
 
@@ -105,8 +104,6 @@ export const messages: Record<keyof typeof english, string> = {
   interruptWithEsc: "中斷（Esc）",
   invalidTerminalPreviewUpdateReconnecting: "終端更新無效，正在重新連線",
 
-  jumpToBottom: "跳到底部",
-
   left: "向左",
   linkCopied: "連結已複製",
   live: "執行中",
@@ -134,7 +131,6 @@ export const messages: Record<keyof typeof english, string> = {
   operation: "操作",
   originalSessionID: "原始工作階段 ID ·",
 
-  pagePosition: "頁面位置",
   pages: "網頁",
   pendingAttachments: "待傳送附件",
   BTab: "BTab",

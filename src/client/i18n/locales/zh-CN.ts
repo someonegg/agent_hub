@@ -27,7 +27,6 @@ export const messages: Record<keyof typeof english, string> = {
   attachToTmuxBeforeTryingAgainCreatingAgainMayStartAnotherSession:
     "重试前请连接 tmux；再次创建可能启动另一个会话。",
   backToHome: "返回首页",
-  backToTop: "返回顶部",
   browseSessionsByProjectReadTheirHistoryAndContinueYourWork:
     "按项目浏览会话、阅读历史记录并继续工作。",
 
@@ -105,8 +104,6 @@ export const messages: Record<keyof typeof english, string> = {
   interruptWithEsc: "中断（Esc）",
   invalidTerminalPreviewUpdateReconnecting: "终端更新无效，正在重新连接",
 
-  jumpToBottom: "跳到底部",
-
   left: "向左",
   linkCopied: "链接已复制",
   live: "运行中",
@@ -134,7 +131,6 @@ export const messages: Record<keyof typeof english, string> = {
   operation: "操作",
   originalSessionID: "原始会话 ID ·",
 
-  pagePosition: "页面位置",
   pages: "网页",
   pendingAttachments: "待发送附件",
   BTab: "BTab",

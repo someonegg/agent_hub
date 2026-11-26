@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ArtifactsPage } from "./components/ArtifactsPage";
@@ -6,6 +6,7 @@ import { DiffPage } from "./components/DiffPage";
 import { CreateSession } from "./components/HubManagement";
 import { HubSidebar } from "./components/HubSidebar";
 import { NodeTabs } from "./components/NodeTabs";
+import { isBlankRegionClick, scrollToEdge } from "./components/scroll-position";
 import { SidebarToggle } from "./components/SidebarToggle";
 import { UploadsPage } from "./components/UploadsPage";
 import { t } from "./i18n";
@@ -94,6 +95,10 @@ function SessionHub({ cache }: { cache: SessionCache }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [topbarActionsTarget, setTopbarActionsTarget] = useState<HTMLDivElement | null>(null);
   const [topbarStatusTarget, setTopbarStatusTarget] = useState<HTMLDivElement | null>(null);
+  const messageScroll = useRef<HTMLDivElement | null>(null);
+  const handleMessageScrollChange = useCallback((element: HTMLDivElement | null) => {
+    messageScroll.current = element;
+  }, []);
   function toggleSidebar() {
     const collapsed = !sidebarCollapsed;
     setSidebarCollapsed(collapsed);
@@ -122,7 +127,13 @@ function SessionHub({ cache }: { cache: SessionCache }) {
         }}
       />
       <div className="hub-content">
-        <div className="hub-topbar">
+        <div
+          className="hub-topbar"
+          onClick={(event) => {
+            if (!isBlankRegionClick(event)) return;
+            scrollToEdge(messageScroll.current, "top");
+          }}
+        >
           {sidebarCollapsed ? <SidebarToggle collapsed onToggle={toggleSidebar} /> : null}
           {sessionId ? (
             <>
@@ -181,6 +192,7 @@ function SessionHub({ cache }: { cache: SessionCache }) {
                 topbarActionsTarget={topbarActionsTarget}
                 topbarStatusTarget={topbarStatusTarget}
                 onNavigate={navigate}
+                onMessageScrollChange={handleMessageScrollChange}
                 onCatalogChanged={catalog.refresh}
                 onUpdatedAt={catalog.reportUpdatedAt}
               />

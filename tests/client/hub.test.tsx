@@ -618,3 +618,20 @@ it("restores a node's catalog and messages while syncing from their saved cursor
     wait: false,
   });
 });
+
+it("scrolls the message region to top only when clicking blank space in .hub-topbar", async () => {
+  window.history.replaceState(null, "", `/sessions/${SESSION_ID}`);
+  const { container } = render(<App />);
+  await flush();
+
+  const topbar = container.querySelector<HTMLElement>(".hub-topbar")!;
+  const scroll = container.querySelector<HTMLElement>(".message-scroll")!;
+  const scrollTo = vi.fn();
+  scroll.scrollTo = scrollTo;
+
+  fireEvent.click(topbar.querySelector("strong")!);
+  expect(scrollTo).not.toHaveBeenCalled();
+
+  fireEvent.click(topbar);
+  expect(scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 0, behavior: "smooth" });
+});

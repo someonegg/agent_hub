@@ -20,6 +20,7 @@ interface SessionPageProps {
   topbarActionsTarget?: HTMLElement | null;
   topbarStatusTarget?: HTMLElement | null;
   onNavigate?: (id: string | null) => void;
+  onMessageScrollChange?: (element: HTMLDivElement | null) => void;
   onCatalogChanged?: () => void;
   onUpdatedAt?: (id: string, updatedAt: string | null) => void;
 }
@@ -31,6 +32,7 @@ export function SessionPage({
   topbarActionsTarget = null,
   topbarStatusTarget = null,
   onNavigate,
+  onMessageScrollChange,
   onCatalogChanged,
   onUpdatedAt,
 }: SessionPageProps) {
@@ -120,6 +122,7 @@ export function SessionPage({
           }
           context={reader.context}
           onNavigate={onNavigate}
+          onMessageScrollChange={onMessageScrollChange}
           readerLoading={reader.readerLoading}
           readerBusy={reader.operation !== null}
           onLoadMore={reader.loadMore}
