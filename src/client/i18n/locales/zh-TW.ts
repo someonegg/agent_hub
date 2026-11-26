@@ -48,6 +48,7 @@ export const messages: Record<keyof typeof english, string> = {
   connected: "已連線",
   connectionUnknown: "連線狀態未知",
   copied: "已複製",
+  copyCode: "複製程式碼",
   copyCommand: "複製命令",
   copyFailed: "複製失敗，請手動選取複製。",
   viewLinkAddress: "查看連結位址",

@@ -73,6 +73,7 @@ export const namespaceKeys = {
     "assistantResponse",
     "assistantResponsePlan",
     "closeLinkAddress",
+    "copyCode",
     "viewLinkAddress",
     "backToHome",
     "couldNotLoadSession",
