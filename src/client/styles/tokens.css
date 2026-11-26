@@ -30,6 +30,8 @@
   --space-small: 0.5rem;
   --space-medium: 1rem;
   --space-large: 1.5rem;
+  --reader-max-width: 64rem;
+  --interaction-max-width: 60rem;
   --surface: #fff;
   --current-hover: #105d66;
 

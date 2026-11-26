@@ -313,7 +313,7 @@
   display: none;
 }
 .hub-topbar-status .session-operation-details {
-  max-width: 72rem;
+  max-width: var(--reader-max-width);
 }
 .hub-topbar-status .operation-status,
 .hub-topbar-status .interaction-error {

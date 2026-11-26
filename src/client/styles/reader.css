@@ -52,7 +52,7 @@ body:has(.session-layout) {
   display: none;
 }
 .interaction-dock .interaction-region {
-  max-width: 52rem;
+  max-width: var(--interaction-max-width);
 }
 @media (width < 768px) {
   .interaction-dock {
@@ -87,9 +87,10 @@ body:has(.session-layout) {
   letter-spacing: normal;
 }
 .reader {
+  --reader-inline-padding: clamp(1rem, 2.5vw, 2rem);
   width: 100%;
-  max-width: 72rem;
-  padding: 1.5rem clamp(1rem, 2.5vw, 2rem) 2rem;
+  max-width: calc(var(--reader-max-width) + var(--reader-inline-padding) * 2);
+  padding: 1.5rem var(--reader-inline-padding) 2rem;
 }
 .reader-header {
   display: flex;
@@ -262,7 +263,8 @@ body:has(.session-layout) {
 }
 @media (width < 768px) {
   .reader {
-    padding: 16px 12px 12px;
+    --reader-inline-padding: 12px;
+    padding: 16px var(--reader-inline-padding) 12px;
   }
   .session-metadata {
     gap: var(--space-small);
