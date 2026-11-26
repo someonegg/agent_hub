@@ -4,9 +4,8 @@ import { useTranslation } from "react-i18next";
 import type { ArtifactsResponse, ArtifactSummary } from "../../shared/api-contract";
 
 import { api } from "../api/client";
-import type { PlainMessageKey } from "../i18n";
+import { copyText } from "../copy-text";
 import { formatDate, t } from "../i18n";
-import { LocalizedError } from "../i18n/localized-error";
 import { nodePagePath } from "../node-path";
 import { RequestError } from "./RequestError";
 
@@ -17,15 +16,12 @@ export function ArtifactsPage() {
   }, [i18n.resolvedLanguage]);
   const [projects, setProjects] = useState<ArtifactsResponse["projects"]>([]);
   const [error, setError] = useState<unknown>("");
-  const [notice, setNotice] = useState<PlainMessageKey | "">("");
+  const [copyFeedback, setCopyFeedback] = useState<"linkCopied" | "couldNotCopyLink" | null>(null);
   const [busy, setBusy] = useState(true);
   async function copyLink(url: string) {
-    try {
-      await navigator.clipboard.writeText(location.origin + nodePagePath(url));
-      setNotice("linkCopied");
-    } catch {
-      setError(new LocalizedError("couldNotCopyLink"));
-    }
+    setCopyFeedback(
+      (await copyText(location.origin + nodePagePath(url))) ? "linkCopied" : "couldNotCopyLink",
+    );
   }
   const loadProjects = useCallback(async () => {
     const data = await api.artifacts();
@@ -33,7 +29,7 @@ export function ArtifactsPage() {
   }, []);
   const runOperation = useCallback(async (action: () => Promise<void>) => {
     setBusy(true);
-    setNotice("");
+    setCopyFeedback(null);
     setError("");
     try {
       await action();
@@ -72,7 +68,9 @@ export function ArtifactsPage() {
           <RequestError error={error} />
         </p>
       ) : null}
-      {notice ? <p role="status">{t(notice)}</p> : null}
+      {copyFeedback ? (
+        <p role={copyFeedback === "linkCopied" ? "status" : "alert"}>{t(copyFeedback)}</p>
+      ) : null}
       {busy ? <p role="status">{t("loadingPages")}</p> : null}
       {!busy && !error && projects.length === 0 ? <p>{t("noPublishedWebPages")}</p> : null}
       {projects.map((project) => (

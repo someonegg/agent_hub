@@ -50,7 +50,7 @@ export const messages: Record<keyof typeof english, string> = {
   connectionUnknown: "连接状态未知",
   copied: "已复制",
   copyCommand: "复制命令",
-  copyFailedSelectTheCommandAndCopyItManually: "复制失败，请选中命令后手动复制。",
+  copyFailed: "复制失败，请手动选择复制。",
   viewLinkAddress: "查看链接地址",
   copyLink: "复制链接",
   couldNotCopyLink: "无法复制链接",
