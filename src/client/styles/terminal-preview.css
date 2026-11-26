@@ -126,6 +126,9 @@
   font-weight: var(--weight-semibold);
 }
 .terminal-key:active:not([aria-disabled="true"]) {
+  color: #fff;
+  background: #27727b;
+  border-color: #8eb4b8;
   transform: translateY(1px);
 }
 .terminal-key[aria-disabled="true"] {
@@ -242,6 +245,10 @@
     background: #27727b;
     border-color: #8eb4b8;
   }
+}
+.terminal-preview-action:active:not([aria-disabled="true"]) {
+  background: color-mix(in srgb, var(--terminal-ink) 20%, transparent);
+  transform: scale(0.94);
 }
 @media (width < 768px) {
   .terminal-preview-action {

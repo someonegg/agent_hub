@@ -109,24 +109,27 @@ export function TerminalPreview({
           onClick={() => void sendKey("interrupt")}
         >
           <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
+            width="24"
+            height="18"
+            viewBox="0 0 24 18"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.6"
             aria-hidden="true"
           >
-            <circle cx="8" cy="8" r="6.75" />
-            <rect
-              x="5.7"
-              y="5.7"
-              width="4.6"
-              height="4.6"
-              rx="0.9"
+            <rect x="1.25" y="1.75" width="21.5" height="14.5" rx="3" strokeWidth="1.4" />
+            <text
+              x="12"
+              y="12"
+              textAnchor="middle"
               fill="currentColor"
               stroke="none"
-            />
+              fontFamily="var(--mono-font)"
+              fontSize="8.5"
+              fontWeight="700"
+              letterSpacing="0.35"
+            >
+              ESC
+            </text>
           </svg>
         </button>
         <span className="terminal-preview-action-divider" aria-hidden="true" />
