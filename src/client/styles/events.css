@@ -37,7 +37,7 @@
 .trace-event article {
   min-width: 0;
   width: 100%;
-  max-width: 52rem;
+  max-width: var(--reader-max-width);
 }
 .trace-event article > p {
   line-height: 1.72;

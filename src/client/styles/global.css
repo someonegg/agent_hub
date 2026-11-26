@@ -107,7 +107,7 @@ button:hover:not(:disabled, [aria-disabled="true"]) {
 .error-state,
 .continuity-notice,
 .interaction-error {
-  max-width: 52rem;
+  max-width: var(--reader-max-width);
   overflow-wrap: anywhere;
   border: 1px solid var(--error-border);
   border-radius: var(--radius-control);

@@ -109,7 +109,7 @@
   text-underline-offset: 3px;
 }
 .interaction-flow {
-  max-width: 52rem;
+  max-width: var(--interaction-max-width);
   margin-top: 0.75rem;
 }
 .interaction-toolbar {

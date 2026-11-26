@@ -91,6 +91,11 @@
     background: var(--code-surface);
   }
 
+  .message-body blockquote :not(pre) > code {
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    border-color: color-mix(in srgb, var(--ink) 12%, transparent);
+  }
+
   @media (max-width: 720px) {
     .message-body h2 {
       font-size: 1.4375rem;
