@@ -39,6 +39,36 @@ const answer = (question: string) =>
     { type: "tool_result", tool_use_id: "ask", content: { answers: { [question]: "Yes" } } },
   ]);
 
+describe("Claude pasted user text", () => {
+  const body = "第一行\n\n    indented line\n";
+  const pasted = `<pasted_content id="fea8">\n${body}</pasted_content id="fea8">`;
+
+  it("unwraps a native multiline paste for both the timeline and title fallback", () => {
+    const state = append(createClaudeState(id), message("user", `\n\n${pasted}\n`));
+    expect(timelineContent(state)).toEqual([`user:${body}`]);
+    expect(state.firstUser).toBe(body);
+  });
+
+  it("keeps wrappers embedded in surrounding user text intact", () => {
+    const embedded = `Before\n${pasted}\nAfter`;
+    const state = append(
+      createClaudeState(id),
+      message("user", [{ type: "text", text: embedded }]),
+    );
+    expect(timelineContent(state)).toEqual([`user:${embedded}`]);
+  });
+
+  it("keeps assistant text and unmatched markers intact", () => {
+    const unmatched = pasted.replace('</pasted_content id="fea8">', '</pasted_content id="abcd">');
+    const state = append(
+      createClaudeState(id),
+      message("assistant", pasted),
+      message("user", unmatched),
+    );
+    expect(timelineContent(state)).toEqual([`assistant:${pasted}`, `user:${unmatched}`]);
+  });
+});
+
 describe("Claude incremental allocation", () => {
   it("reuses timeline and question collections for records without display items", () => {
     const before = append(createClaudeState(id), message("user", "Hello"), ask("Continue?"));

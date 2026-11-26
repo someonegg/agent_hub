@@ -86,6 +86,9 @@ ordinary user text; otherwise the title is `Untitled session`, matching Codex.
 Explicit titles use the first nonempty trimmed line (up to 80 characters); user
 titles share Markdown heading extraction.
 
+The timeline and first-user title fallback unwrap native `<pasted_content>`
+only when it wraps the entire user text block. Embedded wrappers stay intact.
+
 Main-session `ahub-bind` prompts (even with context-injection blocks) are
 omitted from the timeline and first-user title fallback, along with any
 immediate plain-text `OK` acknowledgment (including across preceding

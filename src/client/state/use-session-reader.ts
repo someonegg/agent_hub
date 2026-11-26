@@ -57,6 +57,7 @@ export function useSessionReader(sessionId: string, cache?: SessionCache) {
       const replace = operation === "open" || operation === "reload";
       let page = replace ? null : current.current.page;
       let recovered = false;
+      let retrying = false;
       let retryMs = INITIAL_RETRY_MS;
       setState((s) => ({ ...s, operation, error: null, retrying: false }));
       try {
@@ -67,7 +68,7 @@ export function useSessionReader(sessionId: string, cache?: SessionCache) {
               {
                 after: page?.nextAfter ?? 0,
                 limit: 300,
-                wait: operation === "poll" && !recovered,
+                wait: operation === "poll" && !recovered && !retrying,
                 stateRevision: page?.stateRevision,
               },
               controller.signal,
@@ -106,6 +107,7 @@ export function useSessionReader(sessionId: string, cache?: SessionCache) {
               continue;
             }
             if (!isRetryableRequestError(reason)) throw reason;
+            retrying = true;
             setState((s) => ({ ...s, error: messageFor(reason), retrying: true }));
             await waitForRetry(retryMs, controller.signal);
             retryMs = nextRetryMs(retryMs);
