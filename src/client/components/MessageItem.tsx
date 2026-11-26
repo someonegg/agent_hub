@@ -16,6 +16,7 @@ import type { MessageItem as Message } from "../../shared/domain";
 import { t } from "../i18n";
 import { nodePagePath } from "../node-path";
 import { EventTime } from "./EventTime";
+import { MarkdownCodeBlock } from "./MarkdownCodeBlock";
 import { MarkdownLinkAddress } from "./MarkdownLinkAddress";
 
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
@@ -27,7 +28,16 @@ const PREVIEW_PARSE_OPTIONS = {
 };
 // Keep the parsed destination available after ReactMarkdown filters and encodes hrefs.
 const linkTargets = new WeakMap<NonNullable<ExtraProps["node"]>, { url: string; label: string }>();
+const codeBlocks = new WeakMap<
+  NonNullable<ExtraProps["node"]>,
+  { code: string; language: string | null }
+>();
 const MARKDOWN_HANDLERS = {
+  code(...[state, node]: Parameters<typeof defaultHandlers.code>) {
+    const result = defaultHandlers.code(state, node);
+    codeBlocks.set(result, { code: node.value, language: node.lang?.trim() || null });
+    return result;
+  },
   link(...[state, node]: Parameters<typeof defaultHandlers.link>) {
     const result = defaultHandlers.link(state, node);
     linkTargets.set(result, { url: node.url, label: toString(node) });
@@ -71,11 +81,14 @@ const MARKDOWN_COMPONENTS = {
       <table {...props}>{children}</table>
     </MarkdownScrollRegion>
   ),
-  pre: ({ node: _node, children, ...props }: ComponentProps<"pre"> & ExtraProps) => (
-    <MarkdownScrollRegion label={t("scrollableCodeBlock")} kind="code">
-      <pre {...props}>{children}</pre>
-    </MarkdownScrollRegion>
-  ),
+  pre: ({ node, children, ...props }: ComponentProps<"pre"> & ExtraProps) => {
+    const info = node && codeBlocks.get(node);
+    return (
+      <MarkdownCodeBlock code={info?.code} language={info?.language} preProps={props}>
+        {children}
+      </MarkdownCodeBlock>
+    );
+  },
   span: ({ node: _node, className, children, ...props }: ComponentProps<"span"> & ExtraProps) => {
     if (className?.split(" ").includes("katex-display")) {
       return (
@@ -100,7 +113,7 @@ function MarkdownScrollRegion({
   label,
 }: {
   children: ReactNode;
-  kind: "code" | "math" | "table";
+  kind: "math" | "table";
   label: string;
 }) {
   return (

@@ -259,6 +259,45 @@ describe("session reader components", () => {
     expect(document.querySelector("[node]")).toBeNull();
   });
 
+  it("shows code block language headers and copies raw code without a trailing newline", async () => {
+    const user = userEvent.setup();
+    render(
+      <MessageItem
+        item={{
+          kind: "message",
+          id: "message-code-copy",
+          ordinal: 12,
+          timestamp: null,
+          role: "assistant",
+          phase: "response",
+          itemType: null,
+          markdown: [
+            "```bash",
+            "npm run lint",
+            "npm test",
+            "```",
+            "",
+            "```",
+            "plain text",
+            "```",
+          ].join("\n"),
+        }}
+      />,
+    );
+
+    expect(screen.getByText("bash")).toBeInTheDocument();
+    const copyButtons = screen.getAllByRole("button", { name: "Copy code" });
+    expect(copyButtons).toHaveLength(2);
+
+    await user.click(copyButtons[0]!);
+    expect(await navigator.clipboard.readText()).toBe("npm run lint\nnpm test");
+    expect(screen.getAllByRole("status")[0]).toHaveTextContent("Copied");
+
+    await user.click(copyButtons[1]!);
+    expect(await navigator.clipboard.readText()).toBe("plain text");
+    expect(screen.getAllByRole("status")[1]).toHaveTextContent("Copied");
+  });
+
   it("leaves math syntax in code untouched and keeps invalid math readable", () => {
     render(
       <MessageItem

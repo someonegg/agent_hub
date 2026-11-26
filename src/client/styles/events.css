@@ -162,9 +162,56 @@
   border-radius: 999px;
   background-clip: padding-box;
 }
-.markdown-scroll-code {
+.markdown-code-block {
+  margin-block: 1em;
+  border: 1px solid var(--code-border);
+  border-radius: var(--radius-panel);
   background: var(--code-surface);
-  border-color: var(--code-border);
+  overflow: hidden;
+}
+.markdown-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 2rem;
+  padding: 0.2rem 0.35rem 0.2rem 0.75rem;
+  border-bottom: 1px solid var(--code-border);
+  background: color-mix(in srgb, var(--code-border) 22%, var(--code-surface));
+}
+.markdown-code-lang {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
+  font-family: var(--mono-font);
+  font-size: var(--text-status);
+  line-height: 1.2;
+}
+.markdown-code-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+.markdown-code-feedback {
+  color: var(--ink-soft);
+  font-family: var(--body-font);
+  font-size: var(--text-status);
+  line-height: 1.2;
+}
+.markdown-code-feedback:empty {
+  display: none;
+}
+.markdown-code-block .markdown-scroll-code {
+  margin-block: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.markdown-code-block .markdown-scroll-code:focus-visible {
+  outline-offset: -2px;
 }
 .markdown-scroll-code pre {
   width: max-content;
@@ -218,6 +265,46 @@
   background: transparent;
   border: 1px solid var(--current);
   cursor: pointer;
+}
+.markdown-code-copy,
+.trace-event article .markdown-code-copy {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  line-height: 1;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.markdown-code-copy:focus-visible,
+.trace-event article .markdown-code-copy:focus-visible {
+  outline: 1.5px solid var(--current);
+  outline-offset: -2px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .markdown-code-copy:hover,
+  .trace-event article .markdown-code-copy:hover {
+    color: var(--code-ink);
+    background: color-mix(in srgb, var(--code-ink) 8%, transparent);
+  }
+}
+@media (width < 768px) {
+  .markdown-code-copy,
+  .trace-event article .markdown-code-copy {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
 }
 .trace-event article .plan-toggle {
   display: flex;
@@ -402,7 +489,6 @@
     transition: transform 140ms ease-out;
   }
 }
-.markdown-scroll-code,
 .user-input-card,
 .user-input-options li,
 .user-input-freeform {

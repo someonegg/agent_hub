@@ -47,6 +47,7 @@ export const messages = {
   connected: "Connected",
   connectionUnknown: "Connection unknown",
   copied: "Copied",
+  copyCode: "Copy code",
   copyCommand: "Copy command",
   copyFailed: "Copy failed. Select and copy manually.",
   viewLinkAddress: "View link address",
