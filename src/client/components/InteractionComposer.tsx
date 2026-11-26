@@ -236,9 +236,9 @@ export function InteractionComposer({
                 onClick={() => void send().catch(() => undefined)}
               >
                 <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="1.8"
@@ -246,8 +246,8 @@ export function InteractionComposer({
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
-                  <path d="M8 12.75V3.25" />
-                  <path d="M3.75 7.25 8 3l4.25 4.25" />
+                  <path d="M21.38 2.63 2.63 10.35l7.5 3.52 3.6 7.35 7.65-18.6z" />
+                  <path d="M10.13 13.88 21.38 2.63" />
                 </svg>
               </button>
             </div>

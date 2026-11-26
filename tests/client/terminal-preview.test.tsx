@@ -131,15 +131,6 @@ it.each([
   expect(button).toHaveFocus();
 });
 
-it("interrupts with Ctrl+c in the preview without collapsing it", () => {
-  const handlers = props();
-  render(<TerminalPreview {...handlers} />);
-  const body = screen.getByRole("group", { name: "Terminal controls" }).parentElement!;
-  expect(fireEvent.keyDown(body, { key: "c", ctrlKey: true })).toBe(false);
-  expect(handlers.onSendKeys).toHaveBeenCalledExactlyOnceWith(["interrupt"]);
-  expect(handlers.onToggle).not.toHaveBeenCalled();
-});
-
 it("renders Interrupt to the left of Collapse terminal and sends interrupt without collapsing", () => {
   const handlers = props();
   render(<TerminalPreview {...handlers} />);

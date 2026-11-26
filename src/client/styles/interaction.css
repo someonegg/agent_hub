@@ -48,11 +48,6 @@
     background: var(--hover-surface);
     border-color: var(--notice-border);
   }
-  .interaction-actions .interaction-send:hover:not(:disabled):not([aria-disabled="true"]) {
-    color: var(--paper);
-    background: var(--current-hover);
-    border-color: var(--current-hover);
-  }
   .terminal-key:hover:not([aria-disabled="true"]) {
     color: #fff;
     background: #27727b;
