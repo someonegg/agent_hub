@@ -49,8 +49,7 @@ export const messages = {
   connectionUnknown: "Connection unknown",
   copied: "Copied",
   copyCommand: "Copy command",
-  copyFailedSelectTheCommandAndCopyItManually:
-    "Copy failed. Select the command and copy it manually.",
+  copyFailed: "Copy failed. Select and copy manually.",
   viewLinkAddress: "View link address",
   copyLink: "Copy link",
   couldNotCopyLink: "Could not copy link",

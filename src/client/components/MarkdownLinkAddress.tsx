@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
+import { copyText } from "../copy-text";
 import { t } from "../i18n";
 import { CopyIcon } from "./CopyIcon";
 
@@ -16,7 +17,7 @@ export function MarkdownLinkAddress({
 }) {
   useTranslation();
   const [open, setOpen] = useState(false);
-  const [feedback, setFeedback] = useState<"copied" | "couldNotCopyLink" | null>(null);
+  const [feedback, setFeedback] = useState<"copied" | "copyFailed" | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const title = label || t("viewLinkAddress");
@@ -31,12 +32,7 @@ export function MarkdownLinkAddress({
   }
 
   async function copyAddress() {
-    try {
-      await navigator.clipboard.writeText(url);
-      setFeedback("copied");
-    } catch {
-      setFeedback("couldNotCopyLink");
-    }
+    setFeedback((await copyText(url)) ? "copied" : "copyFailed");
   }
 
   return (

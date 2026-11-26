@@ -50,7 +50,7 @@ export const messages: Record<keyof typeof english, string> = {
   connectionUnknown: "連線狀態未知",
   copied: "已複製",
   copyCommand: "複製命令",
-  copyFailedSelectTheCommandAndCopyItManually: "複製失敗，請選取命令後手動複製。",
+  copyFailed: "複製失敗，請手動選取複製。",
   viewLinkAddress: "查看連結位址",
   copyLink: "複製連結",
   couldNotCopyLink: "無法複製連結",

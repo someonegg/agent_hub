@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { copyText } from "../copy-text";
 import { t } from "../i18n";
 import { CopyIcon } from "./CopyIcon";
 
-const copyFailed = "copyFailedSelectTheCommandAndCopyItManually";
-type CopyMessage = "" | "copied" | typeof copyFailed;
+type CopyMessage = "" | "copied" | "copyFailed";
 
 export function AttachCommand({ command }: { command: string }) {
   useTranslation();
@@ -13,15 +13,7 @@ export function AttachCommand({ command }: { command: string }) {
   const copyLabel = t("copyCommand");
 
   function copyCommand() {
-    const clipboard = navigator.clipboard;
-    if (!clipboard) {
-      setMessage(copyFailed);
-      return;
-    }
-    void clipboard.writeText(command).then(
-      () => setMessage("copied"),
-      () => setMessage(copyFailed),
-    );
+    void copyText(command).then((copied) => setMessage(copied ? "copied" : "copyFailed"));
   }
 
   return (
