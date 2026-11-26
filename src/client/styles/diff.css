@@ -238,7 +238,7 @@
   border-radius: 6px;
   background: #fff8c5;
 }
-@media (max-width: 760px) {
+@media (width < 768px) {
   .diff-page {
     padding: 16px 12px;
   }
