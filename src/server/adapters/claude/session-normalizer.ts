@@ -5,7 +5,12 @@ import { type DecodedRecord, isObject as object } from "../shared/jsonl-decoder.
 import { MAX_MESSAGE_CHARS, MAX_SESSION_DIAGNOSTICS } from "../shared/limits.js";
 import { appendClaudeIdentity, type ClaudeIdentityState } from "./identity.js";
 import { parseClaudeBindingRecord, type ParsedClaudeBindingRecord } from "./interaction.js";
-import { isClaudeContextInjectionBlock, unwrapClaudePastedContent } from "./user-content.js";
+import {
+  type ClaudeQueuedUserPrompt,
+  extractClaudeQueuedUserPrompt,
+  isClaudeContextInjectionBlock,
+  unwrapClaudePastedContent,
+} from "./user-content.js";
 import { normalizeQuestionResponse, normalizeQuestions } from "./user-input-normalizer.js";
 
 type ObjectValue = Record<string, unknown>;
@@ -99,8 +104,12 @@ export function appendClaudeRecords(
     const { ordinal, value: row } = record;
     state.line = ordinal;
     if (!object(row) || row.isSidechain === true || row.parent_tool_use_id != null) continue;
+    const queuedUser = extractClaudeQueuedUserPrompt(row);
     // API copies and progress/subagent notifications never supply conversation or bindings.
-    if (!["user", "assistant", "custom-title", "ai-title", "system"].includes(String(row.type)))
+    if (
+      !queuedUser &&
+      !["user", "assistant", "custom-title", "ai-title", "system"].includes(String(row.type))
+    )
       continue;
     if (!appendClaudeIdentity(state, row, ordinal, retainDiagnostic)) continue;
     const binding = parseClaudeBindingRecord(record);
@@ -114,7 +123,6 @@ export function appendClaudeRecords(
       onBinding?.(binding);
       continue;
     }
-    const timestamp = string(row.timestamp);
     if (row.type === "custom-title") {
       state.customTitle = normalizeSessionTitle(string(row.customTitle)) || state.customTitle;
       continue;
@@ -123,28 +131,33 @@ export function appendClaudeRecords(
       state.aiTitle = normalizeSessionTitle(string(row.aiTitle)) || state.aiTitle;
       continue;
     }
-    if (row.type !== "user" && row.type !== "assistant") continue;
     if (row.isMeta === true || row.isCompactSummary === true || row.subtype === "subagent")
       continue;
-    const message = row.message;
-    if (!object(message) || message.role !== row.type) continue;
-    const role = row.type;
+    const conversation = resolveConversationRow(row, queuedUser);
+    if (!conversation) continue;
+    const { role, timestamp } = conversation;
     let blocks: unknown[] = [];
-    if (typeof message.content === "string") blocks = [{ type: "text", text: message.content }];
-    else if (Array.isArray(message.content)) blocks = message.content;
-    if (role === "user") {
+    if (typeof conversation.content === "string")
+      blocks = [{ type: "text", text: conversation.content }];
+    else if (Array.isArray(conversation.content)) blocks = conversation.content;
+    if (conversation.role === "user") {
       if (state.pendingBindingReply !== null && !isPureContextInjectionBlocks(blocks)) {
         state.pendingBindingReply = null;
       }
     } else if (state.pendingBindingReply !== null) {
-      const decision = evaluateBindingReplyRow(row, message, blocks, state.pendingBindingReply);
+      const decision = evaluateBindingReplyRow(
+        row,
+        conversation.message,
+        blocks,
+        state.pendingBindingReply,
+      );
       state.pendingBindingReply = decision.action === "continue" ? decision.next : null;
       if (decision.action !== "release") continue;
     }
     let phase: "update" | "response" | null = null;
-    if (role === "assistant") {
-      if (message.stop_reason === "tool_use") phase = "update";
-      else if (message.stop_reason === "end_turn") phase = "response";
+    if (conversation.role === "assistant") {
+      if (conversation.message.stop_reason === "tool_use") phase = "update";
+      else if (conversation.message.stop_reason === "end_turn") phase = "response";
     }
     let text: string[] = [];
     const flush = () => {
@@ -220,6 +233,40 @@ export function appendClaudeRecords(
     decoderDiagnostics: diagnostics,
     normalizerDiagnostics: state.diagnostics,
     diagnostics: [...diagnostics, ...state.diagnostics].slice(0, MAX_SESSION_DIAGNOSTICS),
+  };
+}
+
+type ConversationRow =
+  | {
+      readonly role: "user";
+      readonly content: unknown;
+      readonly timestamp: string | null;
+    }
+  | {
+      readonly role: "assistant";
+      readonly message: ObjectValue;
+      readonly content: unknown;
+      readonly timestamp: string | null;
+    };
+
+function resolveConversationRow(
+  row: ObjectValue,
+  queuedUser: ClaudeQueuedUserPrompt | null,
+): ConversationRow | null {
+  if (queuedUser) {
+    return { role: "user", content: queuedUser.content, timestamp: queuedUser.timestamp };
+  }
+  if (row.type !== "user" && row.type !== "assistant") return null;
+  if (!object(row.message) || row.message.role !== row.type) return null;
+  const timestamp = string(row.timestamp);
+  if (row.type === "user") {
+    return { role: "user", content: row.message.content, timestamp };
+  }
+  return {
+    role: "assistant",
+    message: row.message,
+    content: row.message.content,
+    timestamp,
   };
 }
 
