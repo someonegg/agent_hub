@@ -2,7 +2,7 @@ import type { DomainAgentInteraction, DomainBindingEvent } from "../../domain/se
 import { type DecodedRecord, isObject } from "../shared/jsonl-decoder.js";
 import { DEFAULT_KEY_BINDINGS, interruptSteps } from "../shared/session-management.js";
 import { formatClaudeBindingMessage, parseClaudeBindingMessage } from "./binding-message.js";
-import { isClaudeContextInjectionBlock } from "./user-content.js";
+import { extractClaudeQueuedUserPrompt, isClaudeContextInjectionBlock } from "./user-content.js";
 
 export type ParsedClaudeBindingRecord = Omit<DomainBindingEvent, "sessionId">;
 
@@ -21,7 +21,6 @@ export function claudeInteraction(
 export function parseClaudeBindingRecord(record: DecodedRecord): ParsedClaudeBindingRecord | null {
   const row = record.value;
   if (
-    row.type !== "user" ||
     row.isSidechain === true ||
     row.parent_tool_use_id != null ||
     row.isMeta === true ||
@@ -29,14 +28,24 @@ export function parseClaudeBindingRecord(record: DecodedRecord): ParsedClaudeBin
     row.subtype === "subagent"
   )
     return null;
-  const message = row.message;
-  if (!isObject(message) || message.role !== "user") return null;
+  let rawContent: unknown;
+  let timestamp: unknown = row.timestamp;
+  if (row.type === "user") {
+    const message = row.message;
+    if (!isObject(message) || message.role !== "user") return null;
+    rawContent = message.content;
+  } else {
+    const queued = extractClaudeQueuedUserPrompt(row);
+    if (!queued) return null;
+    rawContent = queued.content;
+    timestamp = queued.timestamp;
+  }
 
-  const content = extractClaudeBindingText(message.content);
+  const content = extractClaudeBindingText(rawContent);
   if (content === null) return null;
   const attempt = parseClaudeBindingMessage(content, record.ordinal);
   if (!attempt) return null;
-  const time = typeof row.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
+  const time = typeof timestamp === "string" ? Date.parse(timestamp) : NaN;
   return {
     ordinal: record.ordinal,
     time: Number.isFinite(time) ? time : 0,

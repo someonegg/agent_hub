@@ -69,6 +69,88 @@ describe("Claude pasted user text", () => {
   });
 });
 
+describe("Claude mid-turn queued user attachments", () => {
+  const queuedAttachment = (
+    attachment: Record<string, unknown>,
+    extra: Record<string, unknown> = {},
+  ) => ({
+    type: "attachment",
+    timestamp: "2026-11-27T00:24:34.144Z",
+    attachment: {
+      type: "queued_command",
+      commandMode: "prompt",
+      origin: { kind: "human" },
+      humanTurn: true,
+      ...attachment,
+    },
+    ...extra,
+  });
+
+  it("emits human mid-turn queued_command prompts as user messages", () => {
+    const body = "嗯，改下。\n\n1-3 也调整下， 1没有ffmpeg就跳过";
+    const pasted = `<pasted_content id="beef">\n${body}\n</pasted_content id="beef">`;
+    const state = append(
+      createClaudeState(id),
+      message("assistant", "后台审查完成", { stop_reason: "tool_use" }),
+      queuedAttachment({ prompt: body }),
+      queuedAttachment({ prompt: [{ type: "text", text: pasted }] }),
+      message("assistant", "收到，开工。", { stop_reason: "tool_use" }),
+    );
+    expect(timelineContent(state)).toEqual([
+      "assistant:后台审查完成",
+      `user:${body}`,
+      `user:${body}\n`,
+      "assistant:收到，开工。",
+    ]);
+    expect(state.timeline[1]).toMatchObject({
+      kind: "message",
+      role: "user",
+      phase: null,
+      timestamp: "2026-11-27T00:24:34.144Z",
+    });
+    expect(state.firstUser).toBe(body);
+  });
+
+  it("ignores non-human, non-prompt, sidechain, and system attachments", () => {
+    const before = append(createClaudeState(id), message("user", "Hello"));
+    for (const row of [
+      { type: "attachment", attachment: { type: "prompt_snapshot", prompt: "ignored" } },
+      queuedAttachment({ prompt: "non-human turn", humanTurn: false }),
+      queuedAttachment({ prompt: "system origin", origin: { kind: "system" } }),
+      queuedAttachment({ prompt: "task mode", commandMode: "task-notification" }),
+      queuedAttachment({ prompt: "<task-notification>done</task-notification>" }),
+      queuedAttachment({ prompt: "sidechain" }, { isSidechain: true }),
+      queuedAttachment({ prompt: "subagent" }, { parent_tool_use_id: "tool_1" }),
+      queuedAttachment({ prompt: "meta" }, { isMeta: true }),
+    ]) {
+      const after = append(before, row);
+      expect(after.timeline, JSON.stringify(row)).toBe(before.timeline);
+    }
+  });
+
+  it("treats mid-turn queued user prompts as real turns for binding suppression", () => {
+    const cleared = append(
+      createClaudeState(id),
+      bindingPrompt,
+      queuedAttachment({ prompt: "Follow-up prompt" }),
+      message("assistant", "OK"),
+    );
+    expect(timelineContent(cleared)).toEqual(["user:Follow-up prompt", "assistant:OK"]);
+
+    const bound = append(
+      createClaudeState(id),
+      queuedAttachment({ prompt: formatClaudeBindingMessage(target, "/queued-project", "Queued") }),
+      message("assistant", "OK"),
+    );
+    expect(bound.timeline).toEqual([]);
+    expect(bound).toMatchObject({
+      project: "/queued-project",
+      taskName: "Queued",
+      firstUser: null,
+    });
+  });
+});
+
 describe("Claude incremental allocation", () => {
   it("reuses timeline and question collections for records without display items", () => {
     const before = append(createClaudeState(id), message("user", "Hello"), ask("Continue?"));

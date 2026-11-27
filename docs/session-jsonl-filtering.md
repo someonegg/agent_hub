@@ -60,10 +60,12 @@ otherwise. Thinking, `SYSTEM_MESSAGE`, and tool records are skipped.
 
 Main records with auxiliary provenance, API copies, thinking, ordinary
 tool calls/results, local commands, interruption notices and shell wrappers are
-excluded from conversation output. Ordinary assistant text is retained regardless
-of model. Each complete JSONL line is processed independently without message-ID
-aggregation; block order determines consecutive item ordinals/IDs starting at 1.
-`parentUuid` links native messages.
+excluded from conversation output. Human mid-turn `attachment` records with
+`attachment.type === "queued_command"` (`commandMode: "prompt"`) are published
+as ordinary user messages; other `attachment` records are excluded. Ordinary
+assistant text is retained regardless of model. Each complete JSONL line is
+processed independently without message-ID aggregation; block order determines
+consecutive item ordinals/IDs starting at 1. `parentUuid` links native messages.
 
 Assistant phase uses only that row's `message.stop_reason`: `tool_use` → `update`,
 `end_turn` → `response`, all other values → `null`. `ExitPlanMode.input.plan`
