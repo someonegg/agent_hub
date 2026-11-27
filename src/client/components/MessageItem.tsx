@@ -6,8 +6,12 @@ import { fromMarkdown } from "mdast-util-from-markdown";
 import { gfmFromMarkdown } from "mdast-util-gfm";
 import { defaultHandlers, type Handlers } from "mdast-util-to-hast";
 import { toString } from "mdast-util-to-string";
+import { cjkFriendlyExtension } from "micromark-extension-cjk-friendly";
+import { gfmStrikethroughCjkFriendly } from "micromark-extension-cjk-friendly-gfm-strikethrough";
 import { gfm } from "micromark-extension-gfm";
 import rehypeKatex from "rehype-katex";
+import remarkCjkFriendly from "remark-cjk-friendly/parseOnly";
+import remarkCjkFriendlyGfmStrikethrough from "remark-cjk-friendly-gfm-strikethrough/parseOnly";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 
@@ -20,10 +24,15 @@ import { MarkdownCodeBlock } from "./MarkdownCodeBlock";
 import { MarkdownLinkAddress } from "./MarkdownLinkAddress";
 
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
-const REMARK_PLUGINS = [remarkGfm, remarkMath];
+const REMARK_PLUGINS = [
+  remarkGfm,
+  remarkCjkFriendly,
+  remarkCjkFriendlyGfmStrikethrough,
+  remarkMath,
+];
 const REHYPE_PLUGINS = [rehypeKatex];
 const PREVIEW_PARSE_OPTIONS = {
-  extensions: [gfm()],
+  extensions: [gfm(), cjkFriendlyExtension(), gfmStrikethroughCjkFriendly()],
   mdastExtensions: [gfmFromMarkdown()],
 };
 // Keep the parsed destination available after ReactMarkdown filters and encodes hrefs.

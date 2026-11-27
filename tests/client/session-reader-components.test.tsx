@@ -447,6 +447,53 @@ describe("session reader components", () => {
       ),
     ).toBe(["Old step Done", "Status · Owner", "Ready · Codex"].join("\n"));
   });
+
+  it("renders CJK emphasis and strikethrough adjacent to punctuation", () => {
+    const { container } = render(
+      <MessageItem
+        item={{
+          kind: "message",
+          id: "cjk-markdown",
+          ordinal: 1,
+          timestamp: null,
+          role: "assistant",
+          phase: "response",
+          itemType: null,
+          markdown: [
+            "而**飞地（Enclave）**证明，这是**“全链路”**隐私，做到**可复现构建（Reproducible Builds）**并写入**透明度日志**。",
+            "",
+            "含代码**`foo**bar`（测试）**后文，含链接**[文档](https://example.com)（说明）**后文，~~旧方案（v1）~~新方案。",
+            "",
+            "纯英文foo**bar)**baz不误伤",
+          ].join("\n"),
+        }}
+      />,
+    );
+
+    expect([...container.querySelectorAll("strong")].map((node) => node.textContent)).toEqual([
+      "飞地（Enclave）",
+      "“全链路”",
+      "可复现构建（Reproducible Builds）",
+      "透明度日志",
+      "foo**bar（测试）",
+      "文档（说明）",
+    ]);
+    expect([...container.querySelectorAll("del")].map((node) => node.textContent)).toEqual([
+      "旧方案（v1）",
+    ]);
+    expect(container.querySelector("code")?.textContent).toBe("foo**bar");
+    expect(screen.getByRole("link", { name: "文档" })).toHaveAttribute(
+      "href",
+      "https://example.com",
+    );
+    expect(container).toHaveTextContent("纯英文foo**bar)**baz不误伤");
+  });
+
+  it("strips CJK bold and strikethrough markers in plan previews", () => {
+    expect(
+      planPreview("而**飞地（Enclave）**证明，这是**“全链路”**隐私，~~旧方案（v1）~~新方案。"),
+    ).toBe("而飞地（Enclave）证明，这是“全链路”隐私，旧方案（v1）新方案。");
+  });
 });
 
 it("only displays task metadata inside session information when configured", async () => {
