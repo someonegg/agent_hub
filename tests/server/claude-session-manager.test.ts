@@ -106,14 +106,24 @@ it("provides shared interrupt steps and two pairs of exit interrupts", async () 
   let elapsed = 0;
   expect(
     manager.exitSteps().map((step) => ({
-      keys: step.keys,
+      steps: step.steps,
       atMs: (elapsed += step.delayMs),
     })),
   ).toEqual([
-    { keys: ["C-c"], atMs: 0 },
-    { keys: ["C-c"], atMs: 200 },
-    { keys: ["C-c"], atMs: 2600 },
-    { keys: ["C-c"], atMs: 2800 },
+    {
+      steps: [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 200 },
+      ],
+      atMs: 0,
+    },
+    {
+      steps: [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 150 },
+      ],
+      atMs: 2400,
+    },
   ]);
 });
 

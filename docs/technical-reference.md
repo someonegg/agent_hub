@@ -377,10 +377,10 @@ Exit validates the latest binding and controls the whole tmux session, including
 manual binds, while retaining history. Unbound succeeds; missing fails; archived
 sessions use the same checks. Query errors or ownership changes produce `unknown`.
 
-Both adapters send a staged Ctrl-C sequence, Ctrl-D, then one targeted
-`kill-session` if still running. Each step checks cancellation and
-ownership/state; natural exit stops further input. Forced close still requires
-absence confirmation within the 30-second exit budget.
+Exit sends adapter-defined exit steps, Ctrl-D, then one targeted `kill-session`
+if still running. Each step checks cancellation and ownership/state; natural
+exit stops further input. Forced close still requires absence confirmation
+within the 30-second exit budget.
 See [ADR-112](adr/0112-separate-exit-from-history-management.md).
 
 #### Archive and delete

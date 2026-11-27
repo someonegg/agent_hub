@@ -194,7 +194,7 @@ it("forces only the bound session closed when its outer shell ignores interrupts
       transport.killSession(pane, check),
     );
     const sendExitKeys = vi.fn<SessionInteractionService["sendExitKeys"]>(
-      (pane, _id, keys, check) => transport.sendKeys(pane, [{ keys, delayMs: 0 }], check),
+      (pane, _id, steps, check) => transport.sendKeys(pane, steps, check),
     );
     let now = 0;
     const exit = new SessionExitService(
@@ -206,22 +206,26 @@ it("forces only the bound session closed when its outer shell ignores interrupts
       () => now,
     );
     const task = exit.start("manual", target, new CodexSessionManager("/unused"), () => {});
-    // Four adapter interrupts, then EOF after the shell grace period.
-    for (const value of [0, 200, 2_600, 2_800, 6_000]) {
+    // Two adapter interrupt bursts, then EOF after the shell grace period.
+    for (const value of [0, 2_400, 5_000]) {
       now = value;
       expect(await task.advance()).toBe(false);
     }
     expect(sendExitKeys.mock.calls.map((call) => call[2])).toEqual([
-      ["C-c"],
-      ["C-c"],
-      ["C-c"],
-      ["C-c"],
-      ["C-d"],
+      [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 200 },
+      ],
+      [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 150 },
+      ],
+      [{ keys: ["C-d"], delayMs: 0 }],
     ]);
-    now = 14_999;
+    now = 9_999;
     expect(await task.advance()).toBe(false);
     expect(killTarget).not.toHaveBeenCalled();
-    now = 15_000;
+    now = 10_000;
     expect(await task.advance()).toBe(false);
     expect(killTarget).toHaveBeenCalledOnce();
     expect(await task.advance()).toBe(true);

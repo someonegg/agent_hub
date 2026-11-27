@@ -46,7 +46,7 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
       socketPath: "/tmp/test",
       sessionName: "ahub-00000000-0000-0000-0000-000000000001",
     })),
-    exitSteps: () => [{ keys: ["C-c"] as const, delayMs: 0 }],
+    exitSteps: () => [{ steps: [{ keys: ["C-c"] as const, delayMs: 0 }], delayMs: 0 }],
     archive: vi.fn(async () => undefined),
     delete: vi.fn(async () => undefined),
   };

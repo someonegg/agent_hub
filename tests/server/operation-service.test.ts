@@ -78,7 +78,7 @@ function setup(managementWaitMs = 30, uploads?: UploadCleanup) {
     isValidNativeId: vi.fn((_nativeId: string) => true),
     resolveDirectory: vi.fn(async (directory: string) => ({ directory })),
     launch: vi.fn(async () => target),
-    exitSteps: () => [{ keys: ["C-c"] as const, delayMs: 0 }],
+    exitSteps: () => [{ steps: [{ keys: ["C-c"] as const, delayMs: 0 }], delayMs: 0 }],
     archive: vi.fn(async () => undefined),
     delete: vi.fn(async () => undefined),
   };
@@ -360,7 +360,7 @@ describe.each(["archive", "delete"] as const)("%s exit workflow", (type) => {
     expect(interaction.sendExitKeys).toHaveBeenCalledExactlyOnceWith(
       target,
       "session",
-      ["C-c"],
+      [{ keys: ["C-c"], delayMs: 0 }],
       expect.any(Function),
     );
     expect(manager[type]).not.toHaveBeenCalled();
@@ -802,9 +802,9 @@ it.each(["exit", "archive", "delete"] as const)(
     interaction.resolveTarget.mockResolvedValue(target);
     interaction.inspectTarget.mockResolvedValue("alive");
     manager.exitSteps = () => [
-      { keys: ["C-c"] as const, delayMs: 0 },
-      { keys: ["C-c"] as const, delayMs: 1_000 },
-      { keys: ["C-c"] as const, delayMs: 1_000 },
+      { steps: [{ keys: ["C-c"] as const, delayMs: 0 }], delayMs: 0 },
+      { steps: [{ keys: ["C-c"] as const, delayMs: 0 }], delayMs: 1_000 },
+      { steps: [{ keys: ["C-c"] as const, delayMs: 0 }], delayMs: 1_000 },
     ];
     const op = service.manage(type, "session");
     await flush();
@@ -812,15 +812,15 @@ it.each(["exit", "archive", "delete"] as const)(
     await Promise.all([service.poll(), service.poll()]);
     time(2_000);
     await service.poll();
-    time(6_000);
+    time(5_000);
     await service.poll();
     expect(interaction.sendExitKeys.mock.calls.map((call) => call[2])).toEqual([
-      ["C-c"],
-      ["C-c"],
-      ["C-c"],
-      ["C-d"],
+      [{ keys: ["C-c"], delayMs: 0 }],
+      [{ keys: ["C-c"], delayMs: 0 }],
+      [{ keys: ["C-c"], delayMs: 0 }],
+      [{ keys: ["C-d"], delayMs: 0 }],
     ]);
-    time(15_000);
+    time(10_000);
     await Promise.all([service.poll(), service.poll()]);
     expect(interaction.killTarget).toHaveBeenCalledOnce();
     expect(manager.archive).not.toHaveBeenCalled();

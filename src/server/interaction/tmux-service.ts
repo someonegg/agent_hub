@@ -183,12 +183,19 @@ export class TmuxInteractionService implements InteractionTransport {
         if (step.delayMs > 0) await delay(step.delayMs);
         await this.#revalidate(binding);
         assertAvailable();
-        await this.#run(binding, [
-          "send-keys",
-          "-t",
-          tmuxTarget(binding.sessionName),
-          ...step.keys,
-        ]);
+        try {
+          await this.#run(binding, [
+            "send-keys",
+            "-t",
+            tmuxTarget(binding.sessionName),
+            ...step.keys,
+          ]);
+        } catch (error) {
+          if (error instanceof InteractionTransportError && error.code === "command_failed") {
+            throw await this.#absenceOrError(binding, error);
+          }
+          throw error;
+        }
       }
     });
   }
@@ -225,13 +232,16 @@ export class TmuxInteractionService implements InteractionTransport {
         truncateStart: true,
       });
     } catch (error) {
-      // Only confirmed absence replaces the capture error; failed probes prove nothing.
-      const target = await this.resolveTarget({ valid: true, ordinal: 0, ...binding }).catch(
-        () => undefined,
-      );
-      if (target === null) throw disconnected();
-      throw error;
+      throw await this.#absenceOrError(binding, error);
     }
+  }
+
+  async #absenceOrError(binding: TmuxBinding, error: unknown): Promise<unknown> {
+    // Only confirmed absence replaces the error; failed probes prove nothing.
+    const target = await this.resolveTarget({ valid: true, ordinal: 0, ...binding }).catch(
+      () => undefined,
+    );
+    return target === null ? disconnected() : error;
   }
 
   /** Query errors never establish that the selected session exited. */
