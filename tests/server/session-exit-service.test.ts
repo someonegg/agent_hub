@@ -13,7 +13,7 @@ describe("session exit state machine", () => {
     let active = true;
     const interaction = {
       inspectTarget: vi.fn(async () => "alive" as "alive" | "exited"),
-      sendExitKeys: vi.fn(async (_target, _sessionId, _keys, check) => check()),
+      sendExitKeys: vi.fn(async (_target, _sessionId, _steps, check) => check()),
       killTarget: vi.fn(async (_target, _sessionId, check) => check()),
     };
     const service = new SessionExitService(interaction, () => now);
@@ -42,59 +42,56 @@ describe("session exit state machine", () => {
   it("uses adapter steps once, then EOF and one targeted kill, and requires exit confirmation", async () => {
     const { task, interaction, time } = setup();
     expect(await task.advance()).toBe(false);
-    expect(interaction.sendExitKeys.mock.calls.map((call) => call[2])).toEqual([["C-c"]]);
+    expect(interaction.sendExitKeys.mock.calls.map((call) => call[2])).toEqual([
+      [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 200 },
+      ],
+    ]);
     expect(task.phase).toBe("sending_exit");
-    time(199);
+    time(2_399);
     await task.advance();
     expect(interaction.sendExitKeys).toHaveBeenCalledTimes(1);
-    time(200);
-    await task.advance();
-    expect(task.phase).toBe("sending_exit");
-    time(2_599);
-    await task.advance();
-    expect(interaction.sendExitKeys).toHaveBeenCalledTimes(2);
-    time(2_600);
-    await task.advance();
-    expect(task.phase).toBe("sending_exit");
-    time(2_799);
-    await task.advance();
-    expect(interaction.sendExitKeys).toHaveBeenCalledTimes(3);
-    time(2_800);
+    time(2_400);
     await task.advance();
     expect(task.phase).toBe("waiting_exit");
-    time(5_999);
+    time(4_999);
     await task.advance();
-    expect(interaction.sendExitKeys).toHaveBeenCalledTimes(4);
-    time(6_000);
+    expect(interaction.sendExitKeys).toHaveBeenCalledTimes(2);
+    time(5_000);
     await task.advance();
     expect(interaction.sendExitKeys.mock.calls.map((call) => call[2])).toEqual([
-      ["C-c"],
-      ["C-c"],
-      ["C-c"],
-      ["C-c"],
-      ["C-d"],
+      [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 200 },
+      ],
+      [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 150 },
+      ],
+      [{ keys: ["C-d"], delayMs: 0 }],
     ]);
-    time(14_999);
+    time(9_999);
     await task.advance();
     expect(interaction.killTarget).not.toHaveBeenCalled();
-    time(15_000);
+    time(10_000);
     expect(await task.advance()).toBe(false);
     expect(interaction.killTarget).toHaveBeenCalledExactlyOnceWith(
       target,
       "session",
       expect.any(Function),
     );
-    time(16_000);
+    time(11_000);
     await task.advance();
     expect(interaction.killTarget).toHaveBeenCalledOnce();
     interaction.inspectTarget.mockResolvedValue("exited");
     expect(await task.advance()).toBe(true);
   });
 
-  it.each([0, 5])("stops after natural exit following %i steps", async (count) => {
+  it.each([0, 3])("stops after natural exit following %i steps", async (count) => {
     const { task, interaction, time } = setup();
     for (let index = 0; index < count; index++) {
-      time([0, 200, 2_600, 2_800, 6_000][index]!);
+      time([0, 2_400, 5_000][index]!);
       await task.advance();
     }
     interaction.inspectTarget.mockResolvedValue("exited");
@@ -106,11 +103,11 @@ describe("session exit state machine", () => {
 
   it("does not turn an observation error into a kill", async () => {
     const { task, interaction, time } = setup();
-    for (const value of [0, 200, 2_600, 2_800, 6_000]) {
+    for (const value of [0, 2_400, 5_000]) {
       time(value);
       await task.advance();
     }
-    time(15_000);
+    time(10_000);
     interaction.inspectTarget.mockRejectedValue(new Error("query failed"));
     await expect(task.advance()).rejects.toThrow("query failed");
     expect(interaction.killTarget).not.toHaveBeenCalled();

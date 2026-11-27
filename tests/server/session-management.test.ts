@@ -9,11 +9,21 @@ it("interrupts with Ctrl+U then Escape after the configured delay", () => {
   ]);
 });
 
-it("requests exit with four Ctrl+C steps at the configured delays", () => {
+it("requests exit with two Ctrl+C bursts at the configured delays", () => {
   expect(exitSteps()).toEqual([
-    { keys: ["C-c"], delayMs: 0 },
-    { keys: ["C-c"], delayMs: 200 },
-    { keys: ["C-c"], delayMs: 2400 },
-    { keys: ["C-c"], delayMs: 200 },
+    {
+      delayMs: 0,
+      steps: [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 200 },
+      ],
+    },
+    {
+      delayMs: 2400,
+      steps: [
+        { keys: ["C-c"], delayMs: 0 },
+        { keys: ["C-c"], delayMs: 150 },
+      ],
+    },
   ]);
 });

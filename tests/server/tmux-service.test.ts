@@ -731,6 +731,74 @@ it.each(["alive", "query_failed"])(
   },
 );
 
+it("maps send-keys command_failed to disconnected only when target absence is confirmed", async () => {
+  const socketPath = await unixSocket();
+  const runner = new FakeRunner();
+  const service = new TmuxInteractionService(runner);
+  runner.failure = (call) => {
+    if (call.args[0] === "send-keys") {
+      runner.present = false;
+      return new InteractionTransportError("command_failed", "can't find session");
+    }
+    return null;
+  };
+  await expect(
+    service.sendKeys({ socketPath, sessionName: MAIN }, [{ keys: ["C-c"], delayMs: 0 }]),
+  ).rejects.toMatchObject({ code: "disconnected" });
+  expect(runner.calls.map((call) => call.args[0])).toEqual([
+    "list-sessions",
+    "send-keys",
+    "list-sessions",
+  ]);
+});
+
+it.each(["alive", "query_failed"] as const)(
+  "preserves send-keys command_failed when fallback probe is %s",
+  async (state) => {
+    const socketPath = await unixSocket();
+    const runner = new FakeRunner();
+    const service = new TmuxInteractionService(runner);
+    const error = new InteractionTransportError("command_failed", "send failed");
+    let sendFailed = false;
+    runner.failure = (call) => {
+      if (call.args[0] === "send-keys") {
+        sendFailed = true;
+        return error;
+      }
+      if (sendFailed && state === "query_failed") {
+        return new InteractionTransportError("timeout", "probe failed");
+      }
+      return null;
+    };
+    await expect(
+      service.sendKeys({ socketPath, sessionName: MAIN }, [{ keys: ["C-c"], delayMs: 0 }]),
+    ).rejects.toBe(error);
+    expect(runner.calls.map((call) => call.args[0])).toEqual([
+      "list-sessions",
+      "send-keys",
+      "list-sessions",
+    ]);
+  },
+);
+
+it("preserves send-keys timeout without probing target absence", async () => {
+  const socketPath = await unixSocket();
+  const runner = new FakeRunner();
+  const service = new TmuxInteractionService(runner);
+  const error = new InteractionTransportError("timeout", "timed out");
+  runner.failure = (call) => {
+    if (call.args[0] === "send-keys") {
+      runner.present = false;
+      return error;
+    }
+    return null;
+  };
+  await expect(
+    service.sendKeys({ socketPath, sessionName: MAIN }, [{ keys: ["C-c"], delayMs: 0 }]),
+  ).rejects.toBe(error);
+  expect(runner.calls.map((call) => call.args[0])).toEqual(["list-sessions", "send-keys"]);
+});
+
 it("confirms inside the send transaction without reentering the capture queue", async () => {
   const socketPath = await unixSocket();
   const runner = new FakeRunner();

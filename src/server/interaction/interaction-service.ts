@@ -11,7 +11,6 @@ import type {
   DomainAgentInteraction,
   InteractionBindingAttempt,
   InteractionKeyStep,
-  TmuxKey,
 } from "../domain/session-domain.js";
 import { normalizeMessage } from "./message.js";
 import { confirmMessageSubmission } from "./message-submission.js";
@@ -116,16 +115,21 @@ export class SessionInteractionService {
     const target = await this.tmux.resolveTarget(attempt);
     return target && this.bindings.owns(sessionId, target) ? target : null;
   }
-  sendExitKeys(
+  async sendExitKeys(
     target: TmuxBinding,
     sessionId: string,
-    keys: readonly TmuxKey[],
+    steps: readonly InteractionKeyStep[],
     assertActive: () => void,
   ) {
-    return this.tmux.sendKeys(target, [{ keys, delayMs: 0 }], () => {
-      assertActive();
-      this.#assertOwner(sessionId, target);
-    });
+    try {
+      await this.tmux.sendKeys(target, steps, () => {
+        assertActive();
+        this.#assertOwner(sessionId, target);
+      });
+    } catch (error) {
+      if (error instanceof InteractionTransportError && error.code === "disconnected") return;
+      throw error;
+    }
   }
   killTarget(target: TmuxBinding, sessionId: string, assertActive: () => void) {
     return this.tmux.killSession(target, () => {

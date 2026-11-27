@@ -1,6 +1,6 @@
 import type { PermissionMode } from "../../shared/permission-mode.js";
 import { validProjectDirectory } from "../domain/project-directory.js";
-import type { DomainSession, TmuxKey } from "../domain/session-domain.js";
+import type { DomainSession, InteractionKeyStep } from "../domain/session-domain.js";
 import type { TmuxBinding } from "../interaction/transport.js";
 
 /** Time before startup needs terminal access. */
@@ -12,7 +12,7 @@ export interface ManagementSnapshot {
 }
 
 export interface SessionExitStep {
-  readonly keys: readonly TmuxKey[];
+  readonly steps: readonly InteractionKeyStep[];
   readonly delayMs: number;
 }
 

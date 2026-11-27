@@ -338,7 +338,12 @@ it.each(["message", "keys", "preview", "handoffPaneBinding", "exit", "kill"] as 
               ? service.handoffPaneBinding("session")
               : action === "kill"
                 ? service.killTarget(target, "session", () => {})
-                : service.sendExitKeys(target, "session", ["C-c"], () => {});
+                : service.sendExitKeys(
+                    target,
+                    "session",
+                    [{ keys: ["C-c"], delayMs: 0 }],
+                    () => {},
+                  );
     const rejected = expect(operation).rejects.toMatchObject({ code: "interaction_not_connected" });
     await vi.waitFor(() => expect(execute).toBeTypeOf("function"));
     bindings.submit({
@@ -725,4 +730,26 @@ it("submits a Claude handoff containing the current target without an operation 
   } finally {
     send.mockRestore();
   }
+});
+
+it("ignores disconnected errors during exit key bursts while propagating other transport errors", async () => {
+  const tmux = {
+    sendKeys: vi
+      .fn()
+      .mockRejectedValueOnce(new InteractionTransportError("disconnected", "gone"))
+      .mockRejectedValueOnce(new InteractionTransportError("timeout", "timed out")),
+  };
+  const service = new TestSessionInteractionService(
+    repository(boundSession()),
+    true,
+    tmux as unknown as TmuxInteractionService,
+  );
+  const burst = [
+    { keys: ["C-c"] as const, delayMs: 0 },
+    { keys: ["C-c"] as const, delayMs: 200 },
+  ];
+  await expect(service.sendExitKeys(BINDING, "session", burst, () => {})).resolves.toBeUndefined();
+  await expect(service.sendExitKeys(BINDING, "session", burst, () => {})).rejects.toMatchObject({
+    code: "timeout",
+  });
 });

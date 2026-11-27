@@ -17,7 +17,7 @@ export class SessionExitService {
   constructor(
     private readonly interaction: ExitInteraction,
     private readonly now = Date.now,
-    private readonly timing = { eofDelayMs: 3_200, killDelayMs: 9_000 },
+    private readonly timing = { eofDelayMs: 2_600, killDelayMs: 5_000 },
   ) {}
 
   start(
@@ -27,8 +27,11 @@ export class SessionExitService {
     assertActive: () => void,
   ): SessionExitTask {
     const steps: readonly SessionExitStep[] = [
-      ...capability.exitSteps().map((step) => ({ ...step, keys: [...step.keys] })),
-      { keys: ["C-d"], delayMs: this.timing.eofDelayMs },
+      ...capability.exitSteps().map((step) => ({
+        delayMs: step.delayMs,
+        steps: step.steps.map((keyStep) => ({ ...keyStep, keys: [...keyStep.keys] })),
+      })),
+      { steps: [{ keys: ["C-d"], delayMs: 0 }], delayMs: this.timing.eofDelayMs },
     ];
     let index = 0;
     let due = this.now() + steps[0]!.delayMs;
@@ -46,7 +49,7 @@ export class SessionExitService {
         if (this.now() < due || killed) return false;
         const step = steps[index];
         if (step) {
-          await this.interaction.sendExitKeys(target, sessionId, step.keys, assertActive);
+          await this.interaction.sendExitKeys(target, sessionId, step.steps, assertActive);
           assertActive();
           index++;
           phase = index < steps.length - 1 ? "sending_exit" : "waiting_exit";
