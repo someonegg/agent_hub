@@ -39,7 +39,7 @@ export const sessionHelp = `Usage: ahub-cli session <command> [options]
   interrupt <id>
   handoff <id>
   exit <id> | archive <id> | delete <id>
-Options: --url <http(s)-url> --json --timeout <seconds> (default 15; follow: 30; create/resume/exit/archive/delete: 45)
+Options: --url <http(s)-url> --json --timeout <seconds> (default 15; follow: 30 per request; exit/archive/delete: 45; create/resume: 60; create --worktree: 120)
 Permission mode: default preserves native configuration; auto uses native automatic approval; --yolo is shorthand for --permission-mode yolo.
 List: excludes archived sessions unless --all is set.
 Follow: timeout applies to each HTTP request; observation continues until stopped.
@@ -147,11 +147,10 @@ export function parseSessionArguments(args: string[], environmentUrl?: string) {
       "invalid_arguments",
       "Unsupported key sequence; use session interrupt for interruption",
     );
-  const defaultSeconds = ["create", "resume", "exit", "archive", "delete"].includes(command)
-    ? 45
-    : values.follow
-      ? 30
-      : 15;
+  let defaultSeconds = 15;
+  if (command === "create" || command === "resume") defaultSeconds = values.worktree ? 120 : 60;
+  else if (["exit", "archive", "delete"].includes(command)) defaultSeconds = 45;
+  else if (values.follow) defaultSeconds = 30;
   const seconds = values.timeout === undefined ? defaultSeconds : Number(values.timeout);
   if (!Number.isFinite(seconds) || seconds <= 0 || seconds * 1000 > 2_147_483_647)
     throw new CommandError(

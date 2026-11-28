@@ -518,7 +518,13 @@ it.each([
 it("uses command-specific timeout defaults and validates explicit overrides", () => {
   for (const { args, seconds } of [
     { args: ["list"], seconds: 15 },
-    { args: ["create", "--project", "/project"], seconds: 45 },
+    { args: ["inspect", "id", "--follow"], seconds: 30 },
+    { args: ["exit", "id"], seconds: 45 },
+    { args: ["archive", "id"], seconds: 45 },
+    { args: ["delete", "id"], seconds: 45 },
+    { args: ["create", "--project", "/project"], seconds: 60 },
+    { args: ["create", "--project", "/project", "--worktree"], seconds: 120 },
+    { args: ["resume", "id"], seconds: 60 },
   ]) {
     const context = JSON.stringify(args);
     expect(parseSessionArguments(args), context).toMatchObject({ seconds });
