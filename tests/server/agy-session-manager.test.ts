@@ -1,10 +1,12 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { access, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, it, vi } from "vitest";
 
 import { AgySessionManager } from "../../src/server/adapters/agy/session-manager.js";
 import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
+import { SessionLaunchError } from "../../src/server/management/session-manager.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
 
 const operationId = "00000000-0000-4000-8000-000000000001";
@@ -16,7 +18,7 @@ const launchOptions = {
   workingDirectory: "/launch-directory",
   projectDirectory: "/project",
   taskName: "Task",
-  worktree: true,
+  worktree: false,
   permissionMode: "default" as const,
 };
 
@@ -35,7 +37,7 @@ it.each([
   ["auto", true],
   ["yolo", true],
 ] as const)(
-  "builds create/resume arguments (mode=%s, resume=%s) and ignores worktree",
+  "builds create/resume arguments (mode=%s, resume=%s)",
   async (permissionMode, resume) => {
     const { directory, tmux, manager } = await setup();
     await writeFile(join(directory, ".ahub-env"), 'HTTPS_PROXY="http://proxy.local:8080"\n');
@@ -89,6 +91,55 @@ it.each([
     expect(await readFile(settingsPath, "utf8")).toBe(globalSettings);
   },
 );
+
+it("rejects worktree creation outside Git before launching tmux", async () => {
+  const { directory, tmux, manager } = await setup();
+  const launch = vi.spyOn(tmux, "launchWithTarget");
+  await expect(
+    manager.launch({ ...launchOptions, workingDirectory: directory, worktree: true }),
+  ).rejects.toThrow("requires a working directory inside a Git repository");
+  expect(launch).not.toHaveBeenCalled();
+});
+
+it("creates a canonicalized worktree and retains it on launch failure", async () => {
+  const { directory, tmux, manager } = await setup(true);
+  const repo = join(directory, "repo");
+  await mkdir(repo);
+  const git = (...args: string[]) =>
+    execFileSync("git", args, { cwd: repo, encoding: "utf8" }).trim();
+  git("init", "-q");
+  git(
+    "-c",
+    "user.name=Test",
+    "-c",
+    "user.email=test@example.invalid",
+    "commit",
+    "-qm",
+    "base",
+    "--allow-empty",
+  );
+  const worktree = join(await realpath(directory), ".agent-hub", "worktrees", operationId);
+  const error = new SessionLaunchError("not_started", "tmux launch failed");
+  vi.stubEnv("HOME", directory);
+  vi.stubEnv("USERPROFILE", directory);
+  try {
+    vi.spyOn(tmux, "launchWithTarget").mockImplementation(async (_id, cwd, prepare) => {
+      expect(cwd).toBe(worktree);
+      const args = prepare(target);
+      expect(JSON.parse(args[args.indexOf("--settings") + 1]!)).toEqual({
+        trustedWorkspaces: [worktree, "/project"],
+      });
+      throw error;
+    });
+    await expect(
+      manager.launch({ ...launchOptions, workingDirectory: repo, worktree: true }),
+    ).rejects.toBe(error);
+    expect(git("worktree", "list", "--porcelain")).toContain(operationId);
+    expect(git("branch", "--list", `ahub/${operationId}`)).toContain(`ahub/${operationId}`);
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
 
 it("validates session identities", async () => {
   const { manager } = await setup();

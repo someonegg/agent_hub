@@ -13,6 +13,7 @@ import { exitSteps, resolveDirectory } from "../shared/session-management.js";
 import { formatAgyBindingMessage } from "./binding-message.js";
 import { validAgyId } from "./identity.js";
 import { agyTranscriptPath } from "./paths.js";
+import { createAgyWorktree } from "./worktree.js";
 
 export class AgySessionManager implements SessionManager {
   constructor(
@@ -29,22 +30,25 @@ export class AgySessionManager implements SessionManager {
     if (options.taskName !== undefined && !validTaskName(options.taskName))
       throw new Error(TASK_NAME_ERROR);
     const environment = await readLaunchEnvironment(this.configDirectory);
-    // options.worktree is intentionally ignored: agy has no worktree support yet.
+    const workingDirectory =
+      options.worktree && options.resumeNativeId === undefined
+        ? await createAgyWorktree(options.workingDirectory, options.operationId)
+        : options.workingDirectory;
     return this.tmux.launchWithTarget(
       options.operationId,
-      options.workingDirectory,
+      workingDirectory,
       (target) => {
         const prompt = formatAgyBindingMessage(
           target,
           options.projectDirectory ?? null,
-          options.workingDirectory,
+          workingDirectory,
           options.taskName ?? null,
           options.operationId,
         );
         const command = [this.command];
         if (this.trustWorkspaceForSession) {
-          const trustedWorkspaces = [options.workingDirectory];
-          if (options.projectDirectory && options.projectDirectory !== options.workingDirectory)
+          const trustedWorkspaces = [workingDirectory];
+          if (options.projectDirectory && options.projectDirectory !== workingDirectory)
             trustedWorkspaces.push(options.projectDirectory);
           command.push("--settings", JSON.stringify({ trustedWorkspaces }));
         }
