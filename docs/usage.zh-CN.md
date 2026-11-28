@@ -154,12 +154,13 @@ ahub-cli diff publish /tmp/review.diff --title "Review changes"
 
 启动时传入选项，修改后重启。完整列表见 `agent-hub --help`。
 
-| 选项                   | 默认值         | 用途                                        |
-| ---------------------- | -------------- | ------------------------------------------- |
-| `--port <port>`        | `4173`         | 监听端口，`0` 自动选择空闲端口              |
-| `--home-dir <path>`    | `~/.agent-hub` | Hub 数据目录，包含 `uploads/` 和 `hosting/` |
-| `--hosting`            | 关闭           | 提供已发布网页与差异访问                    |
-| `--tmux-socket <path>` | tmux 默认值    | 使用自定义 tmux socket                      |
+| 选项                            | 默认值         | 用途                                                     |
+| ------------------------------- | -------------- | -------------------------------------------------------- |
+| `--port <port>`                 | `4173`         | 监听端口，`0` 自动选择空闲端口                           |
+| `--home-dir <path>`             | `~/.agent-hub` | Hub 数据目录，包含 `uploads/` 和 `hosting/`              |
+| `--hosting`                     | 关闭           | 提供已发布网页与差异访问                                 |
+| `--tmux-socket <path>`          | tmux 默认值    | 使用自定义 tmux socket                                   |
+| `--trust-workspace-for-session` | 关闭           | 为本机每次创建或恢复会话临时覆盖 Codex 和 agy 的目录信任 |
 
 ### 多个智能体
 

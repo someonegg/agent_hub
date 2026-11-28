@@ -8,11 +8,20 @@ import { exitSteps, resolveDirectory } from "../shared/session-management.js";
 import { codexBindingCommand } from "./interaction-parser.js";
 
 const execute = promisify(execFile);
+
+function projectTrustOverride(directory: string): string {
+  // A quoted key inside the table keeps dots in the path out of the override's key path.
+  // TOML basic strings use the same escapes as JSON for paths, and also require escaping DEL.
+  const key = JSON.stringify(directory).replaceAll("\x7f", "\\u007f");
+  return `projects={ ${key} = { trust_level = "trusted" } }`;
+}
+
 export class CodexSessionManager implements SessionManager {
   constructor(
     private readonly configDirectory: string,
     private readonly tmux = new TmuxLauncher(),
     private readonly command = "codex",
+    private readonly trustWorkspaceForSession = false,
   ) {}
 
   resolveDirectory = resolveDirectory;
@@ -35,6 +44,9 @@ export class CodexSessionManager implements SessionManager {
       ...(resumeNativeId ? ["resume", resumeNativeId] : []),
       "--no-daemon",
       "--no-alt-screen",
+      ...(this.trustWorkspaceForSession && projectDirectory
+        ? ["-c", projectTrustOverride(projectDirectory)]
+        : []),
       ...(worktree ? ["--worktree"] : []),
       ...(permissionMode === "auto"
         ? ["--approve-for-me"]
@@ -71,4 +83,11 @@ export const createCodexSessionManager = (
   configDirectory: string,
   socket?: string,
   command?: string,
-): SessionManager => new CodexSessionManager(configDirectory, new TmuxLauncher(socket), command);
+  trustWorkspaceForSession = false,
+): SessionManager =>
+  new CodexSessionManager(
+    configDirectory,
+    new TmuxLauncher(socket),
+    command,
+    trustWorkspaceForSession,
+  );

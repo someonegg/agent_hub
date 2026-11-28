@@ -192,12 +192,13 @@ by name. Run `ahub-cli skill path ahub-publish` to locate it.
 Pass options at startup and restart after changing them. Use `agent-hub --help`
 for the full list.
 
-| Option                 | Default        | Purpose                                            |
-| ---------------------- | -------------- | -------------------------------------------------- |
-| `--port <port>`        | `4173`         | Listen port; `0` selects a free port               |
-| `--home-dir <path>`    | `~/.agent-hub` | Hub data root containing `uploads/` and `hosting/` |
-| `--hosting`            | Disabled       | Serve published pages and diffs                    |
-| `--tmux-socket <path>` | tmux default   | Use a custom tmux socket                           |
+| Option                          | Default        | Purpose                                                                |
+| ------------------------------- | -------------- | ---------------------------------------------------------------------- |
+| `--port <port>`                 | `4173`         | Listen port; `0` selects a free port                                   |
+| `--home-dir <path>`             | `~/.agent-hub` | Hub data root containing `uploads/` and `hosting/`                     |
+| `--hosting`                     | Disabled       | Serve published pages and diffs                                        |
+| `--tmux-socket <path>`          | tmux default   | Use a custom tmux socket                                               |
+| `--trust-workspace-for-session` | Disabled       | Override Codex and agy workspace trust for each local Create or Resume |
 
 ### Multiple agents
 

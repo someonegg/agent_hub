@@ -417,6 +417,15 @@ Adapters require authenticated runtime CLIs on `PATH`:
 | Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions`      | Local file archive and delete; cleanup covers the session's `subagents` and the per-session directory if empty                       |
 | Antigravity | Interactive `agy -i <binding>` and `agy --resume <UUID> -i <binding>`                  | Worktree is silently ignored; Auto: `--mode auto`; YOLO: `--dangerously-skip-permissions` | Local file archive and delete; cleanup covers only UUID-named data under `brain/`, `conversations/`, `annotations/`, and `presence/` |
 
+With `--trust-workspace-for-session`, local Create and Resume override native
+workspace trust for the launch, including in Default permission mode. Codex
+passes the associated project directory via `-c` when available and lets Codex
+resolve related worktrees. This can supersede an explicit Codex `untrusted`
+entry for the project. Antigravity passes `--settings` with a
+`trustedWorkspaces` list containing the launch directory and any distinct
+associated project directory. The flag defaults to off and belongs on the
+server that launches the runtime, including a remote node.
+
 Implementations: [Codex](../src/server/adapters/codex/session-manager.ts),
 [Claude](../src/server/adapters/claude/session-manager.ts),
 [Antigravity](../src/server/adapters/agy/session-manager.ts).

@@ -33,8 +33,13 @@ describe("server command line", () => {
       ],
       tls: { enabled: false },
       interactionEnabled: true,
+      trustWorkspaceForSession: false,
       uploadDirectory: resolve(homedir(), ".agent-hub/uploads"),
     });
+  });
+
+  it("opts local launches into session workspace trust", () => {
+    expect(runnable(["--trust-workspace-for-session"]).trustWorkspaceForSession).toBe(true);
   });
 
   it("parses all server and mutual TLS options", () => {

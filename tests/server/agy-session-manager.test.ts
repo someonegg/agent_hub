@@ -20,10 +20,14 @@ const launchOptions = {
   permissionMode: "default" as const,
 };
 
-async function setup() {
+async function setup(trustWorkspaceForSession?: boolean) {
   const directory = await createTempDirectory("agy-manager-");
   const tmux = new TmuxLauncher(socket);
-  return { directory, tmux, manager: new AgySessionManager(directory, tmux, "/custom bin/agy") };
+  return {
+    directory,
+    tmux,
+    manager: new AgySessionManager(directory, tmux, "/custom bin/agy", trustWorkspaceForSession),
+  };
 }
 
 it.each([
@@ -59,6 +63,30 @@ it.each([
       ...(resume ? { resumeNativeId: nativeId } : {}),
     });
     expect(launch).toHaveBeenCalledOnce();
+  },
+);
+
+it.each([
+  ["/launch-directory", undefined, ["/launch-directory"]],
+  ["/project", nativeId, ["/launch-directory", "/project"]],
+  [undefined, undefined, ["/launch-directory"]],
+] as const)(
+  "scopes workspace trust with project directory %s",
+  async (projectDirectory, resumeNativeId, trustedWorkspaces) => {
+    const { directory, tmux, manager } = await setup(true);
+    const settingsPath = join(directory, "settings.json");
+    const globalSettings = JSON.stringify({ trustedWorkspaces: ["/third-party"] });
+    await writeFile(settingsPath, globalSettings);
+    const launch = vi
+      .spyOn(tmux, "launchWithTarget")
+      .mockImplementation(async (_id, _cwd, prepare) => {
+        const args = prepare(target);
+        expect(JSON.parse(args[args.indexOf("--settings") + 1]!)).toEqual({ trustedWorkspaces });
+        return target;
+      });
+    await manager.launch({ ...launchOptions, projectDirectory, resumeNativeId });
+    expect(launch).toHaveBeenCalledOnce();
+    expect(await readFile(settingsPath, "utf8")).toBe(globalSettings);
   },
 );
 
