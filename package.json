@@ -1,6 +1,6 @@
 {
   "name": "@someonegg/agent-hub",
-  "version": "0.9.6",
+  "version": "0.9.7",
   "description": "Web hub for Codex, Claude Code, and Antigravity CLI (agy) sessions across one or more nodes",
   "type": "module",
   "engines": {
