@@ -390,9 +390,10 @@ and confirms archive state within 30 seconds.
 
 Claude and Antigravity move the main JSONL to the flat
 `ahub_archived_sessions/<UUID>.jsonl` directory under the adapter's configured
-home. The same source reads this directory as archived history. After moving
-the file, the adapter attempts to remove the session's remaining native files
-within its delete scope. Permanent deletion also removes the archived JSONL.
+home, replacing any existing archive for the same UUID. The same source reads
+this directory as archived history. After moving the file, the adapter attempts
+to remove the session's remaining native files within its delete scope.
+Permanent deletion also removes the archived JSONL.
 
 Delete runs Exit validation and sequence, then permanently removes history through
 the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove the
@@ -444,9 +445,9 @@ independently of the model's reply.
 
 With Worktree enabled on create, the Agy adapter creates branch
 `ahub/<operationId>` from the launch checkout's committed HEAD and runs the
-session in `~/.agent-hub/worktrees/<operationId>/` on the launching node. The
-session retains its project association. Launch failures, exit, archive, and
-delete retain the worktree.
+session in `worktrees/<operationId>/` under the launching node's `--home-dir`
+(default `~/.agent-hub`). The session retains its project association. Launch
+failures, exit, archive, and delete retain the worktree.
 
 The binding is an independent `[ahub-bind:{...}]` message (see
 [`binding-message.ts`](../src/server/adapters/agy/binding-message.ts)) passed with

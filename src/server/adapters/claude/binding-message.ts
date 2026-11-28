@@ -1,10 +1,10 @@
 import { TASK_NAME_ERROR, validTaskName } from "../../../shared/task-name.js";
+import { validOperationId } from "../../domain/operation-id.js";
 import { validProjectDirectory } from "../../domain/project-directory.js";
 import type { InteractionBindingAttempt } from "../../domain/session-domain.js";
 import { validTmuxSessionName } from "../../interaction/tmux-target.js";
 import type { TmuxBinding } from "../../interaction/transport.js";
 import { isObject } from "../shared/jsonl-decoder.js";
-import { validClaudeId } from "./identity.js";
 
 const BINDING_FIELDS = new Set([
   "socketPath",
@@ -24,7 +24,7 @@ export function formatClaudeBindingMessage(
   if (!validProjectDirectory(target.socketPath) || !validTmuxSessionName(target.sessionName)) {
     throw new Error("Invalid Claude binding target");
   }
-  if (operationId !== undefined && !validClaudeId(operationId)) {
+  if (operationId !== undefined && !validOperationId(operationId)) {
     throw new Error("Invalid operation ID");
   }
   if (taskName !== null && !validTaskName(taskName)) {
@@ -61,7 +61,8 @@ export function parseClaudeBindingMessage(
     !validProjectDirectory(socketPath) ||
     typeof sessionName !== "string" ||
     !validTmuxSessionName(sessionName) ||
-    (operationId !== undefined && (typeof operationId !== "string" || !validClaudeId(operationId)))
+    (operationId !== undefined &&
+      (typeof operationId !== "string" || !validOperationId(operationId)))
   )
     return invalid;
 

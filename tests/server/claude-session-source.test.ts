@@ -480,14 +480,11 @@ it("archives Claude history under the same identity and deletes the archive", as
 
   const archive = join(agent, "ahub_archived_sessions", `${id}.jsonl`);
   await mkdir(join(archive, ".."));
-  await writeFile(archive, "conflict");
-  await expect(manager.archive(id)).rejects.toThrow("already exists");
-  expect(await readFile(archive, "utf8")).toBe("conflict");
-  expect(await readFile(join(subagents, "child.jsonl"), "utf8")).toBe("{}");
-  await rm(archive);
-
+  await writeFile(archive, "stale history");
+  const history = await readFile(path, "utf8");
   await manager.archive(id);
   await manager.archive(id);
+  expect(await readFile(archive, "utf8")).toBe(history);
   await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
   await expect(readFile(join(subagents, "child.jsonl"))).rejects.toMatchObject({ code: "ENOENT" });
   const [archived] = (await source.refresh()).sessions;

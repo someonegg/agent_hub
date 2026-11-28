@@ -21,6 +21,7 @@ export class AgySessionManager implements SessionManager {
     private readonly tmux: TmuxLauncher,
     private readonly command = "agy",
     private readonly trustWorkspaceForSession = false,
+    private readonly homeDirectory?: string,
   ) {}
   isValidNativeId = validAgyId;
   resolveDirectory = resolveDirectory;
@@ -32,7 +33,7 @@ export class AgySessionManager implements SessionManager {
     const environment = await readLaunchEnvironment(this.configDirectory);
     const workingDirectory =
       options.worktree && options.resumeNativeId === undefined
-        ? await createAgyWorktree(options.workingDirectory, options.operationId)
+        ? await createAgyWorktree(options.workingDirectory, options.operationId, this.homeDirectory)
         : options.workingDirectory;
     return this.tmux.launchWithTarget(
       options.operationId,
@@ -100,10 +101,12 @@ export const createAgySessionManager = (
   socket?: string,
   command?: string,
   trustWorkspaceForSession = false,
+  homeDirectory?: string,
 ): SessionManager =>
   new AgySessionManager(
     configDirectory,
     new TmuxLauncher(socket),
     command,
     trustWorkspaceForSession,
+    homeDirectory,
   );

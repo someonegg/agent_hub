@@ -52,6 +52,7 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
   const root = await realpath(await createTempDirectory("aga-"));
   const directory = join(root, "project");
   const agent = join(root, "agent");
+  const homeDirectory = join(root, "custom hub data");
   const socket = join(root, `tmux-${process.getuid!()}`, "default");
   let hub: Awaited<ReturnType<typeof createAhub>> | undefined;
   try {
@@ -70,7 +71,10 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
     const command = join(root, "agy");
     await writeFile(command, fakeAgy(agent));
     await chmod(command, 0o755);
-    hub = await createAhub({ agents: [{ nickname: "agy", path: agent, adapter: "agy", command }] });
+    hub = await createAhub({
+      agents: [{ nickname: "agy", path: agent, adapter: "agy", command }],
+      homeDirectory,
+    });
     const active = hub;
     const { base } = await startHttpServer(createApiRouter(hub), () => active.close());
     const until = async (predicate: () => Promise<boolean>, description: string) => {
@@ -100,7 +104,7 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
         requestId: "agy-create",
       }).operationId,
     );
-    const worktree = join(root, ".agent-hub", "worktrees", created.operationId);
+    const worktree = join(homeDirectory, "worktrees", created.operationId);
     expect(git("worktree", "list", "--porcelain")).toContain(
       `branch refs/heads/ahub/${created.operationId}`,
     );

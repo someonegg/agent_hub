@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { validAgyId } from "./identity.js";
+import { validOperationId } from "../../domain/operation-id.js";
 
 const execute = promisify(execFile);
 const GIT_TIMEOUT_MS = 60_000;
@@ -14,8 +14,12 @@ async function git(directory: string, args: string[]): Promise<string> {
   return stdout.trim();
 }
 
-export async function createAgyWorktree(directory: string, operationId: string): Promise<string> {
-  if (!validAgyId(operationId)) throw new Error("Invalid worktree operation ID");
+export async function createAgyWorktree(
+  directory: string,
+  operationId: string,
+  homeDirectory = join(homedir(), ".agent-hub"),
+): Promise<string> {
+  if (!validOperationId(operationId)) throw new Error("Invalid worktree operation ID");
 
   if ((await git(directory, ["rev-parse", "--is-inside-work-tree"]).catch(() => "")) !== "true")
     throw new Error("Agy worktree requires a working directory inside a Git repository");
@@ -23,7 +27,7 @@ export async function createAgyWorktree(directory: string, operationId: string):
     throw new Error("Agy worktree requires a Git repository with a committed HEAD");
   });
 
-  const root = join(homedir(), ".agent-hub", "worktrees");
+  const root = join(homeDirectory, "worktrees");
   await mkdir(root, { recursive: true });
   const path = join(await realpath(root), operationId);
   await git(directory, ["worktree", "add", "-b", `ahub/${operationId}`, path, head]);
