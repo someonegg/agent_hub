@@ -27,7 +27,7 @@ const base = {
     createdAt: null,
     updatedAt: null,
     resume: { allowed: true, reason: null, secret: "secret" },
-    sourceId: "secret",
+    sourceId: "native/child",
   },
   nextAfter: 44,
   hasMore: true,
@@ -52,6 +52,7 @@ it("maps the list with a field whitelist", () => {
     sessions: [
       {
         id: "main",
+        sourceId: "native/main",
         title: "title",
         status: "normal",
         agent: "default",
@@ -74,6 +75,7 @@ it("maps the list with a field whitelist", () => {
     sessions: [
       {
         id: "main",
+        nativeSessionId: "native/main",
         title: "title",
         status: "normal",
         agent: "default",
@@ -82,6 +84,7 @@ it("maps the list with a field whitelist", () => {
       },
       {
         id: "missing",
+        nativeSessionId: null,
         title: "missing",
         status: "archived",
         agent: "work",
@@ -101,6 +104,7 @@ it("renders unsupported, empty pages, cancelled and unavailable outcomes", () =>
     interaction: { supported: false, attachCommand: "secret" },
     hasMore: false,
   });
+  expect(mapped.session.nativeSessionId).toBe("native/child");
   expect(mapped.interaction).toEqual({ supported: false, tmux: null });
   expect(formatResult("inspect", mapped)).toContain("Interaction: unsupported");
   expect(formatResult("inspect", mapped)).toContain(
@@ -167,6 +171,7 @@ it.each([
 it("aligns complete session list columns, including empty projects and long opaque IDs", () => {
   const row = {
     id: "id",
+    nativeSessionId: "native/list-id",
     title: "中文 title",
     status: "live",
     agent: "工作",

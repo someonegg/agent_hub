@@ -15,6 +15,7 @@ export interface ResumeCapability {
 }
 
 export interface SessionSummary {
+  sourceId?: string;
   agent: string;
   id: SessionId;
   title: string;

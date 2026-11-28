@@ -314,11 +314,13 @@ export async function runSessionCommand(args: string[]): Promise<void> {
             };
         }
       });
-      if (launch) await waitForLaunch(operation.sessionId, api, abort.signal);
+      const nativeSessionId = launch
+        ? await waitForLaunch(operation.sessionId, api, abort.signal)
+        : null;
       result = {
         sessionId: operation.sessionId,
         status: "succeeded",
-        ...(launch ? { tmux: launchDiagnostics?.tmux ?? null } : {}),
+        ...(launch ? { nativeSessionId, tmux: launchDiagnostics?.tmux ?? null } : {}),
       };
     }
     output(result, json, json ? "" : formatResult(command, result));

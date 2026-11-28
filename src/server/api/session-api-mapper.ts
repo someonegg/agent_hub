@@ -23,6 +23,7 @@ export class SessionApiMapper {
         if (projectDirectory !== null) projectDirectories.add(projectDirectory);
         return {
           id: session.id,
+          sourceId: session.sourceId,
           agent: session.origin.agent,
           title: this.resolveDisplayTitle(session) ?? session.title,
           projectDirectory,
