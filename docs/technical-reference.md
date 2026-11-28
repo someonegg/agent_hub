@@ -484,12 +484,19 @@ discovery/startup, or persisted recovery state.
 URL precedence: `--url`, `AGENT_HUB_URL`, `http://127.0.0.1:4173`.
 HTTP/HTTPS are supported; HTTPS uses Node.js verification and `NODE_EXTRA_CA_CERTS`.
 
-One `--timeout` deadline covers stdin, HTTP, operation polling, and readiness:
-15 seconds by default, 45 for create/resume/exit/archive/delete. Follow uses
-[per-request deadlines](#cli-continuous-inspection). Lifecycle commands have no
-CLI confirmation prompt and await management; create/resume additionally wait
-for live, connected, idle state. Input success confirms neither task completion
-nor answer correctness.
+For commands with an overall deadline, `--timeout` covers stdin, HTTP requests,
+operation polling, and readiness checks.
+
+| Command                                 | Default timeout                                      |
+| --------------------------------------- | ---------------------------------------------------- |
+| `create --worktree`                     | 120 seconds                                          |
+| `create` without `--worktree`, `resume` | 60 seconds                                           |
+| `exit`, `archive`, `delete`             | 45 seconds                                           |
+| `inspect --follow`                      | 30 seconds [per request](#cli-continuous-inspection) |
+| All other commands                      | 15 seconds                                           |
+
+Lifecycle commands wait for the backend operation to finish. `create` and
+`resume` also wait for the session to become live, connected, and idle.
 
 | Exit code | Meaning                                                       |
 | --------- | ------------------------------------------------------------- |
