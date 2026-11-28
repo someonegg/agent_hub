@@ -14,6 +14,7 @@ const fakeAgy = (home: string) => `#!/usr/bin/env node
 const fs = require("fs");
 const path = require("path");
 const args = process.argv.slice(2);
+const bindingMarker = "[ahub-bind:";
 const resume = args.indexOf("--resume") >= 0 ? args[args.indexOf("--resume") + 1] : null;
 let id = resume || require("crypto").randomUUID();
 const logs = () => path.join(${JSON.stringify(home)}, "brain", id, ".system_generated", "logs");
@@ -24,6 +25,8 @@ const write = (row) => {
 const user = (text) => write({ source: "USER_EXPLICIT", type: "USER_INPUT", content: "<USER_REQUEST>\\n" + text + "\\n</USER_REQUEST>" });
 const model = (content) => write({ source: "MODEL", type: "PLANNER_RESPONSE", content });
 const prompt = args[args.indexOf("-i") + 1];
+const binding = JSON.parse(prompt.slice(prompt.indexOf(bindingMarker) + bindingMarker.length, -1));
+if (binding.workingDirectory !== process.cwd()) throw new Error("Unexpected launch cwd");
 if (resume) write({ source: "SYSTEM", type: "SYSTEM_MESSAGE", content: "resumed" });
 user(prompt);
 model("OK");
@@ -37,7 +40,7 @@ process.stdin.on("data", (data) => {
     if (char === "\\x15" || char === "\\x1b") buffer = "";
     else if (char === "\\r") {
       if (buffer === "/clear") id = require("crypto").randomUUID();
-      else if (buffer) { user(buffer); model(buffer.includes("[ahub-bind:") ? "OK" : "Echo: " + buffer); }
+      else if (buffer) { user(buffer); model(buffer.includes(bindingMarker) ? "OK" : "Echo: " + buffer); }
       buffer = "";
     } else buffer += char;
   }
@@ -54,7 +57,15 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
   try {
     vi.stubEnv("TMUX", undefined);
     vi.stubEnv("TMUX_TMPDIR", root);
+    vi.stubEnv("HOME", root);
+    vi.stubEnv("USERPROFILE", root);
     await mkdir(directory);
+    const git = (...args: string[]) =>
+      execFileSync("git", args, { cwd: directory, encoding: "utf8" }).trim();
+    git("init", "-q");
+    await writeFile(join(directory, "tracked.txt"), "base");
+    git("add", "tracked.txt");
+    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "base");
     await mkdir(agent);
     const command = join(root, "agy");
     await writeFile(command, fakeAgy(agent));
@@ -89,12 +100,18 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
         requestId: "agy-create",
       }).operationId,
     );
+    const worktree = join(root, ".agent-hub", "worktrees", created.operationId);
+    expect(git("worktree", "list", "--porcelain")).toContain(
+      `branch refs/heads/ahub/${created.operationId}`,
+    );
+    await expect(access(join(worktree, "tracked.txt"))).resolves.toBeUndefined();
     const sessionId = created.sessionId!;
     const snapshot = await active.sessions.managementSnapshot();
-    const nativeId = snapshot.byId.get(sessionId)!.sourceId;
-    expect(snapshot.byId.get(sessionId)).toMatchObject({
+    const session = snapshot.byId.get(sessionId)!;
+    const nativeId = session.sourceId;
+    expect(session).toMatchObject({
       projectDirectory: directory,
-      workingDirectory: directory,
+      workingDirectory: worktree,
     });
     expect(await active.sessions.messages(sessionId, {})).toMatchObject({ items: [] });
     expect((await active.sessions.list()).agents).toEqual([
@@ -113,9 +130,11 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
       active.operations.create({ resumeSessionId: sessionId, requestId: "agy-resume" }).operationId,
     );
     expect(resumed.sessionId).toBe(sessionId);
-    expect((await active.sessions.managementSnapshot()).byId.get(sessionId)?.sourceId).toBe(
-      nativeId,
-    );
+    expect((await active.sessions.managementSnapshot()).byId.get(sessionId)).toMatchObject({
+      workingDirectory: worktree,
+      projectDirectory: directory,
+      sourceId: nativeId,
+    });
     expect(await messages(sessionId)).not.toContain("ahub-bind:");
 
     await active.interaction.sendMessage(sessionId, "/clear");
@@ -163,6 +182,7 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
     }
 
     await succeeded(active.operations.manage("delete", handoffId).operationId);
+    await expect(access(worktree)).resolves.toBeUndefined();
     await expect(access(join(agent, "brain", handoffNative))).rejects.toThrow();
     await expect(
       access(join(agent, "ahub_archived_sessions", `${handoffNative}.jsonl`)),
