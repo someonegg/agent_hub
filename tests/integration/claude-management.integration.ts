@@ -233,21 +233,8 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
     const nativeId = (await hub.sessions.managementSnapshot()).byId.get(sessionId)!.sourceId;
     expect(nativeId).toMatch(/^[a-f0-9-]+$/);
     expect((await hub.sessions.list()).agents).toEqual([
-      { nickname: "claude", runtimeName: "Claude Code", management: { archive: false } },
+      { nickname: "claude", runtimeName: "Claude Code", management: { archive: true } },
     ]);
-    // Unsupported HTTP and internal operations must leave the live pane untouched.
-    const response = await fetch(`${base}/api/v1/sessions/${sessionId}/archive`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "{}",
-    });
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({ error: { code: "operation_not_supported" } });
-    const rejected = hub.operations.manage("archive", sessionId);
-    await until(
-      async () => (await hub.operations.get(rejected.operationId))?.status === "failed",
-      "unsupported operation",
-    );
     expect(await hub.interaction.describe(sessionId)).toMatchObject({
       supported: true,
       state: "connected",
@@ -371,6 +358,10 @@ it("runs the Claude lifecycle across cold and running default servers", async ()
       await succeeded(restarted.operations.manage("exit", session.id).operationId);
       const deleteTarget = await restarted.interaction.resolveTarget(handoffSessionId);
       expect(deleteTarget).not.toBeNull();
+      await succeeded(restarted.operations.manage("archive", handoffSessionId).operationId);
+      expect(
+        (await restarted.sessions.managementSnapshot()).byId.get(handoffSessionId)?.archived,
+      ).toBe(true);
       await succeeded(restarted.operations.manage("delete", handoffSessionId).operationId);
       expect((await restarted.sessions.managementSnapshot()).byId.has(handoffSessionId)).toBe(
         false,

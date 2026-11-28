@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { formatClaudeBindingMessage } from "../../src/server/adapters/claude/binding-message.js";
 import { createClaudeSessionSource } from "../../src/server/adapters/claude/claude-session-source.js";
+import { ClaudeSessionManager } from "../../src/server/adapters/claude/session-manager.js";
 import {
   appendClaudeRecords,
   createClaudeState,
@@ -15,6 +16,7 @@ import {
   MAX_MESSAGE_CHARS,
   MAX_SESSION_DIAGNOSTICS,
 } from "../../src/server/adapters/shared/limits.js";
+import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
 import { appendClaudeLines } from "../helpers/claude-normalizer.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
 
@@ -187,11 +189,11 @@ it("keeps Codex and Claude agents independently routed while merging project ass
     const claude = snapshot.sessions.find((session) => session.origin.agent === "glm")!;
     expect(claude.origin.runtimeName).toBe("Claude Code");
     expect(hub.managers.get("glm").isValidNativeId(claude.sourceId!)).toBe(true);
-    expect(hub.managers.get("glm").archive).toBeUndefined();
+    expect(hub.managers.get("glm").archive).toBeTypeOf("function");
     expect(hub.managers.get("codex").archive).toBeTypeOf("function");
     expect((await hub.sessions.list()).agents).toEqual([
       { nickname: "codex", runtimeName: "Codex", management: { archive: true } },
-      { nickname: "glm", runtimeName: "Claude Code", management: { archive: false } },
+      { nickname: "glm", runtimeName: "Claude Code", management: { archive: true } },
     ]);
   } finally {
     hub.close();
@@ -464,4 +466,45 @@ it("caches rejected identities, incrementally checks appends and recovers after 
   await writeFile(path, valid + "\n");
   expect((await source.refresh()).sessions).toHaveLength(1);
   expect(source.lastRefreshTelemetry().fullFiles).toBe(1);
+});
+
+it("archives Claude history under the same identity and deletes the archive", async () => {
+  const { agent, path } = await createSessionAgent("claude-archive-");
+  await cp(join(fixture, relative), path);
+  const source = await createClaudeSessionSource(agent);
+  const manager = new ClaudeSessionManager(agent, new TmuxLauncher());
+  const [original] = (await source.refresh()).sessions;
+  const subagents = join(path, "..", id, "subagents");
+  await mkdir(subagents, { recursive: true });
+  await writeFile(join(subagents, "child.jsonl"), "{}");
+
+  const archive = join(agent, "ahub_archived_sessions", `${id}.jsonl`);
+  await mkdir(join(archive, ".."));
+  await writeFile(archive, "conflict");
+  await expect(manager.archive(id)).rejects.toThrow("already exists");
+  expect(await readFile(archive, "utf8")).toBe("conflict");
+  expect(await readFile(join(subagents, "child.jsonl"), "utf8")).toBe("{}");
+  await rm(archive);
+
+  await manager.archive(id);
+  await manager.archive(id);
+  await expect(readFile(path)).rejects.toMatchObject({ code: "ENOENT" });
+  await expect(readFile(join(subagents, "child.jsonl"))).rejects.toMatchObject({ code: "ENOENT" });
+  const [archived] = (await source.refresh()).sessions;
+  expect(archived).toMatchObject({
+    localId: original!.localId,
+    normalized: {
+      session: { ...original!.normalized.session, archived: true },
+      timeline: original!.normalized.timeline,
+    },
+  });
+  await cp(archive, path);
+  const conflict = await source.refresh();
+  expect(conflict.sessions[0]?.normalized.session.archived).toBe(false);
+  expect(conflict.diagnostics).toContainEqual(
+    expect.objectContaining({ code: "duplicate_native_session_id" }),
+  );
+  await manager.delete(id);
+  expect((await source.refresh()).sessions).toEqual([]);
+  await expect(readFile(archive)).rejects.toMatchObject({ code: "ENOENT" });
 });

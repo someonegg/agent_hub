@@ -1,5 +1,5 @@
 import { rm } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { TASK_NAME_ERROR, validTaskName } from "../../../shared/task-name.js";
 import { TmuxLauncher } from "../../interaction/tmux-launcher.js";
@@ -7,10 +7,12 @@ import {
   type SessionLaunchOptions,
   type SessionManager,
 } from "../../management/session-manager.js";
+import { archivePath, cleanupAfterArchive, moveToArchive } from "../shared/file-archive.js";
 import { readLaunchEnvironment } from "../shared/launch-environment.js";
 import { exitSteps, resolveDirectory } from "../shared/session-management.js";
 import { formatAgyBindingMessage } from "./binding-message.js";
 import { validAgyId } from "./identity.js";
+import { agyTranscriptPath } from "./paths.js";
 
 export class AgySessionManager implements SessionManager {
   constructor(
@@ -48,19 +50,37 @@ export class AgySessionManager implements SessionManager {
       environment,
     );
   }
-  /** Best-effort removal of files named by the UUID; shared databases are never touched. */
+  async archive(nativeId: string): Promise<void> {
+    if (!this.isValidNativeId(nativeId)) throw new Error("Invalid Antigravity session identity");
+    const source = agyTranscriptPath(this.configDirectory, nativeId);
+    await moveToArchive(source, archivePath(this.configDirectory, nativeId));
+    for (const path of this.#sessionPaths(nativeId))
+      await cleanupAfterArchive(path, () => this.#remove(path));
+  }
+
   async delete(nativeId: string): Promise<void> {
     if (!this.isValidNativeId(nativeId)) throw new Error("Invalid Antigravity session identity");
+    for (const path of this.#sessionPaths(nativeId)) await this.#remove(path);
+    await rm(archivePath(this.configDirectory, nativeId), { force: true });
+  }
+
+  #sessionPaths(nativeId: string) {
     const root = this.configDirectory;
-    await rm(join(root, "brain", nativeId), { recursive: true, force: true });
-    for (const path of [
+    return [
+      join(root, "brain", nativeId),
       join(root, "conversations", `${nativeId}.db`),
       join(root, "conversations", `${nativeId}.db-shm`),
       join(root, "conversations", `${nativeId}.db-wal`),
       join(root, "annotations", `${nativeId}.pbtxt`),
       join(root, "presence", `${nativeId}.lock`),
-    ])
-      await rm(path, { force: true });
+    ];
+  }
+
+  #remove(path: string) {
+    return rm(path, {
+      recursive: dirname(path) === join(this.configDirectory, "brain"),
+      force: true,
+    });
   }
   exitSteps = exitSteps;
 }

@@ -45,7 +45,7 @@ sure its original process has exited.
 
 Use the **…** menu in the top bar to:
 
-- **Archive session (Codex only):** stop execution and move the session to the archived list.
+- **Archive session:** stop execution and move the session to the archived list.
 - **Delete session:** permanently remove session history after confirmation.
 - **Handoff:** transfer pane binding to the active agent session after switching sessions in the same terminal.
 - **Exit session:** stop its connected terminal and retain history.

@@ -1,5 +1,5 @@
-import { lstat, readdir, rm, rmdir } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, rm, rmdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
 
 import { TASK_NAME_ERROR, validTaskName } from "../../../shared/task-name.js";
 import { TmuxLauncher } from "../../interaction/tmux-launcher.js";
@@ -7,6 +7,12 @@ import {
   type SessionLaunchOptions,
   type SessionManager,
 } from "../../management/session-manager.js";
+import {
+  archivePath,
+  cleanupAfterArchive,
+  lstatIfPresent,
+  moveToArchive,
+} from "../shared/file-archive.js";
 import { readLaunchEnvironment } from "../shared/launch-environment.js";
 import { exitSteps, resolveDirectory } from "../shared/session-management.js";
 import { formatClaudeBindingMessage } from "./binding-message.js";
@@ -52,38 +58,53 @@ export class ClaudeSessionManager implements SessionManager {
       environment,
     );
   }
+  async archive(nativeId: string): Promise<void> {
+    if (!this.isValidNativeId(nativeId)) throw new Error("Invalid Claude session identity");
+    const projects = await this.#projectDirectories();
+    const sources = [];
+    for (const project of projects) {
+      const path = join(project, `${nativeId}.jsonl`);
+      if (await lstatIfPresent(path)) sources.push(path);
+    }
+    if (sources.length > 1) throw new Error("Duplicate Claude session files");
+    const source = sources[0];
+    await moveToArchive(source, archivePath(this.configDirectory, nativeId));
+    for (const directory of source ? [dirname(source)] : projects) {
+      const session = join(directory, nativeId);
+      await cleanupAfterArchive(session, () => this.#removeSubagents(session));
+    }
+  }
+
   async delete(nativeId: string): Promise<void> {
     if (!this.isValidNativeId(nativeId)) throw new Error("Invalid Claude session identity");
+    for (const project of await this.#projectDirectories()) {
+      await this.#removeSubagents(join(project, nativeId));
+      await rm(join(project, `${nativeId}.jsonl`), { force: true });
+    }
+    await rm(archivePath(this.configDirectory, nativeId), { force: true });
+  }
+
+  async #projectDirectories() {
     const projects = join(this.configDirectory, "projects");
-    let entries;
     try {
-      entries = await readdir(projects, { withFileTypes: true });
+      const entries = await readdir(projects, { withFileTypes: true });
+      return entries
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => join(projects, entry.name));
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
       throw error;
     }
-    for (const project of entries) {
-      if (!project.isDirectory()) continue;
-      const directory = join(projects, project.name);
-      const session = join(directory, nativeId);
-      try {
-        if ((await lstat(session)).isDirectory()) {
-          await rm(join(session, "subagents"), { recursive: true, force: true });
-          try {
-            await rmdir(session);
-          } catch (error) {
-            if (
-              !["ENOENT", "ENOTEMPTY", "EEXIST"].includes(
-                (error as NodeJS.ErrnoException).code ?? "",
-              )
-            )
-              throw error;
-          }
-        }
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      }
-      await rm(join(directory, `${nativeId}.jsonl`), { force: true });
+  }
+
+  async #removeSubagents(session: string) {
+    if (!(await lstatIfPresent(session))?.isDirectory()) return;
+    try {
+      await rm(join(session, "subagents"), { recursive: true, force: true });
+      await rmdir(session);
+    } catch (error) {
+      if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes((error as NodeJS.ErrnoException).code ?? ""))
+        throw error;
     }
   }
   exitSteps = exitSteps;
