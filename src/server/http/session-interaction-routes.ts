@@ -11,6 +11,7 @@ import {
 } from "../interaction/interaction-service.js";
 import { MessageValidationError, normalizeMessage } from "../interaction/message.js";
 import type { ApiRouteHandler } from "./api-route-handler.js";
+import { isSameOrigin } from "./origin.js";
 import { readJsonObject, RequestBodyError } from "./request-body.js";
 import { sendJson } from "./router.js";
 import { SESSION_ID_PATTERN, SESSION_ROOT, sessionPath } from "./session-path.js";
@@ -57,6 +58,12 @@ export function createSessionInteractionRoutes(
         return true;
       }
       if (request.method !== "POST") return false;
+      if (!isSameOrigin(request))
+        throw new RequestBodyError(
+          403,
+          "forbidden",
+          "Cross-origin interaction requests are not allowed",
+        );
       if (interaction === undefined) return interactionUnavailable(response);
       if (operation === "handoff-pane-binding") {
         const body = await readJsonObject(request);

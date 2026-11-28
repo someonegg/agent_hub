@@ -1,11 +1,10 @@
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { createServer, request as httpRequest } from "node:http";
-import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { RequestBodyError } from "../../src/server/http/request-body.js";
 import { sendJson } from "../../src/server/http/router.js";
@@ -13,6 +12,8 @@ import { createUploadRoutes, uploadDirectory } from "../../src/server/http/uploa
 import { UploadStore } from "../../src/server/uploads/store.js";
 import type { UploadAttachment } from "../../src/shared/uploads.js";
 import { MAX_UPLOAD_BYTES } from "../../src/shared/uploads.js";
+import { cleanupAfterEach } from "../helpers/cleanup.js";
+import { createTempDirectory } from "../helpers/temp-directories.js";
 
 vi.mock("node:fs/promises", async (importOriginal) => ({
   ...(await importOriginal<typeof fs>()),
@@ -22,14 +23,8 @@ async function* uploadChunks(content: string) {
   yield Buffer.from(content);
 }
 
-const cleanups: (() => Promise<unknown>)[] = [];
-afterEach(async () => {
-  vi.restoreAllMocks();
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
-});
 async function storeFixture() {
-  const root = await mkdtemp(join(tmpdir(), "hub-upload-test-"));
-  cleanups.push(() => rm(root, { recursive: true, force: true }));
+  const root = await createTempDirectory("hub-upload-test-");
   const directory = join(root, "space ' quote", "uploads");
   const store = new UploadStore(directory);
   return { store, directory };
@@ -51,7 +46,7 @@ async function fixture() {
     }
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  cleanups.push(
+  cleanupAfterEach(
     () =>
       new Promise<void>((resolve) => {
         server.closeAllConnections();
@@ -586,8 +581,7 @@ it.each(["folder", "metadata", "content"])("rejects %s symlink escapes", async (
   const { store, directory, origin } = await fixture();
   const id = "one-00000000000000000";
   const attachment = await store.upload(id, "data.txt", "text/plain", uploadChunks("safe"));
-  const outside = await mkdtemp(join(tmpdir(), "hub-upload-outside-"));
-  cleanups.push(() => rm(outside, { recursive: true, force: true }));
+  const outside = await createTempDirectory("hub-upload-outside-");
   const metadata = join(directory, id, attachment.id + ".meta.json");
   if (target === "folder") {
     await fs.rename(join(directory, id), join(outside, "session"));

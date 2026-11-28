@@ -2,6 +2,7 @@ import { isPermissionMode } from "../../shared/permission-mode.js";
 import { TASK_NAME_ERROR, validTaskName } from "../../shared/task-name.js";
 import { ManagementError, type OperationService } from "../management/operation-service.js";
 import type { ApiRouteHandler } from "./api-route-handler.js";
+import { isSameOrigin } from "./origin.js";
 import { readJsonObject, RequestBodyError } from "./request-body.js";
 import { sendJson } from "./router.js";
 import { SESSION_ID_PATTERN, SESSION_ROOT, sessionPath } from "./session-path.js";
@@ -35,11 +36,7 @@ export function createSessionManagementRoutes(operations?: OperationService): Ap
       const exit = url.pathname.endsWith("/exit");
       const method = create || archive || exit ? "POST" : "DELETE";
       if (request.method !== method) return false;
-      const protocol = "encrypted" in request.socket && request.socket.encrypted ? "https" : "http";
-      if (
-        request.headers.origin &&
-        request.headers.origin !== `${protocol}://${request.headers.host}`
-      ) {
+      if (!isSameOrigin(request)) {
         throw new ManagementError(403, "Cross-origin management requests are not allowed");
       }
       const body = await readJsonObject(request);

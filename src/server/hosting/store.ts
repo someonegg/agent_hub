@@ -17,8 +17,8 @@ import { basename, join, resolve, sep } from "node:path";
 import { DirectoryLock } from "../directory-lock.js";
 import { ResourceValidationError } from "./validation-error.js";
 
-export const ID = /^[a-f0-9]{32}$/;
-export const defaultHostingDirectory = join(homedir(), ".agent-hub", "hosting");
+const ID = /^[a-f0-9]{32}$/;
+const defaultHostingDirectory = join(homedir(), ".agent-hub", "hosting");
 export interface Artifact {
   id: string;
   name: string;

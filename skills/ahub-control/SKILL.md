@@ -111,7 +111,7 @@ For questions (not Plans), an alternative is to interrupt, organize the chosen a
 
 ## Recover from errors
 
-- Follow defaults to 30 seconds per request. Other defaults are 15 seconds for list, inspect, terminal, send, keys, and interrupt; 45 seconds for create, resume, exit, and delete. `--timeout` limits the invocation, except in follow where it limits each HTTP request and there is no overall deadline.
+- Follow defaults to 30 seconds per request. Other defaults are 15 seconds for list, inspect, terminal, send, keys, interrupt, and handoff; 45 seconds for create, resume, exit, archive, and delete. `--timeout` limits the invocation, except in follow where it limits each HTTP request and there is no overall deadline.
 - Exit code 0 means command success, not task completion; 1 means a definite failure or query error; 2 means a submitted write has an uncertain result.
 - After a timeout or exit code 2, check state before repeating a write. Stopping the client does not cancel backend operations; resubmitting create/send can duplicate sessions or messages.
 - For create/resume errors, read `error.code`, `error.message`, `error.sessionId`, and `error.tmux`. Use inspect/terminal when an ID is known; otherwise use the project list and tmux diagnostics.

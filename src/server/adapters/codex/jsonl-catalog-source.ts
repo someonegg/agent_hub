@@ -3,8 +3,8 @@ import { join, resolve } from "node:path";
 
 import type { DomainDiagnostic as Diagnostic } from "../../domain/session-domain.js";
 import { opaqueIdForPath } from "../../security/opaque-id.js";
+import { isExpectedIoError } from "../shared/io-errors.js";
 import type { CatalogDiscovery, CatalogEntry } from "./catalog-source.js";
-import { isExpectedIoError } from "./io-errors.js";
 import type { RolloutDescriptor } from "./rollout-descriptor.js";
 
 const MAX_DEPTH = 8;

@@ -4,6 +4,7 @@ import { extname, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream";
 
 import type { ApiRouterOptions } from "../http/api-router.js";
+import { isSameOrigin } from "../http/origin.js";
 import {
   decodePath,
   isMissingFile,
@@ -42,6 +43,10 @@ const types: Record<string, string> = {
   ".webm": "video/webm",
   ".mp3": "audio/mpeg",
 };
+const crossOriginError = {
+  error: { code: "forbidden", message: "Cross-origin requests are not allowed" },
+};
+
 export function hostingRoutes(directory?: string, options: ApiRouterOptions = {}): ApiRouter {
   const store = directory === undefined ? undefined : new HostingStore(directory);
   const diffs = directory === undefined ? undefined : new DiffStore(directory);
@@ -65,6 +70,10 @@ export function hostingRoutes(directory?: string, options: ApiRouterOptions = {}
         (head || request.method === "DELETE") &&
         (await diffs.exists(match[1]))
       ) {
+        if (!head && !isSameOrigin(request)) {
+          sendJson(response, 403, crossOriginError);
+          return true;
+        }
         if (!head) await diffs.delete(match[1]);
         response.statusCode = head ? 200 : 204;
         response.end();
@@ -106,6 +115,10 @@ export function hostingRoutes(directory?: string, options: ApiRouterOptions = {}
     }
     const deletion = /^\/api\/v1\/artifacts\/([a-f0-9]{32})$/.exec(path);
     if (deletion && request.method === "DELETE") {
+      if (!isSameOrigin(request)) {
+        sendJson(response, 403, crossOriginError);
+        return true;
+      }
       if (await store.delete(deletion[1])) {
         response.statusCode = 204;
         response.end();

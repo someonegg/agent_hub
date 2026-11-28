@@ -798,7 +798,12 @@ it("retries an out-of-range inspect once from the start", async () => {
   ]);
 });
 
-it.each([["--permission-mode", "invalid"]])("rejects invalid permission flags: %s", (...flags) => {
+it.each([
+  ["--permission-mode", "invalid"],
+  ["--yolo", "--permission-mode", "default"],
+  ["--yolo", "--permission-mode", "auto"],
+  ["--yolo", "--permission-mode", "yolo"],
+])("rejects invalid permission flags: %s", (...flags) => {
   for (const args of [
     ["create", "--project", "/project"],
     ["resume", "id"],
@@ -811,6 +816,8 @@ it.each([
   [[], "default"],
   [["--permission-mode", "default"], "default"],
   [["--permission-mode", "auto"], "auto"],
+  [["--permission-mode", "yolo"], "yolo"],
+  [["--yolo"], "yolo"],
 ] as const)("sends the requested permission mode for %s", async (flags, permissionMode) => {
   const seen: unknown[] = [];
   const base = await serve((_req, res, body) => {

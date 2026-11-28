@@ -1,10 +1,10 @@
 import type { SessionMessagesQuery, SessionMessagesResponse } from "../../shared/api-contract.js";
 import type { SessionReader } from "../application/session-reader.js";
 
-export const UPDATES_PROBE_INTERVAL_MS = 1_500;
-export const UPDATES_WAIT_TIMEOUT_MS = 25_000;
-export const MAX_UPDATES_WAITERS = 100;
-export const MAX_UPDATES_WAITERS_PER_SESSION = 10;
+const UPDATES_PROBE_INTERVAL_MS = 1_500;
+const UPDATES_WAIT_TIMEOUT_MS = 25_000;
+const MAX_UPDATES_WAITERS = 100;
+const MAX_UPDATES_WAITERS_PER_SESSION = 10;
 
 export class SessionUpdatesError extends Error {
   constructor(

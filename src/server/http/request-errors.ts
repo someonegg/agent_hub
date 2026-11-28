@@ -23,7 +23,7 @@ export function isMissingFile(error: unknown): boolean {
   return ["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException)?.code ?? "");
 }
 const ids = new WeakMap<IncomingMessage, string>();
-export function requestId(request: IncomingMessage, factory: () => string = randomUUID): string {
+function requestId(request: IncomingMessage, factory: () => string = randomUUID): string {
   let id = ids.get(request);
   if (!id) {
     id = factory();
@@ -31,7 +31,7 @@ export function requestId(request: IncomingMessage, factory: () => string = rand
   }
   return id;
 }
-export const consoleErrorLogger: ApiErrorLogger = {
+const consoleErrorLogger: ApiErrorLogger = {
   error(message, context) {
     console.error(message, context);
   },

@@ -6,11 +6,12 @@ import { expect, it, vi } from "vitest";
 import { CodexSessionManager } from "../../src/server/adapters/codex/session-manager.js";
 import { exitSteps } from "../../src/server/adapters/shared/session-management.js";
 import { TmuxLauncher } from "../../src/server/interaction/tmux-launcher.js";
+import { PERMISSION_MODES } from "../../src/shared/permission-mode.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
 
 it.each(
   ([false, true] as const).flatMap((resume) =>
-    (["default", "auto"] as const).map((permissionMode) => [resume, permissionMode] as const),
+    PERMISSION_MODES.map((permissionMode) => [resume, permissionMode] as const),
   ),
 )("maps Codex launch mode (resume=%s, mode=%s)", async (resume, permissionMode) => {
   const tmux = new TmuxLauncher();
@@ -36,6 +37,9 @@ it.each(
   );
   expect(args.filter((arg) => arg === "--approve-for-me")).toEqual(
     permissionMode === "auto" ? ["--approve-for-me"] : [],
+  );
+  expect(args.filter((arg) => arg === "--yolo")).toEqual(
+    permissionMode === "yolo" ? ["--yolo"] : [],
   );
   expect(args).toContain("--worktree");
 });

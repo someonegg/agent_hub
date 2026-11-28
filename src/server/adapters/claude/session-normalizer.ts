@@ -14,7 +14,6 @@ import {
 import { normalizeQuestionResponse, normalizeQuestions } from "./user-input-normalizer.js";
 
 type ObjectValue = Record<string, unknown>;
-export { object };
 const string = (value: unknown): string | null => (typeof value === "string" ? value : null);
 
 export interface ClaudeBindingReplyState {
@@ -30,7 +29,6 @@ export interface ClaudeState extends ClaudeIdentityState {
   readonly pendingBindingReply: ClaudeBindingReplyState | null;
 }
 
-export type { ClaudeIdentityState } from "./identity.js";
 /** Decoder codes are renamed to adapter-neutral session diagnostics. */
 export function claudeDecoderDiagnostics(
   diagnostics: readonly DomainDiagnostic[],

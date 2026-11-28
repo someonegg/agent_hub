@@ -1,11 +1,12 @@
 import { resolve } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import type {
-  DomainDiagnostic,
-  DomainSession,
-  DomainSessionOrigin,
-  NormalizedSession,
+import {
+  type DomainDiagnostic,
+  type DomainSession,
+  type DomainSessionOrigin,
+  type NormalizedSession,
+  sameSessionOrigin,
 } from "../../domain/session-domain.js";
 import type {
   SessionSource,
@@ -15,6 +16,7 @@ import type {
   SourceSessionEntry,
 } from "../../source/session-source.js";
 import { mergeBindingMetadata } from "../shared/binding-protocol.js";
+import { isExpectedIoError } from "../shared/io-errors.js";
 import {
   CheckpointedJsonlDecoder,
   type JsonlCheckpoint,
@@ -31,7 +33,6 @@ import {
 } from "../shared/source-cache.js";
 import { type IdentityAccumulatorState, IdentityResolver } from "./identity-resolver.js";
 import { codexBindingAttemptsFrom, codexInteraction } from "./interaction-parser.js";
-import { isExpectedIoError } from "./io-errors.js";
 import { JsonlCatalogSource } from "./jsonl-catalog-source.js";
 import type { RolloutDescriptor } from "./rollout-descriptor.js";
 import { SessionIndexReader } from "./session-index-reader.js";
@@ -275,7 +276,7 @@ export class CodexSessionSource implements SessionSource {
         cached !== undefined &&
         identityState === cached.identityState &&
         normalizerState === cached.normalizerState &&
-        sameOrigin(origin, cached.origin)
+        sameSessionOrigin(origin, cached.origin)
           ? cached.normalized
           : this.normalizer.materialize(normalizerState, { ...metadata, threadId }, origin);
       const { projectDirectory: bindProjectDirectory, taskName } = mergeBindingMetadata(
@@ -367,15 +368,6 @@ function rolloutUnavailableDiagnostic(): DomainDiagnostic {
     message: "A registered rollout could not be read.",
     ordinal: null,
   };
-}
-
-function sameOrigin(left: DomainSessionOrigin, right: DomainSessionOrigin): boolean {
-  return (
-    left.sourceType === right.sourceType &&
-    left.agent === right.agent &&
-    left.runtimeName === right.runtimeName &&
-    left.runtimeVersion === right.runtimeVersion
-  );
 }
 
 const IDENTITY_HEAD_BYTES = 64 * 1024;

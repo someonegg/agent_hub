@@ -104,8 +104,8 @@ export function OperationStatus({
         {op.status === "pending" && op.type === "create" ? (
           <p>
             {op.attachCommand
-              ? t("noCodexSessionDetectedYetAttachToTmuxToCheckStartupProgress")
-              : t("startingCodex")}
+              ? t("noAgentSessionDetectedYetAttachToTmuxToCheckStartupProgress")
+              : t("startingAgent")}
           </p>
         ) : null}
         {!compact && op.status === "pending" && op.phase ? (
@@ -537,7 +537,7 @@ function ManageSessionControls({
             <>
               <button
                 type="button"
-                title={t("handOffThisPaneSBindingToTheActiveCodexSession")}
+                title={t("handOffThisPaneSBindingToTheActiveAgentSession")}
                 disabled={busy}
                 onClick={() => {
                   closeMenu();

@@ -1,20 +1,16 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
 
 import { DiffStore } from "../../src/server/hosting/diff-store.js";
 import { createServer, listenServer } from "../../src/server/http/create-server.js";
 import { parseDiff } from "../../src/shared/diff.js";
+import { cleanupAfterEach } from "../helpers/cleanup.js";
+import { createTempDirectory } from "../helpers/temp-directories.js";
 
-const cleanup: (() => Promise<unknown>)[] = [];
-afterEach(async () => {
-  for (const action of cleanup.splice(0).reverse()) await action();
-});
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "hub-diffs-"));
-  cleanup.push(() => rm(root, { recursive: true, force: true }));
+  const root = await createTempDirectory("hub-diffs-");
   const source = join(root, "test.diff");
   await writeFile(
     source,
@@ -112,7 +108,7 @@ it("gates routes, keeps CSP on the viewer, and returns 404 after deletion", asyn
       ...(enabled ? { hostingDirectory: join(root, "hosting") } : {}),
     });
     await listenServer(server, 0, "127.0.0.1");
-    cleanup.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+    cleanupAfterEach(() => new Promise<void>((resolve) => server.close(() => resolve())));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("No address");
     const origin = `http://127.0.0.1:${address.port}`;
@@ -125,6 +121,14 @@ it("gates routes, keeps CSP on the viewer, and returns 404 after deletion", asyn
       if (enabled) expect(response.headers.get("cache-control")).toBe("private, no-store");
     }
     if (enabled) {
+      expect(
+        (
+          await fetch(origin + `/api/v1/diffs/${entry.id}`, {
+            method: "DELETE",
+            headers: { origin: "https://evil.example" },
+          })
+        ).status,
+      ).toBe(403);
       expect((await fetch(origin + `/api/v1/diffs/${entry.id}`, { method: "DELETE" })).status).toBe(
         204,
       );
@@ -206,7 +210,7 @@ it("serves pages and deletes resources without loading diff bodies", async () =>
   const readBody = vi
     .spyOn(DiffStore.prototype, "get")
     .mockRejectedValue(new Error("Unexpected body read"));
-  cleanup.push(async () => readBody.mockRestore());
+  cleanupAfterEach(() => readBody.mockRestore());
   const client = join(root, "client");
   await mkdir(client);
   await writeFile(join(client, "index.html"), "hub");
@@ -220,7 +224,7 @@ it("serves pages and deletes resources without loading diff bodies", async () =>
     hostingDirectory: join(root, "hosting"),
   });
   await listenServer(server, 0, "127.0.0.1");
-  cleanup.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  cleanupAfterEach(() => new Promise<void>((resolve) => server.close(() => resolve())));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("No address");
   const url = `http://127.0.0.1:${address.port}${entry.url}`;

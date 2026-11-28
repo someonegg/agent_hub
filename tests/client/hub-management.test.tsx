@@ -759,7 +759,7 @@ it.each([403, 503])(
   },
 );
 
-it.each(["auto"] as const)(
+it.each(["auto", "yolo"] as const)(
   "offers a %s resume dialog and shares operation occupancy with the management menu",
   async (mode) => {
     const { ResumeSession, OperationStatus } = await import(
@@ -845,7 +845,7 @@ it("initializes creation options only when opening the dialog", () => {
   act(() => updatePreferences({ defaultAgent: "" }));
 });
 
-it("hides unsupported Claude archive while keeping delete and exit", async () => {
+it("hides archive when management.archive is false while keeping delete and exit", async () => {
   const session = {
     ...baseSession,
     origin: { ...baseSession.origin, agent: "glm", runtimeName: "Claude Code" },
