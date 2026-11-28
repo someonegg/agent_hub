@@ -19,6 +19,7 @@ export class AgySessionManager implements SessionManager {
     private readonly configDirectory: string,
     private readonly tmux: TmuxLauncher,
     private readonly command = "agy",
+    private readonly trustWorkspaceForSession = false,
   ) {}
   isValidNativeId = validAgyId;
   resolveDirectory = resolveDirectory;
@@ -41,6 +42,12 @@ export class AgySessionManager implements SessionManager {
           options.operationId,
         );
         const command = [this.command];
+        if (this.trustWorkspaceForSession) {
+          const trustedWorkspaces = [options.workingDirectory];
+          if (options.projectDirectory && options.projectDirectory !== options.workingDirectory)
+            trustedWorkspaces.push(options.projectDirectory);
+          command.push("--settings", JSON.stringify({ trustedWorkspaces }));
+        }
         if (options.resumeNativeId) command.push("--resume", options.resumeNativeId);
         if (options.permissionMode === "auto") command.push("--mode", "auto");
         if (options.permissionMode === "yolo") command.push("--dangerously-skip-permissions");
@@ -88,4 +95,11 @@ export const createAgySessionManager = (
   configDirectory: string,
   socket?: string,
   command?: string,
-): SessionManager => new AgySessionManager(configDirectory, new TmuxLauncher(socket), command);
+  trustWorkspaceForSession = false,
+): SessionManager =>
+  new AgySessionManager(
+    configDirectory,
+    new TmuxLauncher(socket),
+    command,
+    trustWorkspaceForSession,
+  );

@@ -13,6 +13,7 @@ export async function startNode(config: ServerConfig) {
     agents: config.agents,
     socket: config.tmuxSocket,
     interactionEnabled: config.interactionEnabled,
+    trustWorkspaceForSession: config.trustWorkspaceForSession,
     uploads,
   });
   return startServer(

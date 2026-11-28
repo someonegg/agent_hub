@@ -28,15 +28,19 @@ export async function createAhub({
   agents,
   socket,
   interactionEnabled = true,
+  trustWorkspaceForSession = false,
   uploads,
 }: {
   agents: readonly AgentConfig[];
   socket?: string;
   interactionEnabled?: boolean;
+  trustWorkspaceForSession?: boolean;
   uploads?: UploadCleanup;
 }) {
   const paneBindings = new PaneBindingManager();
-  const adapters = await Promise.all(agents.map((agent) => createAdapter(agent, socket)));
+  const adapters = await Promise.all(
+    agents.map((agent) => createAdapter(agent, socket, trustWorkspaceForSession)),
+  );
   const sources = adapters.map((adapter) => adapter.source);
   const managers = new SessionManagerRegistry(sources[0]!.descriptor.agent);
   for (const { source, manager } of adapters) managers.register(source.descriptor.agent, manager);
@@ -100,12 +104,21 @@ interface SessionAdapter {
   readonly manager: SessionManager;
 }
 
-async function createAdapter(agent: AgentConfig, socket?: string): Promise<SessionAdapter> {
+async function createAdapter(
+  agent: AgentConfig,
+  socket: string | undefined,
+  trustWorkspaceForSession: boolean,
+): Promise<SessionAdapter> {
   switch (agent.adapter ?? "codex") {
     case "agy":
       return {
         source: await createAgySessionSource(agent.path, { agent: agent.nickname }),
-        manager: createAgySessionManager(agent.path, socket, agent.command),
+        manager: createAgySessionManager(
+          agent.path,
+          socket,
+          agent.command,
+          trustWorkspaceForSession,
+        ),
       };
     case "claude":
       return {
@@ -115,7 +128,12 @@ async function createAdapter(agent: AgentConfig, socket?: string): Promise<Sessi
     case "codex":
       return {
         source: await createCodexSessionSource(agent.path, { agent: agent.nickname }),
-        manager: createCodexSessionManager(agent.path, socket, agent.command),
+        manager: createCodexSessionManager(
+          agent.path,
+          socket,
+          agent.command,
+          trustWorkspaceForSession,
+        ),
       };
   }
 }

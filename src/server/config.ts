@@ -51,6 +51,7 @@ export interface ServerConfig {
   clientDirectory: string;
   tls: ServerTlsConfig;
   interactionEnabled: boolean;
+  trustWorkspaceForSession?: boolean;
   tmuxSocket?: string;
   uploadDirectory?: string;
   hostingDirectory?: string;
@@ -101,6 +102,7 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       help: { type: "boolean" },
       version: { type: "boolean" },
       "tmux-socket": { type: "string" },
+      "trust-workspace-for-session": { type: "boolean", default: false },
       "home-dir": { type: "string" },
       hosting: { type: "boolean" },
       node: { type: "string", multiple: true },
@@ -194,6 +196,7 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       clientDirectory: fileURLToPath(new URL("../../client/", import.meta.url)),
       tls,
       interactionEnabled: true,
+      trustWorkspaceForSession: values["trust-workspace-for-session"],
       ...(mode?.kind !== "hub" ? { uploadDirectory: resolve(homeDirectory, "uploads") } : {}),
       ...(values.hosting && mode?.kind !== "hub"
         ? { hostingDirectory: resolve(homeDirectory, "hosting") }
@@ -327,6 +330,9 @@ Options:
   --ssl-key <path>     PEM server private key
   --ssl-ca <path>      PEM CA bundle; enables mandatory client certificates
   --tmux-socket <path> tmux socket (default: tmux default selection)
+  --trust-workspace-for-session
+                       Override Codex and agy workspace trust for each local
+                       Create/Resume (default: off)
   --help               Show this help
   --version            Show the current version
 

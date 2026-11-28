@@ -17,14 +17,23 @@ it.each(
   const launch = vi
     .spyOn(tmux, "launch")
     .mockResolvedValue({ socketPath: "/tmp/test", sessionName: "test" });
-  await new CodexSessionManager("/codex-home", tmux).launch({
+  await new CodexSessionManager("/codex-home", tmux, undefined, true).launch({
     operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
-    workingDirectory: "/project",
+    workingDirectory: resume ? "/worktrees/task" : '/project.with dots/"quoted"\\name',
+    projectDirectory: '/project.with dots/"quoted"\\name',
     worktree: true,
     permissionMode,
     ...(resume ? { resumeNativeId: "00000000-0000-4000-8000-000000000001" } : {}),
   });
   const args = launch.mock.calls[0]![2];
+  const configIndex = args.indexOf("-c");
+  expect(configIndex).toBeGreaterThan(0);
+  expect(args[configIndex + 1]).toBe(
+    'projects={ "/project.with dots/\\"quoted\\"\\\\name" = { trust_level = "trusted" } }',
+  );
+  expect(launch.mock.calls[0]![1]).toBe(
+    resume ? "/worktrees/task" : '/project.with dots/"quoted"\\name',
+  );
   expect(args.filter((arg) => arg === "--approve-for-me")).toEqual(
     permissionMode === "auto" ? ["--approve-for-me"] : [],
   );
@@ -37,7 +46,7 @@ it("resumes an explicit UUID in the original CODEX_HOME with an operation bindin
     socketPath: "/tmp/test",
     sessionName: "ahub-00000000-0000-0000-0000-000000000001",
   });
-  const manager = new CodexSessionManager("/original-agent", tmux);
+  const manager = new CodexSessionManager("/original-agent", tmux, undefined, true);
   const nativeId = "00000000-0000-4000-8000-000000000001";
   await manager.launch({
     operationId: "54c105aa-3622-45bc-b4c4-e0fa9110d399",
@@ -50,6 +59,7 @@ it("resumes an explicit UUID in the original CODEX_HOME with an operation bindin
   expect(args.slice(0, 3)).toEqual(["codex", "resume", nativeId]);
   expect(launch.mock.calls[0]![3]).toEqual({ CODEX_HOME: "/original-agent" });
   expect(args).not.toContain("--worktree");
+  expect(args).not.toContain("-c");
   expect(args.at(-1)).toContain("54c105aa-3622-45bc-b4c4-e0fa9110d399");
   expect(manager.isValidNativeId(nativeId)).toBe(true);
   for (const resumeNativeId of ["malicious", "", "native:会话/42%"]) {
@@ -98,10 +108,12 @@ appendFileSync(${JSON.stringify(output)}, JSON.stringify(call) + "\\n");
       workingDirectory: "/project",
       worktree: false,
       permissionMode: "default",
+      projectDirectory: "/project",
       ...(resumeNativeId ? { resumeNativeId } : {}),
     });
   }
   expect(launch.mock.calls.map((call) => call[2][0])).toEqual([command, command]);
+  for (const [, , args] of launch.mock.calls) expect(args).not.toContain("-c");
   await manager.archive(nativeId);
   await manager.delete(nativeId);
   expect(
