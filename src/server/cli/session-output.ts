@@ -9,6 +9,7 @@ import { formatTable, formatTmux, singleLine } from "./output.js";
 export interface CliSessionList {
   sessions: {
     id: string;
+    nativeSessionId: string | null;
     title: string;
     status: string;
     agent: string;
@@ -19,6 +20,7 @@ export interface CliSessionList {
 }
 export interface CliSession {
   id: string;
+  nativeSessionId: string | null;
   title: string;
   status: string;
   agent: string;
@@ -81,6 +83,7 @@ export interface CliTerminal {
 }
 export interface CliOperation {
   sessionId: string | null;
+  nativeSessionId?: string | null;
   status: "sent" | "succeeded";
   tmux?: TmuxTarget | null;
 }
@@ -96,6 +99,7 @@ export function mapList(
       .filter((s) => includeArchived || s.status !== "archived")
       .map((s) => ({
         id: s.id,
+        nativeSessionId: s.sourceId ?? null,
         title: s.title,
         status: s.status,
         agent: s.agent,
@@ -116,6 +120,7 @@ export function mapInspect(value: SessionMessagesResponse): CliInspect {
   return {
     session: {
       id: s.id,
+      nativeSessionId: s.sourceId ?? null,
       title: s.title,
       status: s.status,
       agent: s.origin.agent,

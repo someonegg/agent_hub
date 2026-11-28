@@ -52,7 +52,7 @@ export async function waitForLaunch(
   sessionId: string | null | undefined,
   api: SessionClient["request"],
   signal: AbortSignal,
-): Promise<void> {
+): Promise<string | null> {
   if (!sessionId) throw new Error("Launch response has no session");
   for (;;) {
     const observed = await api<SessionMessagesResponse>(
@@ -64,7 +64,7 @@ export async function waitForLaunch(
       observed.interaction.state === "connected" &&
       observed.interaction.activity === "idle"
     )
-      break;
+      return observed.session.sourceId ?? null;
     await pauseSessionPolling(signal);
   }
 }

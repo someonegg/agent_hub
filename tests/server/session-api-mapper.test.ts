@@ -34,6 +34,7 @@ describe("session API mapping", () => {
     const catalog = mapper.list([session]);
     expect(catalog.sessions[0]).toEqual({
       id: session.id,
+      sourceId: session.sourceId,
       agent: session.origin.agent,
       title: session.title,
       projectDirectory: "/project",

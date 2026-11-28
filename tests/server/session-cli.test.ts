@@ -186,6 +186,7 @@ it("uses explicit URL over the environment and filters by associated project", a
       sessions: [
         {
           id: "yes",
+          sourceId: "native/list-id",
           projectDirectory: "/project",
           title: "Title",
           status: "normal",
@@ -201,6 +202,7 @@ it("uses explicit URL over the environment and filters by associated project", a
   expect(JSON.parse(result.stdout).sessions).toEqual([
     {
       id: "yes",
+      nativeSessionId: "native/list-id",
       title: "Title",
       status: "normal",
       agent: "work",
@@ -345,7 +347,7 @@ it("waits for lifecycle completion and launch idle, mapping only public results"
     else {
       inspections++;
       reply(res, {
-        session: { id: "session", status: "live" },
+        session: { id: "session", sourceId: "native/create-id", status: "live" },
         interaction: {
           supported: true,
           state: "connected",
@@ -370,6 +372,7 @@ it("waits for lifecycle completion and launch idle, mapping only public results"
   expect(result.code).toBe(0);
   expect(JSON.parse(result.stdout)).toEqual({
     sessionId: "session",
+    nativeSessionId: "native/create-id",
     status: "succeeded",
     tmux: { socketPath: "/tmp/socket", sessionName: "ahub-00000000-0000-0000-0000-000000000007" },
   });
