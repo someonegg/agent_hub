@@ -1,8 +1,9 @@
-import type {
-  DomainBindingEvent,
-  DomainDiagnostic,
-  DomainSessionId,
-  NormalizedSession,
+import {
+  type DomainBindingEvent,
+  type DomainDiagnostic,
+  type DomainSessionId,
+  type NormalizedSession,
+  sameSessionOrigin,
 } from "../domain/session-domain.js";
 import { opaqueIdForParts } from "../security/opaque-id.js";
 import type {
@@ -233,21 +234,9 @@ function sameSourceInput(left: PendingSession, right: PendingSession): boolean {
   return (
     left.normalized === right.normalized &&
     left.nativeSessionId === right.nativeSessionId &&
-    sameOrigin(left.origin, right.origin) &&
+    sameSessionOrigin(left.origin, right.origin) &&
     left.descriptor.sourceType === right.descriptor.sourceType &&
     left.descriptor.agent === right.descriptor.agent &&
     left.descriptor.displayName === right.descriptor.displayName
-  );
-}
-
-function sameOrigin(
-  left: SourceSessionEntry["origin"],
-  right: SourceSessionEntry["origin"],
-): boolean {
-  return (
-    left.sourceType === right.sourceType &&
-    left.agent === right.agent &&
-    left.runtimeName === right.runtimeName &&
-    left.runtimeVersion === right.runtimeVersion
   );
 }

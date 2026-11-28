@@ -1,5 +1,7 @@
-export type PermissionMode = "default" | "auto" | "yolo";
+export const PERMISSION_MODES = ["default", "auto", "yolo"] as const;
+
+export type PermissionMode = (typeof PERMISSION_MODES)[number];
 
 export function isPermissionMode(value: unknown): value is PermissionMode {
-  return value === "default" || value === "auto" || value === "yolo";
+  return PERMISSION_MODES.some((mode) => value === mode);
 }

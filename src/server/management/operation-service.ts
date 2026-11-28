@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { CreateSessionRequest, HubOperation } from "../../shared/api-contract.js";
 import { isPermissionMode } from "../../shared/permission-mode.js";
 import type { SessionInteractionService } from "../interaction/interaction-service.js";
-import { type PaneBindingManager, paneBindings } from "../interaction/pane-binding-manager.js";
+import { PaneBindingManager } from "../interaction/pane-binding-manager.js";
 import type { RuntimeEvaluator } from "../interaction/runtime-capabilities.js";
 import { attachCommand } from "../interaction/tmux-launcher.js";
 import type { UploadCleanup } from "../uploads/store.js";
@@ -76,7 +76,7 @@ export class OperationService {
     const {
       now = Date.now,
       waitMs = { create: 60_000, exit: 30_000, archive: 30_000, delete: 30_000 },
-      bindings = paneBindings,
+      bindings = new PaneBindingManager(),
       runtime,
       uploads,
     } = options;

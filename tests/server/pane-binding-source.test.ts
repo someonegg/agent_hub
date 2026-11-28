@@ -6,10 +6,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { createCodexSessionSource } from "../../src/server/adapters/codex/codex-session-source.js";
 import { SessionReadService } from "../../src/server/application/session-read-service.js";
 import { SessionInteractionService } from "../../src/server/interaction/interaction-service.js";
-import {
-  PaneBindingManager,
-  paneBindings,
-} from "../../src/server/interaction/pane-binding-manager.js";
+import { PaneBindingManager } from "../../src/server/interaction/pane-binding-manager.js";
 import type { InteractionTransport } from "../../src/server/interaction/transport.js";
 import { closeAfterEach } from "../helpers/cleanup.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
@@ -88,7 +85,6 @@ it.each([false, true])(
     );
     const catalog = (await sessions.list()).sessions;
     expect(catalog).toHaveLength(2);
-    for (const item of catalog) expect(paneBindings.latest(item.id)).toBeNull();
     const idFor = async (pane: string) => {
       for (const item of catalog) {
         const attempt = bindings.latest(item.id);

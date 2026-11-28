@@ -1,19 +1,15 @@
-import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { afterEach, expect, it, vi } from "vitest";
+import { expect, it, vi } from "vitest";
 
 import { HostingStore } from "../../src/server/hosting/store.js";
 import { createServer, listenServer } from "../../src/server/http/create-server.js";
+import { cleanupAfterEach } from "../helpers/cleanup.js";
+import { createTempDirectory } from "../helpers/temp-directories.js";
 
-const cleanup: (() => Promise<unknown>)[] = [];
-afterEach(async () => {
-  for (const action of cleanup.splice(0).reverse()) await action();
-});
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), "hosting-"));
-  cleanup.push(() => rm(root, { recursive: true, force: true }));
+  const root = await createTempDirectory("hosting-");
   const source = join(root, "页面 demo");
   const project = join(root, "项目", ".hub", "100% space");
   await mkdir(source);
@@ -86,7 +82,7 @@ it("serves immutable snapshot paths, MIME and HEAD with independent headers and 
     hostingDirectory: store.root,
   });
   await listenServer(server, 0, "127.0.0.1");
-  cleanup.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  cleanupAfterEach(() => new Promise<void>((resolve) => server.close(() => resolve())));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("No address");
   const base = `http://127.0.0.1:${address.port}`;
@@ -127,6 +123,14 @@ it("serves immutable snapshot paths, MIME and HEAD with independent headers and 
   expect((await fetch(base + "/")).headers.get("content-security-policy")).toContain(
     "script-src 'self'",
   );
+  expect(
+    (
+      await fetch(base + "/api/v1/artifacts/" + artifact.id, {
+        method: "DELETE",
+        headers: { origin: "https://evil.example" },
+      })
+    ).status,
+  ).toBe(403);
   expect(
     (await fetch(base + "/api/v1/artifacts/" + artifact.id, { method: "DELETE" })).status,
   ).toBe(204);
@@ -185,7 +189,7 @@ it("keeps all hosting routes disabled without touching existing snapshots", asyn
     interactionEnabled: false,
   });
   await listenServer(server, 0, "127.0.0.1");
-  cleanup.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  cleanupAfterEach(() => new Promise<void>((resolve) => server.close(() => resolve())));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("No address");
   const base = `http://127.0.0.1:${address.port}`;
@@ -237,7 +241,7 @@ it("classifies malformed paths, missing files and storage failures with correlat
     { logger, requestId: () => "hosting-request" },
   );
   await listenServer(server, 0, "127.0.0.1");
-  cleanup.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
+  cleanupAfterEach(() => new Promise<void>((resolve) => server.close(() => resolve())));
   const address = server.address();
   if (!address || typeof address === "string") throw new Error("No address");
   const base = `http://127.0.0.1:${address.port}`;

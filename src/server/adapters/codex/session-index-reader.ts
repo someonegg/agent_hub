@@ -2,7 +2,7 @@ import { open } from "node:fs/promises";
 import { join } from "node:path";
 
 import { normalizeSessionTitle } from "../../domain/session-text.js";
-import { MAX_JSONL_LINE_BYTES } from "./limits.js";
+import { MAX_JSONL_LINE_BYTES } from "../shared/limits.js";
 
 interface SessionIndexFingerprint {
   readonly size: number;

@@ -94,7 +94,7 @@ export const messages: Record<keyof typeof english, string> = {
   filterByAgent: "按智能体筛选",
   foldersAreNotSupported: "不支持文件夹",
   goToBoundSession: "前往已绑定会话",
-  handOffThisPaneSBindingToTheActiveCodexSession: "将此窗格的绑定移交给当前活动的智能体会话。",
+  handOffThisPaneSBindingToTheActiveAgentSession: "将此窗格的绑定移交给当前活动的智能体会话。",
   handoff: "移交绑定",
   hide: "隐藏",
 
@@ -118,7 +118,7 @@ export const messages: Record<keyof typeof english, string> = {
   loadingUploads: "正在加载上传记录…",
   messageToAgent: "发送给智能体的消息",
   newSession: "新建会话",
-  noCodexSessionDetectedYetAttachToTmuxToCheckStartupProgress:
+  noAgentSessionDetectedYetAttachToTmuxToCheckStartupProgress:
     "尚未检测到智能体会话。请连接 tmux 查看启动进度。",
   noAnswerRecorded: "尚无回答记录。",
 
@@ -189,7 +189,7 @@ export const messages: Record<keyof typeof english, string> = {
 
   someContentCouldNotBeFullyParsedCheckTheOriginalTextBelow:
     "部分内容未能完整解析，请查看下方原文。",
-  startingCodex: "正在启动智能体",
+  startingAgent: "正在启动智能体",
   superseded: "已被替代",
   takePhoto: "拍照",
   inputArea: "消息输入",
@@ -263,7 +263,7 @@ export const messages: Record<keyof typeof english, string> = {
   statusSucceeded: "成功",
   statusFailed: "失败",
   statusUnknown: "未知",
-  metaDescription: "私有、本地的 Codex 会话阅读与交互中心",
+  metaDescription: "私有、本地的 Codex、Claude Code 与 Antigravity 会话阅读与交互中心",
   messageNotSubmitted: "未能成功提交，请检查终端。",
   interactionNotSupported: "此会话不支持终端交互。",
   interactionFailed: "交互失败，请检查终端。",

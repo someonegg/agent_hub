@@ -59,14 +59,15 @@ Run additional checks for the affected area:
 | `npm run test:integration:tmux`   | Native tmux interaction changes                                   |
 | `npm run test:integration:codex`  | Native Codex lifecycle changes                                    |
 | `npm run test:integration:claude` | Native Claude lifecycle changes (requires `claude`, tmux and Git) |
+| `npm run test:integration:agy`    | Native Antigravity lifecycle changes (requires tmux and Git)      |
 | `npm run test:hosting`            | Hosting/diff changes and desktop/mobile diff screenshots          |
 | `npm run benchmark:scale`         | Scale or performance changes                                      |
 
-With tmux, Git, and both runtime CLIs installed, `npm run test:all` runs unit tests
-and all three native integration suites. Lifecycle suites use isolated projects,
-agents, credentials, and tmux sockets; Claude uses a local API stub. They do not
-call a model or use existing user sessions. Hosting checks require `playwright-cli`
-and its browser.
+With tmux, Git, `codex`, and `claude` installed, `npm run test:all` runs unit tests
+and all four integration suites. Lifecycle suites use isolated projects, agents,
+credentials, and tmux sockets. Claude uses a local API stub, and Antigravity uses
+a fake `agy` executable. The suites make no model calls and use only test sessions.
+Hosting checks require `playwright-cli` and its browser.
 
 `test:package` builds, packs, installs, and smoke-tests outside the repository.
 Use `npm run test:package -- --skip-build` to reuse a current build, or

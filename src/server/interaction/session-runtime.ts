@@ -4,7 +4,7 @@ import {
   resolveResumeDirectory,
   type SessionManagerRegistry,
 } from "../management/session-manager.js";
-import { type PaneBindingManager, paneBindings } from "./pane-binding-manager.js";
+import { PaneBindingManager } from "./pane-binding-manager.js";
 import {
   isCurrentObservation,
   observePaneBinding,
@@ -20,7 +20,7 @@ export class SessionRuntime {
   constructor(
     private readonly transport: Pick<InteractionTransport, "resolveTarget">,
     private readonly managers: SessionManagerRegistry,
-    private readonly bindings: PaneBindingManager = paneBindings,
+    private readonly bindings: PaneBindingManager = new PaneBindingManager(),
   ) {}
 
   probe(attempt: InteractionBindingAttempt): Promise<TmuxBinding | null> {

@@ -94,7 +94,7 @@ export const messages = {
   filterByAgent: "Filter by agent",
   foldersAreNotSupported: "Folders are not supported",
   goToBoundSession: "Go to bound session",
-  handOffThisPaneSBindingToTheActiveCodexSession:
+  handOffThisPaneSBindingToTheActiveAgentSession:
     "Hand off this pane’s binding to the active agent session.",
   handoff: "Handoff",
   hide: "Hide",
@@ -119,7 +119,7 @@ export const messages = {
   loadingUploads: "Loading uploads…",
   messageToAgent: "Message to agent",
   newSession: "New session",
-  noCodexSessionDetectedYetAttachToTmuxToCheckStartupProgress:
+  noAgentSessionDetectedYetAttachToTmuxToCheckStartupProgress:
     "No agent session detected yet. Attach to tmux to check startup progress.",
   noAnswerRecorded: "No answer recorded.",
 
@@ -190,7 +190,7 @@ export const messages = {
 
   someContentCouldNotBeFullyParsedCheckTheOriginalTextBelow:
     "Some content could not be fully parsed. Check the original text below.",
-  startingCodex: "Starting agent",
+  startingAgent: "Starting agent",
   superseded: "Superseded",
   takePhoto: "Take photo",
   inputArea: "Message Input",
@@ -264,7 +264,7 @@ export const messages = {
   statusSucceeded: "succeeded",
   statusFailed: "failed",
   statusUnknown: "unknown",
-  metaDescription: "A private, local reader for Codex sessions",
+  metaDescription: "A private, local hub for Codex, Claude Code, and Antigravity sessions",
   messageNotSubmitted: "Could not submit. Please check the terminal.",
   interactionNotSupported: "Interaction is not supported for this session.",
   interactionFailed: "The interaction failed. Please check the terminal.",

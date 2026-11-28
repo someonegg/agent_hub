@@ -69,5 +69,3 @@ function compare(left: PaneBindEvent, right: PaneBindEvent): number {
     left.position - right.position
   );
 }
-
-export const paneBindings = new PaneBindingManager();

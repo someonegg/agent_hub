@@ -55,7 +55,7 @@ accepted original do not clear them
 ### Session identity
 
 Native IDs are agent-scoped. Adapters publish nonempty native IDs; management
-format validation belongs to the owning adapter (both current adapters require
+format validation belongs to the owning adapter (all three current adapters require
 UUIDs). Codex rollouts with missing or blank IDs are skipped with a bounded source
 warning and retried on every refresh.
 
@@ -85,10 +85,10 @@ HTTP session IDs use `[A-Za-z0-9_-]{20,100}`, distinct from native IDs;
 
 ### Agent identity and routing
 
-An Agent owns configuration, Skills, memory, and model settings; Codex and Claude
-Code are Runtimes. Catalog agents expose `nickname`, `runtimeName`, and management
-capabilities; session origins expose `agent`, `runtimeName`, nullable
-`runtimeVersion`, and no `formatVersion`.
+An Agent owns configuration, Skills, memory, and model settings. Codex, Claude
+Code, and Antigravity are Runtimes. Catalog agents expose `nickname`, `runtimeName`,
+and management capabilities. Session origins expose `agent`, `runtimeName`, and
+nullable `runtimeVersion`. They omit `formatVersion`.
 
 Public nicknames route requests; configured absolute paths namespace identities.
 Renaming/reordering preserves session IDs; moving agent directories changes them.
@@ -100,7 +100,8 @@ exists. Any explicit agent replaces all defaults in argument order; nickname
 `default` has no special meaning, and at most one `--agy-agent` is allowed because
 `agy` has a fixed data directory. Creation uses the first nickname when omitted;
 unknown nicknames return `400`, request-ID reuse across agents `409`.
-Operations use the owning CLI/environment: `CODEX_HOME` or `CLAUDE_CONFIG_DIR`.
+Operations use the owning CLI/environment: `CODEX_HOME`, `CLAUDE_CONFIG_DIR`, or
+the fixed Antigravity directory `~/.gemini/antigravity-cli`.
 See [Multiple agents](usage.md#multiple-agents).
 
 ## Conversation model
@@ -398,7 +399,8 @@ Permanent deletion also removes the archived JSONL.
 Delete runs Exit validation and sequence, then permanently removes history through
 the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove the
 session JSONL, its `<UUID>/subagents` directory, and the per-session directory
-if empty). Exit, deletion, and same-source
+if empty; Antigravity: remove UUID-named data under `brain/`, `conversations/`,
+`annotations/`, and `presence/`, plus any archived JSONL). Exit, deletion, and same-source
 absence confirmation have separate 30-, 25-, and 30-second budgets. Initially
 absent in a successful snapshot succeeds. Successful snapshots may skip unreadable
 data and confirm absence; thrown reads cannot.
@@ -507,13 +509,13 @@ Launch errors retain `sessionId` and `tmux` inside `error` (unknown values are n
 including readiness timeouts. Exact fields and text formatting live in
 [session-output.ts](../src/server/cli/session-output.ts).
 
-| Command       | Result                                                                              |
-| ------------- | ----------------------------------------------------------------------------------- |
-| `list`        | `{ sessions }`: identity, title, status, agent, project, update time, optional task |
-| `inspect`     | `{ session, interaction, items, nextAfter, hasMore }`                               |
-| `terminal`    | `{ content, truncated, capturedAt }`                                                |
-| Input/handoff | `{ sessionId, status: "sent" }`                                                     |
-| Lifecycle     | `{ sessionId, status: "succeeded" }`; create/resume also include `tmux`             |
+| Command       | Result                                                                                        |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `list`        | `{ sessions }`: identity, title, status, agent, project, update time, optional task           |
+| `inspect`     | `{ session, interaction, items, nextAfter, hasMore }`                                         |
+| `terminal`    | `{ content, truncated, capturedAt }`                                                          |
+| Input/handoff | `{ sessionId, status: "sent" }`                                                               |
+| Lifecycle     | `{ sessionId, status: "succeeded" }`; create/resume also include `nativeSessionId` and `tmux` |
 
 `--project` filters project association, not launch/worktree location. Explicit IDs
 go directly to endpoints without catalog lookup. Nullable metadata remains

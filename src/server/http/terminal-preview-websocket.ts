@@ -9,6 +9,7 @@ import {
   type SessionInteractionService,
 } from "../interaction/interaction-service.js";
 import { InteractionTransportError } from "../interaction/transport.js";
+import { isSameOrigin } from "./origin.js";
 import { SESSION_ID_PATTERN, SESSION_ROOT } from "./session-path.js";
 
 export interface ServerUpgradeHandler {
@@ -55,12 +56,7 @@ export function createTerminalPreviewWebSocket(
       const match = PATH.exec(url.pathname);
       if (!match) return reject(socket, 404, "Not Found");
       if (url.search) return reject(socket, 400, "Bad Request");
-      const secure = "encrypted" in request.socket && request.socket.encrypted;
-      if (
-        request.headers.origin &&
-        request.headers.origin !== `${secure ? "https" : "http"}://${request.headers.host}`
-      )
-        return reject(socket, 403, "Forbidden");
+      if (!isSameOrigin(request)) return reject(socket, 403, "Forbidden");
       server.handleUpgrade(request, socket, head, (ws) => {
         const sessionId = match[1]!;
         const abort = new AbortController();

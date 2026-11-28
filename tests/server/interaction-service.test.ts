@@ -12,7 +12,10 @@ import type {
 import { SessionInteractionService } from "../../src/server/interaction/interaction-service.js";
 import { PaneBindingManager } from "../../src/server/interaction/pane-binding-manager.js";
 import { TmuxInteractionService } from "../../src/server/interaction/tmux-service.js";
-import { InteractionTransportError } from "../../src/server/interaction/transport.js";
+import {
+  type InteractionTransport,
+  InteractionTransportError,
+} from "../../src/server/interaction/transport.js";
 
 let bindings: PaneBindingManager;
 const SESSION_NAME = "ahub-00000000-0000-0000-0000-000000000007";
@@ -24,7 +27,7 @@ beforeEach(() => {
 });
 
 class TestSessionInteractionService extends SessionInteractionService {
-  constructor(reader: SessionReader, enabled: boolean, tmux: TmuxInteractionService) {
+  constructor(reader: SessionReader, enabled: boolean, tmux: InteractionTransport) {
     super(reader, tmux, {
       enabled,
       bindings,
@@ -32,6 +35,19 @@ class TestSessionInteractionService extends SessionInteractionService {
     });
     services.push(this);
   }
+}
+
+function createTransport(overrides: Partial<InteractionTransport> = {}) {
+  return {
+    connect: vi.fn<InteractionTransport["connect"]>(),
+    resolveTarget: vi.fn<InteractionTransport["resolveTarget"]>(),
+    killSession: vi.fn<InteractionTransport["killSession"]>(),
+    inspect: vi.fn<InteractionTransport["inspect"]>(),
+    sendMessage: vi.fn<InteractionTransport["sendMessage"]>(),
+    sendKeys: vi.fn<InteractionTransport["sendKeys"]>(),
+    captureTerminal: vi.fn<InteractionTransport["captureTerminal"]>(),
+    ...overrides,
+  };
 }
 
 function repository(snapshot: InteractionSessionSnapshot | null): SessionReader {
@@ -113,7 +129,7 @@ describe("session interaction policy", () => {
 
   it("allows all actions whenever the pane is connected", async () => {
     const binding = BINDING;
-    const tmux = {
+    const tmux = createTransport({
       connect: vi.fn().mockResolvedValue(binding),
       resolveTarget: vi.fn().mockResolvedValue(binding),
       sendMessage: vi.fn().mockResolvedValue(undefined),
@@ -122,7 +138,7 @@ describe("session interaction policy", () => {
         content: "recent output",
         truncated: false,
       }),
-    } as unknown as TmuxInteractionService;
+    });
     const service = new TestSessionInteractionService(repository(boundSession()), true, tmux);
 
     await expect(service.describe("session")).resolves.toEqual({
@@ -190,11 +206,11 @@ describe("session interaction policy", () => {
 it("uses the adapter interrupt capability and preserves repeated interrupt ordering", async () => {
   const snapshot = boundSession();
   const interruptSteps = vi.fn(codexInterruptSteps);
-  const tmux = {
+  const tmux = createTransport({
     connect: vi.fn().mockResolvedValue(BINDING),
     resolveTarget: vi.fn().mockResolvedValue(BINDING),
     sendKeys: vi.fn().mockResolvedValue(undefined),
-  } as unknown as TmuxInteractionService;
+  });
   const service = new TestSessionInteractionService(
     repository({
       ...snapshot,
@@ -215,12 +231,12 @@ it("uses the adapter interrupt capability and preserves repeated interrupt order
 });
 
 it("refreshes connection status after each completed query", async () => {
-  const tmux = {
+  const tmux = createTransport({
     connect: vi
       .fn()
       .mockRejectedValueOnce(new InteractionTransportError("disconnected", "gone"))
       .mockResolvedValue(BINDING),
-  } as unknown as TmuxInteractionService;
+  });
   const service = new TestSessionInteractionService(repository(boundSession()), true, tmux);
   expect(await service.describe("session")).toMatchObject({ state: "disconnected", tmux: null });
   expect(await service.describe("session")).toMatchObject({ state: "connected" });
@@ -230,12 +246,12 @@ it("refreshes connection status after each completed query", async () => {
 it("freshly resolves management targets and rejects input while busy", async () => {
   const reader = repository(boundSession());
   const binding = BINDING;
-  const tmux = {
+  const tmux = createTransport({
     connect: vi.fn().mockResolvedValue(binding),
     resolveTarget: vi.fn().mockResolvedValue(null),
     sendMessage: vi.fn(),
     sendKeys: vi.fn(),
-  } as unknown as TmuxInteractionService;
+  });
   const service = new TestSessionInteractionService(reader, true, tmux);
   expect(await service.describe("session")).toMatchObject({
     state: "connected",
@@ -266,12 +282,12 @@ it.each([
 ] as const)(
   "translates handoffPaneBinding transport failure %s without retry",
   async (transportCode, code) => {
-    const tmux = {
+    const tmux = createTransport({
       connect: vi.fn().mockResolvedValue(BINDING),
       sendMessage: vi
         .fn()
         .mockRejectedValue(new InteractionTransportError(transportCode, "failed")),
-    } as unknown as TmuxInteractionService;
+    });
     const service = new TestSessionInteractionService(repository(boundSession()), true, tmux);
     await expect(service.handoffPaneBinding("session")).rejects.toMatchObject({ code });
     expect(tmux.sendMessage).toHaveBeenCalledOnce();
@@ -279,7 +295,7 @@ it.each([
 );
 
 it("rejects handoffPaneBinding for missing sessions and while management is busy", async () => {
-  const tmux = { connect: vi.fn(), sendMessage: vi.fn() } as unknown as TmuxInteractionService;
+  const tmux = createTransport();
   const missing = new TestSessionInteractionService(repository(null), true, tmux);
   await expect(missing.handoffPaneBinding("session")).rejects.toMatchObject({
     code: "session_not_found",
@@ -307,7 +323,7 @@ it.each(["message", "keys", "preview", "handoffPaneBinding", "exit", "kill"] as 
           }
         };
       });
-    const tmux = {
+    const tmux = createTransport({
       connect: vi.fn().mockResolvedValue(target),
       resolveTarget: vi.fn().mockResolvedValue(target),
       sendMessage: vi.fn((_target, _message, check) => queue(check)),
@@ -316,7 +332,7 @@ it.each(["message", "keys", "preview", "handoffPaneBinding", "exit", "kill"] as 
       captureTerminal: vi.fn((_target, check) =>
         queue(check).then(() => ({ content: "pane", truncated: false })),
       ),
-    } as unknown as TmuxInteractionService;
+    });
     const service = new TestSessionInteractionService(reader, true, tmux);
     const operation =
       action === "message"
@@ -361,7 +377,7 @@ it.each(["message", "keys", "preview", "handoffPaneBinding", "exit", "kill"] as 
 it("rechecks management target ownership after validation", async () => {
   const reader = repository(boundSession());
   const target = BINDING;
-  const tmux = {
+  const tmux = createTransport({
     resolveTarget: vi.fn(async () => {
       bindings.submit({
         sessionId: "replacement",
@@ -372,7 +388,7 @@ it("rechecks management target ownership after validation", async () => {
       });
       return target;
     }),
-  } as unknown as TmuxInteractionService;
+  });
   expect(
     await new TestSessionInteractionService(reader, true, tmux).resolveTarget("session"),
   ).toBeNull();
@@ -382,7 +398,7 @@ it.each([false, true])(
   "does not retry status validation when the binding changes (failure=%s)",
   async (failure) => {
     const reader = repository(boundSession());
-    const tmux = {
+    const tmux = createTransport({
       connect: vi.fn(async () => {
         bindings.submit({
           sessionId: "session",
@@ -402,7 +418,7 @@ it.each([false, true])(
           sessionName: SESSION_NAME,
         };
       }),
-    } as unknown as TmuxInteractionService;
+    });
     expect(
       await new TestSessionInteractionService(reader, true, tmux).describe("session"),
     ).toMatchObject({ state: "unknown", tmux: null, attachCommand: null });
@@ -431,7 +447,7 @@ it("does not recurse when a replacement changes during lookup", async () => {
       });
     return session();
   });
-  const tmux = { connect: vi.fn().mockResolvedValue(target) } as unknown as TmuxInteractionService;
+  const tmux = createTransport({ connect: vi.fn().mockResolvedValue(target) });
   expect(
     await new TestSessionInteractionService(reader, true, tmux).describe("session"),
   ).toMatchObject({ state: "unknown", tmux: null });
@@ -455,7 +471,7 @@ it.each(["present", "missing", "error", "replacement missing", "binding changed"
       vi.mocked(reader.getInteractionSession).mockImplementation(async (id) =>
         id === "replacement" ? null : session(),
       );
-    const tmux = {
+    const tmux = createTransport({
       connect: vi.fn(async () => {
         if (scenario === "missing") throw new InteractionTransportError("disconnected", "gone");
         if (scenario === "error") throw new Error("failed");
@@ -469,7 +485,7 @@ it.each(["present", "missing", "error", "replacement missing", "binding changed"
           });
         return target;
       }),
-    } as unknown as TmuxInteractionService;
+    });
     const service = new TestSessionInteractionService(reader, true, tmux);
     expect(await service.describe("session")).toMatchObject({
       state:
@@ -493,14 +509,14 @@ it("rejects an exit observation when ownership changes while querying pane liven
   const reader = repository(boundSession());
   const target = BINDING;
   let resolve!: (state: "exited") => void;
-  const tmux = {
+  const tmux = createTransport({
     inspect: vi.fn(
       () =>
         new Promise<"exited">((done) => {
           resolve = done;
         }),
     ),
-  } as unknown as TmuxInteractionService;
+  });
   const service = new TestSessionInteractionService(reader, true, tmux);
   const observation = service.inspectTarget(target, "session");
   const rejected = expect(observation).rejects.toMatchObject({ code: "interaction_not_connected" });
@@ -547,11 +563,11 @@ it.each([
       notify = changed;
       return { ready: Promise.resolve(), close: stop };
     });
-    const tmux = {
+    const tmux = createTransport({
       connect: vi.fn().mockResolvedValue(binding),
       resolveTarget: vi.fn().mockResolvedValue(binding),
       captureTerminal: vi.fn(async () => ({ content, truncated: false })),
-    } as unknown as TmuxInteractionService;
+    });
     const service = new SessionInteractionService(repository(snapshot), tmux, {
       enabled: true,
       bindings,
@@ -622,11 +638,11 @@ it("checks idle both before transport and at actual input, while allowing interr
     const snapshot = boundSession();
     const target = BINDING;
     let output!: (hasOutput: boolean) => void;
-    const tmux = {
+    const tmux = createTransport({
       connect: vi.fn(async () => target),
-      sendMessage: vi.fn(async (_target, _message, check) => check()),
-      sendKeys: vi.fn(async (_target, _keys, check) => check()),
-    } as unknown as TmuxInteractionService;
+      sendMessage: vi.fn(async (_target, _message, check) => check!()),
+      sendKeys: vi.fn(async (_target, _keys, check) => check!()),
+    });
     const service = new SessionInteractionService(repository(snapshot), tmux, {
       enabled: true,
       bindings,
@@ -733,17 +749,13 @@ it("submits a Claude handoff containing the current target without an operation 
 });
 
 it("ignores disconnected errors during exit key bursts while propagating other transport errors", async () => {
-  const tmux = {
+  const tmux = createTransport({
     sendKeys: vi
       .fn()
       .mockRejectedValueOnce(new InteractionTransportError("disconnected", "gone"))
       .mockRejectedValueOnce(new InteractionTransportError("timeout", "timed out")),
-  };
-  const service = new TestSessionInteractionService(
-    repository(boundSession()),
-    true,
-    tmux as unknown as TmuxInteractionService,
-  );
+  });
+  const service = new TestSessionInteractionService(repository(boundSession()), true, tmux);
   const burst = [
     { keys: ["C-c"] as const, delayMs: 0 },
     { keys: ["C-c"] as const, delayMs: 200 },

@@ -6,7 +6,7 @@ import { SessionReadService } from "../../src/server/application/session-read-se
 import { SessionCatalogService } from "../../src/server/catalog/session-catalog-service.js";
 import { createApiRouter } from "../../src/server/http/api-router.js";
 import { SessionInteractionService } from "../../src/server/interaction/interaction-service.js";
-import { paneBindings } from "../../src/server/interaction/pane-binding-manager.js";
+import { PaneBindingManager } from "../../src/server/interaction/pane-binding-manager.js";
 import { TmuxInteractionService } from "../../src/server/interaction/tmux-service.js";
 import { OperationService } from "../../src/server/management/operation-service.js";
 import { SessionManagerRegistry } from "../../src/server/management/session-manager.js";
@@ -21,18 +21,19 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
   const agent = await createTempDirectory("management-http-");
   const source = await createCodexSessionSource(agent);
   const store = new CatalogSnapshotStore([source]);
+  const bindings = new PaneBindingManager();
   const interaction = new SessionInteractionService(
     new CatalogInteractionSessionReader(store),
     new TmuxInteractionService(),
     {
       enabled: true,
-      bindings: paneBindings,
+      bindings,
       listener: createTestPreviewListener(),
     },
   );
   const sessions = new SessionReadService([source], {
     publishBindings: (events) => {
-      for (const event of events) paneBindings.submit(event);
+      for (const event of events) bindings.submit(event);
     },
     store,
     interaction,
@@ -55,7 +56,7 @@ it("accepts asynchronous writes, deduplicates, keeps reads routed, and retrieves
     sessions,
     interaction,
     new SessionManagerRegistry("test").register("test", manager),
-    { now: () => now },
+    { now: () => now, bindings },
   );
   const catalogService = new SessionCatalogService(sessions);
   const updates = new SessionUpdatesService(sessions);

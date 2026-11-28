@@ -2,7 +2,7 @@ import type { HubOperation, SessionMessagesResponse } from "../../shared/api-con
 import { CommandError } from "./command-error.js";
 import type { SessionClient } from "./session-client.js";
 
-export const pauseSessionPolling = (signal: AbortSignal, milliseconds = 500) =>
+const pauseSessionPolling = (signal: AbortSignal, milliseconds = 500) =>
   new Promise<void>((accept, reject) => {
     if (signal.aborted) {
       reject(new Error("Command interrupted or timed out"));

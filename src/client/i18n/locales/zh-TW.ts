@@ -94,7 +94,7 @@ export const messages: Record<keyof typeof english, string> = {
   filterByAgent: "按智慧體篩選",
   foldersAreNotSupported: "不支援資料夾",
   goToBoundSession: "前往已繫結工作階段",
-  handOffThisPaneSBindingToTheActiveCodexSession: "將此窗格的繫結移交給目前活動的智慧體工作階段。",
+  handOffThisPaneSBindingToTheActiveAgentSession: "將此窗格的繫結移交給目前活動的智慧體工作階段。",
   handoff: "移交繫結",
   hide: "隱藏",
 
@@ -118,7 +118,7 @@ export const messages: Record<keyof typeof english, string> = {
   loadingUploads: "正在載入上傳記錄…",
   messageToAgent: "傳送給智慧體的訊息",
   newSession: "新增工作階段",
-  noCodexSessionDetectedYetAttachToTmuxToCheckStartupProgress:
+  noAgentSessionDetectedYetAttachToTmuxToCheckStartupProgress:
     "尚未檢測到智慧體工作階段。請連線 tmux 檢視啟動進度。",
   noAnswerRecorded: "尚無回答記錄。",
 
@@ -189,7 +189,7 @@ export const messages: Record<keyof typeof english, string> = {
 
   someContentCouldNotBeFullyParsedCheckTheOriginalTextBelow:
     "部分內容未能完整解析，請檢視下方原文。",
-  startingCodex: "正在啟動智慧體",
+  startingAgent: "正在啟動智慧體",
   superseded: "已被替代",
   takePhoto: "拍照",
   inputArea: "訊息輸入",
@@ -263,7 +263,7 @@ export const messages: Record<keyof typeof english, string> = {
   statusSucceeded: "成功",
   statusFailed: "失敗",
   statusUnknown: "未知",
-  metaDescription: "私有、本地的 Codex 工作階段閱讀與互動中心",
+  metaDescription: "私有、本地的 Codex、Claude Code 與 Antigravity 工作階段閱讀與互動中心",
   messageNotSubmitted: "未能成功提交，請檢查終端。",
   interactionNotSupported: "此工作階段不支援終端互動。",
   interactionFailed: "互動失敗，請檢查終端。",

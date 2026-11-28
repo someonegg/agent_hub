@@ -115,3 +115,12 @@ export interface NormalizedSession {
   readonly timeline: readonly DomainTimelineRecord[];
   readonly interaction?: DomainAgentInteraction | null;
 }
+
+export function sameSessionOrigin(left: DomainSessionOrigin, right: DomainSessionOrigin): boolean {
+  return (
+    left.sourceType === right.sourceType &&
+    left.agent === right.agent &&
+    left.runtimeName === right.runtimeName &&
+    left.runtimeVersion === right.runtimeVersion
+  );
+}

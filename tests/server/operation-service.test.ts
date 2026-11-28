@@ -224,7 +224,7 @@ describe("observed management operations", () => {
       });
     },
   );
-  it.each(["auto"] as const)(
+  it.each(["auto", "yolo"] as const)(
     "defaults permission mode, forwards %s, and includes it in request deduplication",
     async (mode) => {
       const { service, manager } = setup();
@@ -1060,7 +1060,7 @@ describe("safe resume operations", () => {
     expect(f.manager.launch).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["default", "auto"] as const)(
+  it.each(["default", "auto", "yolo"] as const)(
     "uses the original agent and forwards %s on resume",
     async (mode) => {
       const f = resumable();

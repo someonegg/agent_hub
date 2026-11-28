@@ -11,6 +11,7 @@ import type { Duplex } from "node:stream";
 
 import { NODE_ID_PATTERN } from "../../shared/node-id.js";
 import type { NodeTarget, ServerMode } from "../config.js";
+import { isSameOrigin } from "./origin.js";
 import { MalformedRequestError, requestUrl } from "./request-errors.js";
 import { type ApiRouter, emptyApiRouter, sendJson } from "./router.js";
 import { SESSION_ID_PATTERN, SESSION_ROOT } from "./session-path.js";
@@ -36,14 +37,6 @@ function endToEnd(headers: IncomingMessage["headers"]): OutgoingHttpHeaders {
   for (const name of [...HOP_HEADERS, ...(headers.connection ?? "").toLowerCase().split(",")])
     delete result[name.trim()];
   return result;
-}
-
-function sameOrigin(request: IncomingMessage) {
-  const scheme = "encrypted" in request.socket && request.socket.encrypted ? "https" : "http";
-  return (
-    request.headers.origin === undefined ||
-    request.headers.origin === `${scheme}://${request.headers.host}`
-  );
 }
 
 export function createNodeProxy(
@@ -150,7 +143,7 @@ export function createNodeProxy(
         fail(404, "not_found", "Node not found");
         return true;
       }
-      if (request.method !== "GET" && !head && !sameOrigin(request)) {
+      if (request.method !== "GET" && !head && !isSameOrigin(request)) {
         fail(403, "forbidden", "Cross-origin Node requests are not allowed");
         return true;
       }
@@ -247,7 +240,7 @@ export function createNodeProxy(
       const path = match && "/api" + match[2];
       downstream.on("error", () => downstream.destroy());
       if (!node || !path || !TERMINAL_PATH.test(path)) return reject(404);
-      if (!sameOrigin(request)) return reject(403);
+      if (!isSameOrigin(request)) return reject(403);
       const upstream = connect(request, node, path + url.search, true);
       let peer: Duplex | undefined;
       let closed = false;

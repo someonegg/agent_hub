@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Agent Hub",
   "short_name": "Agent Hub",
-  "description": "A private, local reader for Codex sessions",
+  "description": "A private, local hub for Codex, Claude Code, and Antigravity sessions",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

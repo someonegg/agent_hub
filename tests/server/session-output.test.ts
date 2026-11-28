@@ -136,7 +136,7 @@ it("maps terminal fields explicitly", () => {
       truncated: false,
       capturedAt: "now",
       secret: "secret",
-    } as any),
+    } as Parameters<typeof mapTerminal>[0]),
   ).toEqual({ content: "screen", truncated: false, capturedAt: "now" });
 });
 

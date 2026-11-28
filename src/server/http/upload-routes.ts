@@ -7,6 +7,7 @@ import type { SessionReader } from "../application/session-reader.js";
 import { resolveHomeDirectory } from "../config.js";
 import { type UploadStore, validAttachmentId } from "../uploads/store.js";
 import type { ApiRouteHandler } from "./api-route-handler.js";
+import { isSameOrigin } from "./origin.js";
 import { RequestBodyError } from "./request-body.js";
 import { sendJson } from "./router.js";
 import { isOpaqueId } from "./session-path.js";
@@ -54,15 +55,8 @@ export function createUploadRoutes(
       if (attachmentId && !validAttachmentId(attachmentId))
         throw new RequestBodyError(400, "invalid_session", "Invalid attachment ID");
       const method = request.method;
-      if (method === "POST" || method === "DELETE") {
-        const protocol =
-          "encrypted" in request.socket && request.socket.encrypted ? "https" : "http";
-        if (
-          request.headers.origin &&
-          request.headers.origin !== `${protocol}://${request.headers.host}`
-        )
-          throw new RequestBodyError(403, "forbidden", "Cross-origin uploads are not allowed");
-      }
+      if ((method === "POST" || method === "DELETE") && !isSameOrigin(request))
+        throw new RequestBodyError(403, "forbidden", "Cross-origin uploads are not allowed");
       let allowedMethod = "GET";
       if (!match) allowedMethod = "POST";
       else if (attachmentId && !contentPath) allowedMethod = "DELETE";

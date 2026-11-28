@@ -8,9 +8,9 @@ import type {
 import { normalizeSessionTitle, sessionTitleFromMarkdown } from "../../domain/session-text.js";
 import type { DecodedRecord } from "../shared/jsonl-decoder.js";
 import { isObject } from "../shared/jsonl-decoder.js";
+import { MAX_SESSION_DIAGNOSTICS } from "../shared/limits.js";
 import type { SessionMetadata } from "./identity-resolver.js";
 import { codexInteraction } from "./interaction-parser.js";
-import { MAX_SESSION_DIAGNOSTICS } from "./limits.js";
 import { eventMessage } from "./message-normalizer.js";
 import { type ParsedResponseItem, parseResponseItem } from "./response-item-parser.js";
 import type { RolloutDescriptor } from "./rollout-descriptor.js";

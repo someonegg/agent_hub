@@ -14,7 +14,7 @@ import type {
 } from "../domain/session-domain.js";
 import { normalizeMessage } from "./message.js";
 import { confirmMessageSubmission } from "./message-submission.js";
-import { type PaneBindingManager, paneBindings } from "./pane-binding-manager.js";
+import { PaneBindingManager } from "./pane-binding-manager.js";
 import { isCurrentObservation, observePaneBinding } from "./pane-observation.js";
 import type { RuntimeProbe } from "./runtime-capabilities.js";
 import { TerminalActivityService } from "./terminal-activity-service.js";
@@ -82,7 +82,7 @@ export class SessionInteractionService {
   ) {
     const {
       enabled,
-      bindings = paneBindings,
+      bindings = new PaneBindingManager(),
       listener = createTmuxPreviewListener(),
       runtime,
     } = options;
