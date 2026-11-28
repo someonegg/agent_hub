@@ -30,6 +30,6 @@ export async function createAgyWorktree(
   const root = join(homeDirectory, "worktrees");
   await mkdir(root, { recursive: true });
   const path = join(await realpath(root), operationId);
-  await git(directory, ["worktree", "add", "-b", `ahub/${operationId}`, path, head]);
+  await git(directory, ["worktree", "add", "--detach", path, head]);
   return path;
 }

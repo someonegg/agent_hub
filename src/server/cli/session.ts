@@ -376,7 +376,7 @@ async function readStdin(signal: AbortSignal): Promise<string> {
   });
 }
 
-function validateSendMessage(input: string, force = false): string {
+export function validateSendMessage(input: string, force = false): string {
   const message = validateArguments(() => normalizeMessage(input));
   if (!force && message.startsWith("/"))
     throw new CommandError(

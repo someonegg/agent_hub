@@ -9,7 +9,7 @@ import { join, resolve } from "node:path";
 import { afterEach, expect, it } from "vitest";
 
 import { CommandError } from "../../src/server/cli/command-error.js";
-import { parseSessionArguments } from "../../src/server/cli/session.js";
+import { parseSessionArguments, validateSendMessage } from "../../src/server/cli/session.js";
 import { createTempDirectory } from "../helpers/temp-directories.js";
 import { TEST_CA, TEST_SERVER_CERTIFICATE, TEST_SERVER_KEY } from "./tls-fixtures.js";
 
@@ -242,56 +242,61 @@ it("requires idle for send and keys unless forced, leaving interrupt and handoff
   ]);
 });
 
-it.each(["--message", "--stdin"])(
-  "guards only the start of send input via %s",
-  async (source) => {
-    const seen: unknown[] = [];
-    const base = await serve((_req, res, body) => {
-      seen.push(body);
-      res.writeHead(204);
-      res.end();
-    });
-    const send = (message: string, force = false) =>
-      cli(
-        [
-          "send",
-          "id",
-          source,
-          ...(source === "--message" ? [message] : []),
-          ...(force ? ["--force"] : []),
-          "--url",
-          base,
-          "--json",
-        ],
-        source === "--stdin" ? message : "",
-      );
-    const commands = ["/help", "/help\ntext"];
-    for (const message of commands) {
-      const result = await send(message);
-      expect(result.code).toBe(1);
-      expect(JSON.parse(result.stdout)).toMatchObject({
-        error: { code: "invalid_arguments", message: expect.stringContaining("--force") },
-      });
-    }
-    expect(seen).toEqual([]);
-    const allowed = [
-      "$skill",
-      "$skill\ntext",
-      "text\n/help\n$skill",
-      " /help",
-      "\n/help",
-      "\n$skill",
-      "text / $",
-    ];
-    for (const message of allowed) expect((await send(message)).code).toBe(0);
-    for (const message of commands) expect((await send(message, true)).code).toBe(0);
-    expect(seen).toEqual([
-      ...allowed.map((message) => ({ message, requireIdle: true })),
-      ...commands.map((message) => ({ message, requireIdle: false })),
-    ]);
-  },
-  15_000,
-);
+it("guards only a slash at the start of send input unless forced", () => {
+  for (const message of ["/help", "/help\ntext"]) {
+    expect(() => validateSendMessage(message)).toThrow(
+      expect.objectContaining({
+        code: "invalid_arguments",
+        message: expect.stringContaining("--force"),
+      }),
+    );
+    expect(validateSendMessage(message, true)).toBe(message);
+  }
+  for (const message of [
+    "$skill",
+    "$skill\ntext",
+    "text\n/help\n$skill",
+    " /help",
+    "\n/help",
+    "\n$skill",
+    "text / $",
+  ]) {
+    expect(validateSendMessage(message)).toBe(message);
+  }
+});
+
+it.each(["--message", "--stdin"])("validates and sends input via %s", async (source) => {
+  const seen: unknown[] = [];
+  const base = await serve((_req, res, body) => {
+    seen.push(body);
+    res.writeHead(204);
+    res.end();
+  });
+  const message = "/help\ntext";
+  const send = (...flags: string[]) =>
+    cli(
+      [
+        "send",
+        "id",
+        source,
+        ...(source === "--message" ? [message] : []),
+        ...flags,
+        "--url",
+        base,
+        "--json",
+      ],
+      source === "--stdin" ? message : "",
+    );
+
+  const blocked = await send();
+  expect(blocked.code).toBe(1);
+  expect(JSON.parse(blocked.stdout)).toMatchObject({
+    error: { code: "invalid_arguments", message: expect.stringContaining("--force") },
+  });
+  expect(seen).toEqual([]);
+  expect((await send("--force")).code).toBe(0);
+  expect(seen).toEqual([{ message, requireIdle: false }]);
+});
 
 it("sends 256 KiB through stdin and rejects larger messages before submission", async () => {
   const seen: unknown[] = [];

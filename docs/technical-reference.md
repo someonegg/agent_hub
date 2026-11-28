@@ -55,9 +55,8 @@ accepted original do not clear them
 ### Session identity
 
 Native IDs are agent-scoped. Adapters publish nonempty native IDs; management
-format validation belongs to the owning adapter (all three current adapters require
-UUIDs). Codex rollouts with missing or blank IDs are skipped with a bounded source
-warning and retried on every refresh.
+format validation belongs to the owning adapter. Codex rollouts with missing or
+blank IDs are skipped with a bounded source warning and retried on every refresh.
 
 Duplicates retain the accepted readable rollout, otherwise the first fully
 readable candidate in logical path order. Codex caches confirmed duplicate
@@ -414,11 +413,11 @@ the exit flow. See [operation-service.ts](../src/server/management/operation-ser
 
 Adapters require authenticated runtime CLIs on `PATH`:
 
-| Runtime     | Create and resume                                                                      | Launch options                                                                        | History management                                                                                                                   |
-| ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                                | `codex archive <UUID>` and `codex delete <UUID> --force`                                                                             |
-| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions`  | Local file archive and delete; cleanup covers the session's `subagents` and the per-session directory if empty                       |
-| Antigravity | Interactive `agy -i <binding>` and `agy --resume <UUID> -i <binding>`                  | Hub-managed Git worktree; Auto: `--mode auto`; YOLO: `--dangerously-skip-permissions` | Local file archive and delete; cleanup covers only UUID-named data under `brain/`, `conversations/`, `annotations/`, and `presence/` |
+| Runtime     | Create and resume                                                                      | Launch options                                                                        | History management                                       |
+| ----------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                                | `codex archive <UUID>` and `codex delete <UUID> --force` |
+| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions`  | Local file archive and delete                            |
+| Antigravity | Interactive `agy -i <binding>` and `agy --resume <UUID> -i <binding>`                  | Hub-managed Git worktree; Auto: `--mode auto`; YOLO: `--dangerously-skip-permissions` | Local file archive and delete                            |
 
 With `--trust-workspace-for-session`, local Create and Resume override native
 workspace trust for the launch, including in Default permission mode. Codex
@@ -445,11 +444,11 @@ independently of the model's reply.
 
 ### Antigravity launch binding
 
-With Worktree enabled on create, the Agy adapter creates branch
-`ahub/<operationId>` from the launch checkout's committed HEAD and runs the
-session in `worktrees/<operationId>/` under the launching node's `--home-dir`
-(default `~/.agent-hub`). The session retains its project association. Launch
-failures, exit, archive, and delete retain the worktree.
+With Worktree enabled on create, the Agy adapter checks out the launch
+checkout's committed HEAD in detached mode and runs the session in
+`worktrees/<operationId>/` under the launching node's `--home-dir` (default
+`~/.agent-hub`). The session retains its project association. Launch failures, exit,
+archive, and delete retain the worktree.
 
 The binding is an independent `[ahub-bind:{...}]` message (see
 [`binding-message.ts`](../src/server/adapters/agy/binding-message.ts)) passed with

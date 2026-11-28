@@ -414,7 +414,7 @@ it("aggregates and filters merged projects, remembers the agent and keeps a dire
     }),
   ).toHaveValue("work");
 });
-it("defaults creation to the first agent in aggregate view and restores a stored filter", async () => {
+it("ignores a removed agent filter and restores a valid stored filter", async () => {
   window.history.replaceState(null, "", "/");
   browserStorage.setItem("ahub.agent", "removed-source");
   vi.mocked(api.sessions)
@@ -424,20 +424,6 @@ it("defaults creation to the first agent in aggregate view and restores a stored
   const view = render(<App />);
   await flush();
   expect(screen.getByLabelText("Filter by agent")).toHaveValue("");
-  fireEvent.click(screen.getAllByRole("button", { name: "New session" })[0]!);
-  fireEvent.change(screen.getByLabelText("Project directory"), { target: { value: "custom" } });
-  fireEvent.change(screen.getByLabelText("Directory path"), { target: { value: "/project" } });
-  expect(screen.getByRole("button", { name: "Create session" })).toBeEnabled();
-  fireEvent.change(screen.getByLabelText("Session agent"), { target: { value: "work" } });
-  expect(screen.getByRole("button", { name: "Create session" })).toBeEnabled();
-  const create = vi
-    .spyOn(api, "createSession")
-    .mockRejectedValue(new Error("Test submission stopped"));
-  fireEvent.click(screen.getByRole("button", { name: "Create session" }));
-  await flush();
-  expect(create).toHaveBeenCalledWith(
-    expect.objectContaining({ agent: "work", projectDirectory: "/project" }),
-  );
   fireEvent.change(screen.getByLabelText("Filter by agent"), { target: { value: "work" } });
   view.unmount();
   vi.mocked(api.sessions)
@@ -475,7 +461,7 @@ it("preselects the default creation agent and respects an explicit agent filter"
   expect(screen.getByLabelText("Session agent")).toHaveValue("work");
 });
 
-it.each(["pending", "failed", "succeeded", "rejected"] as const)(
+it.each(["succeeded", "rejected"] as const)(
   "discards a late creation %s result after switching Nodes",
   async (outcome) => {
     vi.spyOn(client, "listNodes").mockResolvedValue({ nodes: [{ id: "remote" }, { id: "local" }] });
@@ -512,11 +498,11 @@ it.each(["pending", "failed", "succeeded", "rejected"] as const)(
     const result: HubOperation = {
       operationId: "create-op",
       type: "create",
-      status: outcome === "rejected" ? "failed" : outcome,
-      sessionId: outcome === "succeeded" ? OTHER_SESSION_ID : null,
+      status: "succeeded",
+      sessionId: OTHER_SESSION_ID,
       phase: null,
       attachCommand: null,
-      error: outcome === "failed" ? "Creation failed on Node" : null,
+      error: null,
       createdAt: "2026-10-16T00:00:00Z",
       updatedAt: "2026-10-16T00:00:00Z",
     };

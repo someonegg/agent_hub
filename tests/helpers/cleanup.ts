@@ -1,8 +1,4 @@
-import { afterEach } from "vitest";
-
 const cleanups: (() => void | Promise<void>)[] = [];
-
-afterEach(runCleanups);
 
 export async function runCleanups(): Promise<void> {
   const errors: unknown[] = [];

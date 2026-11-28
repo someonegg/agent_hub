@@ -132,6 +132,14 @@ it("gates routes, keeps CSP on the viewer, and returns 404 after deletion", asyn
       expect((await fetch(origin + `/api/v1/diffs/${entry.id}`, { method: "DELETE" })).status).toBe(
         204,
       );
+      expect(
+        (
+          await fetch(origin + `/api/v1/diffs/${entry.id}`, {
+            method: "DELETE",
+            headers: { origin: "https://evil.example" },
+          })
+        ).status,
+      ).toBe(403);
       for (const path of [entry.url, `/api/v1/diffs/${entry.id}`, "/api/v1/diffs"])
         expect((await fetch(origin + path)).status).toBe(404);
     }
@@ -210,7 +218,6 @@ it("serves pages and deletes resources without loading diff bodies", async () =>
   const readBody = vi
     .spyOn(DiffStore.prototype, "get")
     .mockRejectedValue(new Error("Unexpected body read"));
-  cleanupAfterEach(() => readBody.mockRestore());
   const client = join(root, "client");
   await mkdir(client);
   await writeFile(join(client, "index.html"), "hub");

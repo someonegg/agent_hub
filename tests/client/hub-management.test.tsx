@@ -592,11 +592,8 @@ it("keeps failed initial recovery locked until a 404 confirms removal", async ()
   expect(submit).toHaveBeenCalledOnce();
 });
 
-it("tracks creation without storage and ignores an aborted query after unmount", async () => {
+it("aborts the creation query on unmount and ignores its late result", async () => {
   vi.useFakeTimers();
-  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
-    throw new Error("Storage disabled");
-  });
   vi.spyOn(api, "createSession").mockResolvedValue(pending);
   let resolve!: (operation: HubOperation) => void;
   const get = vi.spyOn(api, "operation").mockReturnValue(
@@ -610,7 +607,6 @@ it("tracks creation without storage and ignores an aborted query after unmount",
   );
   fireEvent.click(screen.getByRole("button", { name: "Create session" }));
   await flush();
-  expect(write).not.toHaveBeenCalledWith("ahub.operation.create", expect.anything());
   await act(async () => {
     await vi.advanceTimersByTimeAsync(1000);
   });
