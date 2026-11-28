@@ -157,12 +157,14 @@
   font-size: inherit;
   font-weight: var(--weight-medium);
   line-height: var(--leading-ui);
+  overflow-wrap: anywhere;
 }
 .user-input-header {
   margin: 0;
   color: var(--trace-color);
   font-size: var(--text-small);
   text-transform: none;
+  overflow-wrap: anywhere;
 }
 .user-input-options {
   display: grid;
@@ -180,6 +182,10 @@
   border: 1px solid var(--mist);
   border-radius: var(--radius-panel);
   background: var(--paper);
+}
+.user-input-options li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .user-input-options strong {
   font-weight: var(--weight-medium);
@@ -211,6 +217,7 @@
   color: var(--current);
   font-size: var(--text-small);
   text-transform: none;
+  overflow-wrap: anywhere;
 }
 .user-input-freeform p {
   margin: 0.3rem 0 0;
@@ -220,6 +227,7 @@
 .user-input-unavailable {
   color: var(--ink-soft);
   font-size: var(--text-small);
+  overflow-wrap: anywhere;
 }
 .truncated {
   color: #7a4f2d;

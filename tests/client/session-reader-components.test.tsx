@@ -259,6 +259,34 @@ describe("session reader components", () => {
     expect(document.querySelector("[node]")).toBeNull();
   });
 
+  it("renders safe <br> line breaks inside markdown tables while still skipping other raw HTML", () => {
+    render(
+      <MessageItem
+        item={{
+          kind: "message",
+          id: "message-table-br",
+          ordinal: 12,
+          timestamp: null,
+          role: "assistant",
+          phase: "response",
+          itemType: null,
+          markdown: [
+            "| Field | Notes |",
+            "| --- | --- |",
+            "| plain | line 1<br>line 2<br />line 3<BR/>line 4 |",
+            "| safe | keep `<br>` in code and skip <br onclick='alert(1)'><b>raw</b> |",
+          ].join("\n"),
+        }}
+      />,
+    );
+
+    const cells = screen.getAllByRole("cell");
+    expect(cells[1]?.querySelectorAll("br")).toHaveLength(3);
+    expect(cells[3]?.querySelectorAll("br")).toHaveLength(0);
+    expect(cells[3]?.querySelector("b")).toBeNull();
+    expect(cells[3]?.querySelector("code")).toHaveTextContent("<br>");
+  });
+
   it("shows code block language headers and copies raw code without a trailing newline", async () => {
     const user = userEvent.setup();
     render(
