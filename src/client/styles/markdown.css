@@ -299,6 +299,7 @@
 
 .markdown-scroll-table {
   border: 0;
+  container-type: inline-size;
 }
 .markdown-scroll-table table {
   width: max-content;
@@ -306,10 +307,12 @@
   border-collapse: collapse;
 }
 .markdown-scroll-table :is(th, td) {
+  max-width: clamp(12rem, 45cqi, 30rem);
   padding: var(--space-small) 0.75rem;
   border: 1px solid var(--mist);
   text-align: start;
   vertical-align: top;
+  overflow-wrap: break-word;
 }
 .markdown-scroll-table th {
   background: var(--paper-deep);

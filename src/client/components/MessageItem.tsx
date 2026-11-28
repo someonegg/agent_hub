@@ -24,6 +24,7 @@ import { MarkdownCodeBlock } from "./MarkdownCodeBlock";
 import { MarkdownLinkAddress } from "./MarkdownLinkAddress";
 
 const SAFE_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+const LINE_BREAK_HTML = /^<br\s*\/?>$/i;
 const REMARK_PLUGINS = [
   remarkGfm,
   remarkCjkFriendly,
@@ -46,6 +47,14 @@ const MARKDOWN_HANDLERS = {
     const result = defaultHandlers.code(state, node);
     codeBlocks.set(result, { code: node.value, language: node.lang?.trim() || null });
     return result;
+  },
+  html(...[state, node]: Parameters<typeof defaultHandlers.html>) {
+    if (LINE_BREAK_HTML.test(node.value.trim())) {
+      const result = { type: "element" as const, tagName: "br", properties: {}, children: [] };
+      state.patch(node, result);
+      return result;
+    }
+    return defaultHandlers.html(state, node);
   },
   link(...[state, node]: Parameters<typeof defaultHandlers.link>) {
     const result = defaultHandlers.link(state, node);
