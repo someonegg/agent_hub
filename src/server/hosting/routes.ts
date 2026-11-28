@@ -62,7 +62,9 @@ export function hostingRoutes(directory?: string, options: ApiRouterOptions = {}
       response.setHeader("Cache-Control", "private, no-store");
       const match = /^\/api\/v1\/diffs\/([^/]+)$/.exec(path);
       const entry = diffs && match && request.method === "GET" ? await diffs.get(match[1]) : null;
-      if (entry) {
+      if (diffs && match && request.method === "DELETE" && !isSameOrigin(request)) {
+        sendJson(response, 403, crossOriginError);
+      } else if (entry) {
         sendJson(response, 200, entry);
       } else if (
         diffs &&
@@ -70,10 +72,6 @@ export function hostingRoutes(directory?: string, options: ApiRouterOptions = {}
         (head || request.method === "DELETE") &&
         (await diffs.exists(match[1]))
       ) {
-        if (!head && !isSameOrigin(request)) {
-          sendJson(response, 403, crossOriginError);
-          return true;
-        }
         if (!head) await diffs.delete(match[1]);
         response.statusCode = head ? 200 : 204;
         response.end();

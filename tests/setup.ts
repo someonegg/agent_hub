@@ -1,8 +1,15 @@
 import { afterEach, vi } from "vitest";
 
+import { runCleanups } from "./helpers/cleanup.js";
 import { cleanupTempDirectories } from "./helpers/temp-directories.js";
 
-afterEach(cleanupTempDirectories);
+afterEach(async () => {
+  try {
+    await runCleanups();
+  } finally {
+    await cleanupTempDirectories();
+  }
+});
 // Node-only suites do not need the DOM matchers or React renderer.
 if (typeof window !== "undefined") {
   // jsdom has no scrolling implementation; keep scroll-container interactions observable.

@@ -67,6 +67,7 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
     await writeFile(join(directory, "tracked.txt"), "base");
     git("add", "tracked.txt");
     git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "base");
+    const launchHead = git("rev-parse", "HEAD");
     await mkdir(agent);
     const command = join(root, "agy");
     await writeFile(command, fakeAgy(agent));
@@ -106,7 +107,7 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
     );
     const worktree = join(homeDirectory, "worktrees", created.operationId);
     expect(git("worktree", "list", "--porcelain")).toContain(
-      `branch refs/heads/ahub/${created.operationId}`,
+      `worktree ${worktree}\nHEAD ${launchHead}\ndetached`,
     );
     await expect(access(join(worktree, "tracked.txt"))).resolves.toBeUndefined();
     const sessionId = created.sessionId!;

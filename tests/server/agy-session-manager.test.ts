@@ -101,7 +101,7 @@ it("rejects worktree creation outside Git before launching tmux", async () => {
   expect(launch).not.toHaveBeenCalled();
 });
 
-it("creates a canonicalized worktree and retains it on launch failure", async () => {
+it("creates a canonicalized detached worktree and retains it on launch failure", async () => {
   const { directory, tmux, manager } = await setup(true);
   const repo = join(directory, "repo");
   await mkdir(repo);
@@ -118,6 +118,7 @@ it("creates a canonicalized worktree and retains it on launch failure", async ()
     "base",
     "--allow-empty",
   );
+  const branches = git("branch", "--list");
   const worktree = join(await realpath(directory), ".agent-hub", "worktrees", operationId);
   const error = new SessionLaunchError("not_started", "tmux launch failed");
   vi.stubEnv("HOME", directory);
@@ -134,8 +135,10 @@ it("creates a canonicalized worktree and retains it on launch failure", async ()
     await expect(
       manager.launch({ ...launchOptions, workingDirectory: repo, worktree: true }),
     ).rejects.toBe(error);
-    expect(git("worktree", "list", "--porcelain")).toContain(operationId);
-    expect(git("branch", "--list", `ahub/${operationId}`)).toContain(`ahub/${operationId}`);
+    expect(git("worktree", "list", "--porcelain")).toContain(
+      `worktree ${worktree}\nHEAD ${git("rev-parse", "HEAD")}\ndetached`,
+    );
+    expect(git("branch", "--list")).toBe(branches);
   } finally {
     vi.unstubAllEnvs();
   }
