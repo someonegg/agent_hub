@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { expect, it, vi } from "vitest";
@@ -62,13 +62,13 @@ it.each([
   },
 );
 
-it("validates identities and does not support archive", async () => {
+it("validates session identities", async () => {
   const { manager } = await setup();
   await expect(manager.launch({ ...launchOptions, resumeNativeId: "bad" })).rejects.toThrow(
     "Invalid resume identity",
   );
   await expect(manager.delete("../x")).rejects.toThrow("Invalid Antigravity session identity");
-  expect("archive" in manager).toBe(false);
+  await expect(manager.archive("../x")).rejects.toThrow("Invalid Antigravity session identity");
 });
 
 it("deletes UUID-named files best-effort without touching the summary database", async () => {
@@ -90,4 +90,36 @@ it("deletes UUID-named files best-effort without touching the summary database",
   for (const path of paths.slice(0, -1))
     await expect(access(join(directory, path))).rejects.toThrow();
   await expect(access(join(directory, paths.at(-1)!))).resolves.toBeUndefined();
+});
+
+it("keeps archived history when an associated file cannot be removed", async () => {
+  const { directory, manager } = await setup();
+  const transcript = join(
+    directory,
+    "brain",
+    nativeId,
+    ".system_generated",
+    "logs",
+    "transcript_full.jsonl",
+  );
+  const blocked = join(directory, "conversations", `${nativeId}.db`);
+  const annotation = join(directory, "annotations", `${nativeId}.pbtxt`);
+  const archive = join(directory, "ahub_archived_sessions", `${nativeId}.jsonl`);
+  await mkdir(join(transcript, ".."), { recursive: true });
+  await mkdir(blocked, { recursive: true });
+  await mkdir(join(annotation, ".."));
+  await writeFile(transcript, "history");
+  await writeFile(annotation, "annotation");
+
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  try {
+    await manager.archive(nativeId);
+    expect(warn).toHaveBeenCalledWith(expect.any(String), blocked, expect.any(Error));
+    expect(await readFile(archive, "utf8")).toBe("history");
+    await expect(access(annotation)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(access(transcript)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(access(blocked)).resolves.toBeUndefined();
+  } finally {
+    warn.mockRestore();
+  }
 });

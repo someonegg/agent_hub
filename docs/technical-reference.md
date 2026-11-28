@@ -24,11 +24,11 @@ use each returned `nextAfter` as the next request's `after`.
 
 ### Discovery and caching
 
-| Runtime     | Sources                                                                                                                     |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------- |
-| Codex       | `rollout-*.jsonl` under `sessions/` and `archived_sessions/`; advisory titles from `session_index.jsonl`                    |
-| Claude      | `projects/<project>/<UUID>.jsonl`; main sessions only, excluding native shell commands/output                               |
-| Antigravity | `brain/<UUID>/.system_generated/logs/transcript_full.jsonl`; only sessions whose first user message is an Agent Hub binding |
+| Runtime     | Sources                                                                                                                                                               |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codex       | `rollout-*.jsonl` under `sessions/` and `archived_sessions/`; advisory titles from `session_index.jsonl`                                                              |
+| Claude      | `projects/<project>/<UUID>.jsonl` and `ahub_archived_sessions/<UUID>.jsonl`; main sessions only, excluding native shell commands/output                               |
+| Antigravity | `brain/<UUID>/.system_generated/logs/transcript_full.jsonl` and `ahub_archived_sessions/<UUID>.jsonl`; only sessions whose first user message is an Agent Hub binding |
 
 Codex follows trusted-directory symlinks through depth 8 (root = 0), without
 cycle detection or real-path deduplication. Logical paths determine order/cache keys.
@@ -343,9 +343,8 @@ share session occupancy: identical lifecycle operations coalesce, conflicts retu
 ### Execution and confirmation
 
 Delete is required; archive is optional. Public agent archive capability derives from
-method presence; Codex supports archive and Claude does not. Unsupported archive
-HTTP requests return `409 operation_not_supported`; lifecycle execution repeats
-the check before resolving targets, exiting, or invoking native effects.
+method presence. Unsupported archive HTTP requests return `409 operation_not_supported`;
+lifecycle execution repeats the check before resolving targets, exiting, or invoking native effects.
 
 #### Create and resume
 
@@ -386,8 +385,14 @@ See [ADR-112](adr/0112-separate-exit-from-history-management.md).
 #### Archive and delete
 
 Archive refreshes the source; already archived succeeds. Otherwise it validates
-native identity, exits, invokes native archive once (25-second command limit),
+native identity, exits, invokes the owning adapter once (25-second execution limit),
 and confirms archive state within 30 seconds.
+
+Claude and Antigravity move the main JSONL to the flat
+`ahub_archived_sessions/<UUID>.jsonl` directory under the adapter's configured
+home. The same source reads this directory as archived history. After moving
+the file, the adapter attempts to remove the session's remaining native files
+within its delete scope. Permanent deletion also removes the archived JSONL.
 
 Delete runs Exit validation and sequence, then permanently removes history through
 the owning adapter (Codex: `codex delete <UUID> --force`; Claude: remove the
@@ -406,11 +411,11 @@ the exit flow. See [operation-service.ts](../src/server/management/operation-ser
 
 Adapters require authenticated runtime CLIs on `PATH`:
 
-| Runtime     | Create and resume                                                                      | Launch options                                                                            | History management                                                                                                                         |
-| ----------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                                    | `codex archive <UUID>` and `codex delete <UUID> --force`                                                                                   |
-| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions`      | The adapter deletes local session files directly; no native archive/delete command is invoked                                              |
-| Antigravity | Interactive `agy -i <binding>` and `agy --resume <UUID> -i <binding>`                  | Worktree is silently ignored; Auto: `--mode auto`; YOLO: `--dangerously-skip-permissions` | No archive; delete removes only UUID-named files under `brain/`, `conversations/`, `annotations/`, and `presence/`, never shared databases |
+| Runtime     | Create and resume                                                                      | Launch options                                                                            | History management                                                                                                                   |
+| ----------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Codex       | Interactive `codex` and `codex resume <UUID>`, both with `--no-daemon --no-alt-screen` | `--worktree`; Auto: `--approve-for-me`; YOLO: `--yolo`                                    | `codex archive <UUID>` and `codex delete <UUID> --force`                                                                             |
+| Claude Code | Interactive `claude` and `claude --resume <UUID>`                                      | `--worktree`; Auto: `--permission-mode auto`; YOLO: `--dangerously-skip-permissions`      | Local file archive and delete; cleanup covers the session's `subagents` and the per-session directory if empty                       |
+| Antigravity | Interactive `agy -i <binding>` and `agy --resume <UUID> -i <binding>`                  | Worktree is silently ignored; Auto: `--mode auto`; YOLO: `--dangerously-skip-permissions` | Local file archive and delete; cleanup covers only UUID-named data under `brain/`, `conversations/`, `annotations/`, and `presence/` |
 
 Implementations: [Codex](../src/server/adapters/codex/session-manager.ts),
 [Claude](../src/server/adapters/claude/session-manager.ts),

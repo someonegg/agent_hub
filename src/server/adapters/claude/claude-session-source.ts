@@ -10,6 +10,7 @@ import type {
   SourceBindingEvent,
   SourceSessionEntry,
 } from "../../source/session-source.js";
+import { discoverArchivedFiles, readSessionFiles } from "../shared/file-archive.js";
 import { isExpectedIoError as expectedIo } from "../shared/io-errors.js";
 import { CheckpointedJsonlDecoder, type JsonlCheckpoint } from "../shared/jsonl-decoder.js";
 import { MAX_SESSION_DIAGNOSTICS } from "../shared/limits.js";
@@ -71,97 +72,99 @@ export class ClaudeSessionSource implements SessionSource {
     const rejected = new Map<string, RejectedCacheEntry>();
     const seen = new Set<string>();
     const projects = join(this.directory, "projects");
-    try {
-      const candidates = await discoverClaudeFiles(projects, warn);
-      candidates.sort((a, b) =>
+    const candidates = [
+      ...(await readSessionFiles(
+        () => discoverClaudeFiles(projects, warn),
+        warn,
+        "Claude projects directory",
+      )),
+      ...(await readSessionFiles(
+        () => discoverArchivedFiles(this.directory, validClaudeId),
+        warn,
+        "Claude archive directory",
+      )),
+    ];
+    candidates.sort(
+      (a, b) =>
+        Number(a.archived) - Number(b.archived) ||
         acceptedPathOrder(
           this.#cache,
           relative(this.directory, a.path),
           relative(this.directory, b.path),
         ),
-      );
-      for (const { path, nativeId } of candidates) {
-        if (seen.has(nativeId)) {
-          warn({
-            code: "duplicate_native_session_id",
-            severity: "warning",
-            message: "Duplicate Claude session file ignored",
-            ordinal: null,
-          });
-          continue;
-        }
-        const key = relative(this.directory, path);
-        const old = this.#cache.get(key) ?? this.#rejected.get(key);
-        let decoded;
-        let fingerprint: FileFingerprint;
-        try {
-          const info = await stat(path);
-          fingerprint = { sourceRelativePath: key, size: info.size, mtimeMs: info.mtimeMs };
-          if (old && sameFingerprint(old.fingerprint, fingerprint)) {
-            if (old.entry !== undefined) {
-              next.set(key, old);
-              seen.add(nativeId);
-            } else {
-              rejected.set(key, old);
-              warn(...old.state.diagnostics);
-            }
-            continue;
-          }
-          const started = performance.now();
-          decoded = await this.#decoder.decode({ path }, old?.checkpoint);
-          this.#telemetry.decodeMs += performance.now() - started;
-          this.#telemetry[decoded.mode === "append" ? "appendFiles" : "fullFiles"]++;
-          this.#telemetry.probeBytes += decoded.telemetry.probeBytes;
-          this.#telemetry.decodeBytes += decoded.telemetry.decodeBytes;
-        } catch (error) {
-          if (!expectedIo(error)) throw error;
-          warn({
-            code: "session_unavailable",
-            severity: "warning",
-            message: "Claude session could not be read",
-            ordinal: null,
-          });
-          continue;
-        }
-        const append = decoded.mode === "append" && !!old;
-        const base = append ? old.state : createClaudeState(nativeId);
-        const parsedBindings: ParsedClaudeBindingRecord[] = [];
-        const started = performance.now();
-        const state = appendClaudeRecords(
-          base,
-          decoded.records,
-          claudeDecoderDiagnostics(decoded.diagnostics),
-          (binding) => parsedBindings.push(binding),
-        );
-        this.#telemetry.normalizeMs += performance.now() - started;
-        if (state.identityConflict) {
-          warn(...state.diagnostics);
-          rejected.set(key, { fingerprint, checkpoint: decoded.checkpoint, state });
-          continue;
-        }
-        const entry =
-          old?.entry !== undefined && old.state === state
-            ? old.entry
-            : materializeClaudeSession(state, nativeId, this.descriptor);
-        const localId = entry.localId;
-        next.set(key, {
-          fingerprint,
-          checkpoint: decoded.checkpoint,
-          state,
-          entry,
-        });
-        seen.add(nativeId);
-        bindings.push(...parsedBindings.map((event) => ({ ...event, localId })));
-      }
-    } catch (error) {
-      if (!expectedIo(error)) throw error;
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+    );
+    for (const { path, nativeId, archived } of candidates) {
+      if (seen.has(nativeId)) {
         warn({
-          code: "source_unavailable",
+          code: "duplicate_native_session_id",
           severity: "warning",
-          message: "Claude projects directory could not be read",
+          message: "Duplicate Claude session file ignored",
           ordinal: null,
         });
+        continue;
+      }
+      const key = relative(this.directory, path);
+      const old = this.#cache.get(key) ?? this.#rejected.get(key);
+      let decoded;
+      let fingerprint: FileFingerprint;
+      try {
+        const info = await stat(path);
+        fingerprint = { sourceRelativePath: key, size: info.size, mtimeMs: info.mtimeMs };
+        if (old && sameFingerprint(old.fingerprint, fingerprint)) {
+          if (old.entry !== undefined) {
+            next.set(key, old);
+            seen.add(nativeId);
+          } else {
+            rejected.set(key, old);
+            warn(...old.state.diagnostics);
+          }
+          continue;
+        }
+        const started = performance.now();
+        decoded = await this.#decoder.decode({ path }, old?.checkpoint);
+        this.#telemetry.decodeMs += performance.now() - started;
+        this.#telemetry[decoded.mode === "append" ? "appendFiles" : "fullFiles"]++;
+        this.#telemetry.probeBytes += decoded.telemetry.probeBytes;
+        this.#telemetry.decodeBytes += decoded.telemetry.decodeBytes;
+      } catch (error) {
+        if (!expectedIo(error)) throw error;
+        warn({
+          code: "session_unavailable",
+          severity: "warning",
+          message: "Claude session could not be read",
+          ordinal: null,
+        });
+        continue;
+      }
+      const append = decoded.mode === "append" && !!old;
+      const base = append ? old.state : createClaudeState(nativeId);
+      const parsedBindings: ParsedClaudeBindingRecord[] = [];
+      const started = performance.now();
+      const state = appendClaudeRecords(
+        base,
+        decoded.records,
+        claudeDecoderDiagnostics(decoded.diagnostics),
+        (binding) => parsedBindings.push(binding),
+      );
+      this.#telemetry.normalizeMs += performance.now() - started;
+      if (state.identityConflict) {
+        warn(...state.diagnostics);
+        rejected.set(key, { fingerprint, checkpoint: decoded.checkpoint, state });
+        continue;
+      }
+      const entry =
+        old?.entry !== undefined && old.state === state
+          ? old.entry
+          : materializeClaudeSession(state, nativeId, this.descriptor, archived);
+      const localId = entry.localId;
+      next.set(key, {
+        fingerprint,
+        checkpoint: decoded.checkpoint,
+        state,
+        entry,
+      });
+      seen.add(nativeId);
+      bindings.push(...parsedBindings.map((event) => ({ ...event, localId })));
     }
     this.#cache = next;
     this.#rejected = rejected;
@@ -192,7 +195,7 @@ async function discoverClaudeFiles(
   projects: string,
   warn: (...items: readonly DomainDiagnostic[]) => void,
 ) {
-  const candidates: { path: string; nativeId: string }[] = [];
+  const candidates: { path: string; nativeId: string; archived: boolean }[] = [];
   for (const project of (await readdir(projects, { withFileTypes: true })).sort((a, b) =>
     a.name.localeCompare(b.name),
   )) {
@@ -214,7 +217,7 @@ async function discoverClaudeFiles(
       if (!file.isFile() || !file.name.endsWith(".jsonl")) continue;
       const nativeId = file.name.slice(0, -6);
       if (!validClaudeId(nativeId)) continue;
-      candidates.push({ path: join(projects, project.name, file.name), nativeId });
+      candidates.push({ path: join(projects, project.name, file.name), nativeId, archived: false });
     }
   }
   return candidates;
@@ -224,6 +227,7 @@ function materializeClaudeSession(
   state: ClaudeState,
   nativeId: string,
   descriptor: SessionSourceDescriptor,
+  archived: boolean,
 ): SourceSessionEntry {
   const projectDirectory = state.project ?? state.firstCwd;
   const origin = {
@@ -248,7 +252,7 @@ function materializeClaudeSession(
       taskName: state.taskName,
       createdAt: state.createdAt,
       updatedAt: state.updatedAt,
-      archived: false,
+      archived,
       warningCount: state.diagnostics.length,
       diagnostics: state.diagnostics,
     },

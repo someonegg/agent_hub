@@ -10,6 +10,7 @@ import type {
   SourceBindingEvent,
   SourceSessionEntry,
 } from "../../source/session-source.js";
+import { discoverArchivedFiles, readSessionFiles } from "../shared/file-archive.js";
 import { isExpectedIoError as expectedIo } from "../shared/io-errors.js";
 import {
   CheckpointedJsonlDecoder,
@@ -31,6 +32,7 @@ import {
   parseAgyBindingRecord,
   type ParsedAgyBindingRecord,
 } from "./interaction.js";
+import { agyTranscriptPath } from "./paths.js";
 import {
   agyDecoderDiagnostics,
   type AgyState,
@@ -99,97 +101,107 @@ export class AgySessionSource implements SessionSource {
     const next = new Map<string, CacheEntry>();
     const rejected = new Map<string, FileFingerprint | null>();
     const seen = new Set<string>();
-    try {
-      const candidates = await discoverAgyFiles(join(this.directory, "brain"));
-      candidates.sort((a, b) =>
+    const candidates = [
+      ...(await readSessionFiles(
+        () => discoverAgyFiles(this.directory),
+        warn,
+        "Antigravity brain directory",
+      )),
+      ...(await readSessionFiles(
+        () => discoverArchivedFiles(this.directory, validAgyId),
+        warn,
+        "Antigravity archive directory",
+      )),
+    ];
+    candidates.sort(
+      (a, b) =>
+        Number(a.archived) - Number(b.archived) ||
         acceptedPathOrder(
           this.#cache,
           relative(this.directory, a.path),
           relative(this.directory, b.path),
         ),
-      );
-      for (const { path, nativeId } of candidates) {
-        if (seen.has(nativeId)) continue;
-        const key = relative(this.directory, path);
-        const oldAccepted = this.#cache.get(key);
-        const oldRejected = this.#rejected.get(key);
-        let decoded;
-        let fingerprint: FileFingerprint;
-        try {
-          const info = await stat(path);
-          if (oldRejected === null) {
-            rejected.set(key, null);
-            continue;
-          }
-          fingerprint = { sourceRelativePath: key, size: info.size, mtimeMs: info.mtimeMs };
-          if (oldAccepted && sameFingerprint(oldAccepted.fingerprint, fingerprint)) {
-            next.set(key, oldAccepted);
-            seen.add(nativeId);
-            continue;
-          }
-          if (oldRejected && sameFingerprint(oldRejected, fingerprint)) {
-            rejected.set(key, oldRejected);
-            continue;
-          }
-          let headDecided = false;
-          const started = performance.now();
-          decoded = oldAccepted
-            ? await this.#decoder.decode({ path }, oldAccepted.checkpoint)
-            : await this.#decoder.decode(
-                { path },
-                undefined,
-                createHeadCheck(info.size, () => {
-                  headDecided = true;
-                }),
-              );
-          this.#telemetry.decodeMs += performance.now() - started;
-          this.#telemetry.probeBytes += decoded.telemetry.probeBytes;
-          if (decoded.mode === "stopped") {
-            rejected.set(key, headDecided ? null : fingerprint);
-            continue;
-          }
-          this.#telemetry[decoded.mode === "append" ? "appendFiles" : "fullFiles"]++;
-          this.#telemetry.decodeBytes += decoded.telemetry.decodeBytes;
-        } catch (error) {
-          if (!expectedIo(error)) throw error;
-          if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
-          warn({
-            code: "session_unavailable",
-            severity: "warning",
-            message: "Antigravity session could not be read",
-            ordinal: null,
-          });
-          continue;
-        }
-        const base =
-          decoded.mode === "append" && oldAccepted ? oldAccepted.state : createAgyState(nativeId);
-        const parsedBindings: ParsedAgyBindingRecord[] = [];
-        const started = performance.now();
-        const state = appendAgyRecords(
-          base,
-          decoded.records,
-          agyDecoderDiagnostics(decoded.diagnostics),
-          (binding) => parsedBindings.push(binding),
-        );
-        this.#telemetry.normalizeMs += performance.now() - started;
-        const entry =
-          oldAccepted !== undefined && oldAccepted.state === state
-            ? oldAccepted.entry
-            : materializeAgySession(state, this.descriptor);
-        const localId = entry.localId;
-        next.set(key, { fingerprint, checkpoint: decoded.checkpoint, state, entry });
-        seen.add(nativeId);
-        bindings.push(...parsedBindings.map((event) => ({ ...event, localId })));
-      }
-    } catch (error) {
-      if (!expectedIo(error)) throw error;
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT")
+    );
+    for (const { path, nativeId, archived } of candidates) {
+      if (seen.has(nativeId)) {
         warn({
-          code: "source_unavailable",
+          code: "duplicate_native_session_id",
           severity: "warning",
-          message: "Antigravity brain directory could not be read",
+          message: "Duplicate Antigravity session file ignored",
           ordinal: null,
         });
+        continue;
+      }
+      const key = relative(this.directory, path);
+      const oldAccepted = this.#cache.get(key);
+      const oldRejected = this.#rejected.get(key);
+      let decoded;
+      let fingerprint: FileFingerprint;
+      try {
+        const info = await stat(path);
+        if (oldRejected === null) {
+          rejected.set(key, null);
+          continue;
+        }
+        fingerprint = { sourceRelativePath: key, size: info.size, mtimeMs: info.mtimeMs };
+        if (oldAccepted && sameFingerprint(oldAccepted.fingerprint, fingerprint)) {
+          next.set(key, oldAccepted);
+          seen.add(nativeId);
+          continue;
+        }
+        if (oldRejected && sameFingerprint(oldRejected, fingerprint)) {
+          rejected.set(key, oldRejected);
+          continue;
+        }
+        let headDecided = false;
+        const started = performance.now();
+        decoded = oldAccepted
+          ? await this.#decoder.decode({ path }, oldAccepted.checkpoint)
+          : await this.#decoder.decode(
+              { path },
+              undefined,
+              createHeadCheck(info.size, () => {
+                headDecided = true;
+              }),
+            );
+        this.#telemetry.decodeMs += performance.now() - started;
+        this.#telemetry.probeBytes += decoded.telemetry.probeBytes;
+        if (decoded.mode === "stopped") {
+          rejected.set(key, headDecided ? null : fingerprint);
+          continue;
+        }
+        this.#telemetry[decoded.mode === "append" ? "appendFiles" : "fullFiles"]++;
+        this.#telemetry.decodeBytes += decoded.telemetry.decodeBytes;
+      } catch (error) {
+        if (!expectedIo(error)) throw error;
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        warn({
+          code: "session_unavailable",
+          severity: "warning",
+          message: "Antigravity session could not be read",
+          ordinal: null,
+        });
+        continue;
+      }
+      const base =
+        decoded.mode === "append" && oldAccepted ? oldAccepted.state : createAgyState(nativeId);
+      const parsedBindings: ParsedAgyBindingRecord[] = [];
+      const started = performance.now();
+      const state = appendAgyRecords(
+        base,
+        decoded.records,
+        agyDecoderDiagnostics(decoded.diagnostics),
+        (binding) => parsedBindings.push(binding),
+      );
+      this.#telemetry.normalizeMs += performance.now() - started;
+      const entry =
+        oldAccepted !== undefined && oldAccepted.state === state
+          ? oldAccepted.entry
+          : materializeAgySession(state, this.descriptor, archived);
+      const localId = entry.localId;
+      next.set(key, { fingerprint, checkpoint: decoded.checkpoint, state, entry });
+      seen.add(nativeId);
+      bindings.push(...parsedBindings.map((event) => ({ ...event, localId })));
     }
     this.#cache = next;
     this.#rejected = rejected;
@@ -217,15 +229,17 @@ export async function createAgySessionSource(
   return new AgySessionSource(directory, `agy-jsonl\0${directory}`, options);
 }
 
-async function discoverAgyFiles(brain: string) {
-  const candidates: { path: string; nativeId: string }[] = [];
+async function discoverAgyFiles(home: string) {
+  const brain = join(home, "brain");
+  const candidates: { path: string; nativeId: string; archived: boolean }[] = [];
   for (const entry of (await readdir(brain, { withFileTypes: true })).sort((a, b) =>
     a.name.localeCompare(b.name),
   )) {
     if (!entry.isDirectory() || !validAgyId(entry.name)) continue;
     candidates.push({
-      path: join(brain, entry.name, ".system_generated", "logs", "transcript_full.jsonl"),
+      path: agyTranscriptPath(home, entry.name),
       nativeId: entry.name,
+      archived: false,
     });
   }
   return candidates;
@@ -234,6 +248,7 @@ async function discoverAgyFiles(brain: string) {
 function materializeAgySession(
   state: AgyState,
   descriptor: SessionSourceDescriptor,
+  archived: boolean,
 ): SourceSessionEntry {
   const { nativeId } = state;
   const origin = {
@@ -255,7 +270,7 @@ function materializeAgySession(
       taskName: state.taskName,
       createdAt: state.createdAt,
       updatedAt: state.updatedAt,
-      archived: false,
+      archived,
       warningCount: state.diagnostics.length,
       diagnostics: state.diagnostics,
     },

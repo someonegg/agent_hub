@@ -19,7 +19,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
     ...fs,
     readdir: async (...args: Parameters<typeof fs.readdir>) => {
       if (
-        hooks.failure?.operation === "readdir" ||
+        (hooks.failure?.operation === "readdir" && String(args[0]).endsWith("/projects")) ||
         (hooks.failure?.operation === "project" && String(args[0]).endsWith("/project"))
       )
         throw hooks.failure.error;

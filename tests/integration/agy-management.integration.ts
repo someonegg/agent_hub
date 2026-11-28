@@ -98,19 +98,11 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
     });
     expect(await active.sessions.messages(sessionId, {})).toMatchObject({ items: [] });
     expect((await active.sessions.list()).agents).toEqual([
-      { nickname: "agy", runtimeName: "Antigravity", management: { archive: false } },
+      { nickname: "agy", runtimeName: "Antigravity", management: { archive: true } },
     ]);
 
     await active.interaction.sendMessage(sessionId, "Say hello");
     await until(async () => (await messages(sessionId)).includes("Echo: Say hello"), "echo");
-
-    const archive = await fetch(`${base}/api/v1/sessions/${sessionId}/archive`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: "{}",
-    });
-    expect(archive.status).toBe(409);
-    expect(await archive.json()).toMatchObject({ error: { code: "operation_not_supported" } });
 
     await active.interaction.sendKeys(sessionId, ["interrupt"]);
     expect(await active.interaction.describe(sessionId)).toMatchObject({ state: "connected" });
@@ -148,8 +140,33 @@ it("runs the Antigravity lifecycle with a fake agy", async () => {
     expect(handoffNative).not.toBe(nativeId);
     expect(await messages(handoffId)).not.toContain("ahub-bind:");
 
+    const archive = await fetch(`${base}/api/v1/sessions/${handoffId}/archive`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+    expect(archive.status).toBe(202);
+    await succeeded((await archive.json()).operationId);
+    expect((await active.sessions.managementSnapshot()).byId.get(handoffId)?.archived).toBe(true);
+    await expect(
+      access(join(agent, "ahub_archived_sessions", `${handoffNative}.jsonl`)),
+    ).resolves.toBeUndefined();
+    const reopened = await createAhub({
+      agents: [{ nickname: "agy", path: agent, adapter: "agy", command }],
+    });
+    try {
+      expect((await reopened.sessions.managementSnapshot()).byId.get(handoffId)?.archived).toBe(
+        true,
+      );
+    } finally {
+      reopened.close();
+    }
+
     await succeeded(active.operations.manage("delete", handoffId).operationId);
     await expect(access(join(agent, "brain", handoffNative))).rejects.toThrow();
+    await expect(
+      access(join(agent, "ahub_archived_sessions", `${handoffNative}.jsonl`)),
+    ).rejects.toThrow();
   } finally {
     hub?.close();
     vi.unstubAllEnvs();
