@@ -171,7 +171,7 @@ it("deletes UUID-named files best-effort without touching the summary database",
   await expect(access(join(directory, paths.at(-1)!))).resolves.toBeUndefined();
 });
 
-it("keeps archived history when an associated file cannot be removed", async () => {
+it("replaces existing archived history even when an associated file cannot be removed", async () => {
   const { directory, manager } = await setup();
   const transcript = join(
     directory,
@@ -187,8 +187,10 @@ it("keeps archived history when an associated file cannot be removed", async () 
   await mkdir(join(transcript, ".."), { recursive: true });
   await mkdir(blocked, { recursive: true });
   await mkdir(join(annotation, ".."));
+  await mkdir(join(archive, ".."));
   await writeFile(transcript, "history");
   await writeFile(annotation, "annotation");
+  await writeFile(archive, "stale history");
 
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   try {

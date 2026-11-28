@@ -95,6 +95,7 @@ describe("server command line", () => {
 
 it("resolves upload directories and rejects empty configuration", () => {
   const config = runnable(["--home-dir", "uploads with spaces"]);
+  expect(config.homeDirectory).toBe(resolve("uploads with spaces"));
   expect(config.uploadDirectory).toBe(resolve("uploads with spaces", "uploads"));
   expect(() => loadConfig(["--home-dir", " "])).toThrow("--home-dir must not be empty");
 });

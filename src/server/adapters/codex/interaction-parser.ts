@@ -1,4 +1,5 @@
 import { TASK_NAME_ERROR, validTaskName } from "../../../shared/task-name.js";
+import { validOperationId } from "../../domain/operation-id.js";
 import type {
   DomainAgentInteraction,
   InteractionBindingAttempt,
@@ -38,7 +39,7 @@ export function codexBindingAttemptsFrom(record: DecodedRecord): InteractionBind
   const found: InteractionBindingAttempt[] = [];
   for (const block of shellBlocks) {
     const lines = (block[1] ?? "").split("\n").map((line) => line.replace(/\r$/, ""));
-    found.push(...bindingAttempts(lines, record.ordinal, validOperationId));
+    found.push(...bindingAttempts(lines, record.ordinal));
   }
   const lastOpen = text.lastIndexOf("<user_shell_command>");
   const lastClose = text.lastIndexOf("</user_shell_command>");
@@ -72,8 +73,4 @@ export function codexBindingCommand(
   if (operationId !== undefined && !validOperationId(operationId))
     throw new Error("Invalid operation ID");
   return formatBindingCommand(operationId ?? "", projectDirectory, taskName ?? null);
-}
-
-function validOperationId(id: string): boolean {
-  return /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id);
 }

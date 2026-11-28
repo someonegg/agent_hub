@@ -25,7 +25,6 @@ export async function moveToArchive(source: string | undefined, destination: str
     throw new Error("Session history file not found");
   }
   if (!info.isFile()) throw new Error("Session history is not a regular file");
-  if (await lstatIfPresent(destination)) throw new Error("Session archive already exists");
   await mkdir(dirname(destination), { recursive: true });
   try {
     await rename(source, destination);
@@ -34,7 +33,6 @@ export async function moveToArchive(source: string | undefined, destination: str
     const temp = join(dirname(destination), `.${randomUUID()}.tmp`);
     try {
       await copyFile(source, temp, constants.COPYFILE_EXCL);
-      if (await lstatIfPresent(destination)) throw new Error("Session archive already exists");
       await rename(temp, destination);
     } catch (copyError) {
       await rm(temp, { force: true });

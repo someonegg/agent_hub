@@ -1,6 +1,7 @@
 import { isAbsolute } from "node:path";
 
 import { validTaskName } from "../../../shared/task-name.js";
+import { validOperationId } from "../../domain/operation-id.js";
 import { validProjectDirectory } from "../../domain/project-directory.js";
 import type { InteractionBindingAttempt } from "../../domain/session-domain.js";
 import { shellQuote } from "../../interaction/tmux-launcher.js";
@@ -21,7 +22,6 @@ export function formatBindingCommand(
 export function bindingAttempts(
   lines: readonly string[],
   ordinal: number,
-  validOperationId: (id: string) => boolean,
 ): InteractionBindingAttempt[] {
   const found: InteractionBindingAttempt[] = [];
   for (let index = 0; index < lines.length; index++) {

@@ -29,17 +29,19 @@ export async function createAhub({
   socket,
   interactionEnabled = true,
   trustWorkspaceForSession = false,
+  homeDirectory,
   uploads,
 }: {
   agents: readonly AgentConfig[];
   socket?: string;
   interactionEnabled?: boolean;
   trustWorkspaceForSession?: boolean;
+  homeDirectory?: string;
   uploads?: UploadCleanup;
 }) {
   const paneBindings = new PaneBindingManager();
   const adapters = await Promise.all(
-    agents.map((agent) => createAdapter(agent, socket, trustWorkspaceForSession)),
+    agents.map((agent) => createAdapter(agent, socket, trustWorkspaceForSession, homeDirectory)),
   );
   const sources = adapters.map((adapter) => adapter.source);
   const managers = new SessionManagerRegistry(sources[0]!.descriptor.agent);
@@ -108,6 +110,7 @@ async function createAdapter(
   agent: AgentConfig,
   socket: string | undefined,
   trustWorkspaceForSession: boolean,
+  homeDirectory: string | undefined,
 ): Promise<SessionAdapter> {
   switch (agent.adapter ?? "codex") {
     case "agy":
@@ -118,6 +121,7 @@ async function createAdapter(
           socket,
           agent.command,
           trustWorkspaceForSession,
+          homeDirectory,
         ),
       };
     case "claude":

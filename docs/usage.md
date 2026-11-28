@@ -195,7 +195,7 @@ for the full list.
 | Option                          | Default        | Purpose                                                                |
 | ------------------------------- | -------------- | ---------------------------------------------------------------------- |
 | `--port <port>`                 | `4173`         | Listen port; `0` selects a free port                                   |
-| `--home-dir <path>`             | `~/.agent-hub` | Hub data root containing `uploads/` and `hosting/`                     |
+| `--home-dir <path>`             | `~/.agent-hub` | Hub data root containing `uploads/`, `hosting/`, and `worktrees/`      |
 | `--hosting`                     | Disabled       | Serve published pages and diffs                                        |
 | `--tmux-socket <path>`          | tmux default   | Use a custom tmux socket                                               |
 | `--trust-workspace-for-session` | Disabled       | Override Codex and agy workspace trust for each local Create or Resume |

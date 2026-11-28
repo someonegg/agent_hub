@@ -53,6 +53,7 @@ export interface ServerConfig {
   interactionEnabled: boolean;
   trustWorkspaceForSession?: boolean;
   tmuxSocket?: string;
+  homeDirectory?: string;
   uploadDirectory?: string;
   hostingDirectory?: string;
 }
@@ -197,6 +198,7 @@ export function loadConfig(args: readonly string[] = process.argv.slice(2)): Com
       tls,
       interactionEnabled: true,
       trustWorkspaceForSession: values["trust-workspace-for-session"],
+      homeDirectory,
       ...(mode?.kind !== "hub" ? { uploadDirectory: resolve(homeDirectory, "uploads") } : {}),
       ...(values.hosting && mode?.kind !== "hub"
         ? { hostingDirectory: resolve(homeDirectory, "hosting") }
@@ -307,7 +309,7 @@ Options:
   --node-client-key <path>
                        PEM client key for HTTPS Nodes
   --hosting            Enable trusted same-origin static web hosting
-  --home-dir <path>    Hub data root (default: ~/.agent-hub; uploads/ and hosting/)
+  --home-dir <path>    Hub data root (default: ~/.agent-hub; uploads/, hosting/, worktrees/)
   --codex-agent <nickname=path>
                        Codex agent; repeat for multiple agents
   --claude-agent <nickname=path>
